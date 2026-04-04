@@ -1,0 +1,9 @@
+parameters:
+	level: 7
+	paths:
+		- backend
+		- site
+		- tests
+	tmpDir: runtime/phpstan
+	parallel:
+		maximumNumberOfProcesses: 1

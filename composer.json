@@ -1,0 +1,58 @@
+{
+    "name": "garner/cms",
+    "description": "Garner CMS core repository scaffold",
+    "license": "proprietary",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^12.0",
+        "league/commonmark": "^2.8",
+        "lemmon/validator": "^0.13.0",
+        "twig/twig": "^3.0"
+    },
+    "require-dev": {
+        "carthage-software/mago": "^1.18",
+        "ergebnis/composer-normalize": "^2.50",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Garner\\": "backend/src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "analyze": "vendor/bin/phpstan analyse --memory-limit=1G",
+        "check": [
+            "@platform-check",
+            "mago format --check",
+            "@analyze",
+            "@lint",
+            "@test"
+        ],
+        "format": "vendor/bin/mago format",
+        "lint": "vendor/bin/mago lint",
+        "platform-check": "composer check-platform-reqs",
+        "start": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -S localhost:8000 -t backend backend/server.php"
+        ],
+        "studio:build": "npm run studio:build",
+        "studio:dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npm run studio:dev"
+        ],
+        "studio:install": "npm install",
+        "studio:preview": [
+            "Composer\\Config::disableProcessTimeout",
+            "npm run studio:preview"
+        ],
+        "test": "phpunit"
+    }
+}

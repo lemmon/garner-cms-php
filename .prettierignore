@@ -1,0 +1,9 @@
+.references/
+.svelte-kit/
+frontend/.svelte-kit/
+frontend/build/
+frontend/node_modules/
+node_modules/
+runtime/
+storage/
+vendor/

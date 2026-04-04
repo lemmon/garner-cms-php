@@ -1,0 +1,9 @@
+{
+  "plugins": [
+    "prettier-plugin-svelte",
+    "prettier-plugin-packagejson",
+    "prettier-plugin-tailwindcss"
+  ],
+  "singleQuote": true,
+  "trailingComma": "es5"
+}

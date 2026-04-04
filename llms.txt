@@ -1,0 +1,154 @@
+# Garner CMS LLM Guide
+
+## What Garner Is
+
+Garner CMS is a custom PHP CMS with:
+
+- a PHP backend in `backend/`
+- a SvelteKit Studio app in `frontend/`
+- Tailwind-based Studio components in `frontend/src/lib/components/`
+- canonical content stored as JSON in `content/`
+- a derived SQLite index in `runtime/index.sqlite`
+- Twig as the public page templating engine
+
+Garner is file-native, not filesystem-shaped. The directory tree is not the public sitemap. URLs are derived from page metadata and indexed in SQLite.
+
+## Directory Responsibilities
+
+- `content/`: canonical content and page-owned files
+- `site/`: developer-authored source only
+- `storage/`: persistent app state
+- `runtime/`: disposable derived state
+- `vendor/`: Composer dependencies
+
+Never treat `site/` as a cache or runtime directory.
+
+## Content Model
+
+Each page lives at:
+
+```text
+content/pages/{id}/+page.json
+```
+
+Important page fields:
+
+- `id`: stable generated identifier
+- `parent_id`: nullable parent reference
+- `slug`: nullable path segment
+- `template`: runtime template/controller name
+- `status`: `draft`, `unlisted`, or `listed`
+- `fields`: plain JSON object with persisted content
+
+Path rules:
+
+- the configured home page resolves to `/`
+- otherwise use `slug` when present
+- otherwise use `id` as the path segment
+
+ID generation is intentionally configurable. `uuid_v7` is the default architectural choice, but the system should support alternate generators such as shorter IDs or `cuid2`.
+
+## Rendering Model
+
+Garner uses Twig for public page rendering.
+Markdown content is parsed with `league/commonmark` through a Garner service and exposed to Twig with a `markdown` filter.
+
+Public request order:
+
+1. `/favicon.ico` serves `site/favicon.ico` when present, otherwise a built-in Garner fallback
+2. `/api/*` dispatches backend actions
+3. `/studio/*` serves the built Garner Studio SPA
+4. `site/routes.php` can return a direct response before page resolution
+5. page lookup resolves through SQLite
+6. `site/controllers/{template}.php` runs before Twig
+7. if the controller returns an array, merge it into the Twig context
+8. if the controller returns `RenderedResponse`, skip Twig and return that response directly
+9. otherwise render `site/templates/{template}.twig`, with fallback to `default.twig`
+
+This means Garner supports both:
+
+- route-style responses from `site/routes.php`
+- page-controller-style responses tied to content pages
+
+## Site Extension Points
+
+Use these first:
+
+- `site/routes.php`: direct text, JSON, or HTML responses
+- `site/controllers/{template}.php`: controller logic for resolved pages
+- `site/templates/{template}.twig`: Twig page templates
+- `site/snippets/*.twig`: shared partials
+- `site/favicon.ico`: project favicon override
+
+## Runtime Data Rules
+
+- runtime code should work on plain decoded data first
+- blueprints are authoring-time schema, not runtime semantic truth
+- use explicit helpers/factories or DTOs when semantics are needed
+- do not recreate generic helpers that already exist in the PHP ecosystem
+
+## Files and Media
+
+Files are page-owned by default:
+
+```text
+content/pages/{id}/files/
+```
+
+But ownership and accessibility are separate:
+
+- one page owns the file physically
+- any page may reference that file logically
+
+## Current Libraries
+
+- `twig/twig`: page rendering
+- `illuminate/support`: collections and string helpers
+- `carthage-software/mago`: PHP formatting and linting
+- `phpstan/phpstan`: static analysis
+- `tailwindcss`: Studio styling and component foundation
+- `lemmon/validator`: planned validation engine
+
+Use Garner code for CMS-specific behavior and ecosystem libraries for generic behavior.
+
+## Studio Frontend Notes
+
+- the PHP backend serves the built Studio app from `frontend/build/`
+- the Studio base path is currently fixed at `/studio` and must match the backend prefix
+- root `eslint.config.mjs` owns JS and Svelte linting
+- shared Studio UI primitives live in `frontend/src/lib/components/`
+- form primitives live in `frontend/src/lib/components/forms/`
+- prefer those primitives over ad-hoc repeated markup when Studio starts growing
+
+## Current Commands
+
+From repo root:
+
+- `composer start`: run the backend
+- `composer check`: run the PHP check suite
+- `composer lint`: lint PHP code
+- `composer analyze`: run PHPStan
+- `composer format`: format PHP code
+- `composer studio:dev`: run Studio in dev mode
+- `composer test`: run PHPUnit
+- `composer studio:build`: build Studio
+- `http://localhost:8000/studio`: built Studio served by the PHP backend
+- `composer platform-check`: verify platform requirements
+- `npm run lint`: lint frontend and repo JS/Svelte files
+- `npm run format`: format repo files
+
+## Important Constraints
+
+- do not write generated state into `site/`
+- do not assume blueprints are required at runtime
+- do not assume page directories express URL structure
+- do not assume every public response goes through Twig
+- prefer `snake_case` for persisted and external data
+
+## Docs To Read Next
+
+- `docs/vision.md`
+- `docs/architecture.md`
+- `docs/plan.md`
+- `docs/known-issues.md`
+- `docs/decisions/README.md`

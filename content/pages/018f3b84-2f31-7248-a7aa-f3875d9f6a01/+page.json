@@ -1,0 +1,16 @@
+{
+    "id": "018f3b84-2f31-7248-a7aa-f3875d9f6a01",
+    "kind": "page",
+    "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
+    "slug": "controller-data",
+    "blueprint": "default",
+    "template": "controller-data",
+    "status": "listed",
+    "sort": 20,
+    "fields": {
+        "title": "Controller Data",
+        "text": "This page uses a same-name controller before Twig rendering."
+    },
+    "created_at": "2026-04-04T09:15:00+00:00",
+    "updated_at": "2026-04-04T09:15:00+00:00"
+}

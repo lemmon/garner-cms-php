@@ -1,0 +1,27 @@
+{
+  "name": "garner-cms-workspace",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "prettier --check . && eslint . --max-warnings=0",
+    "studio:build": "npm run build --workspace=@garner/studio",
+    "studio:dev": "npm run dev --workspace=@garner/studio",
+    "studio:preview": "npm run preview --workspace=@garner/studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "~9",
+    "eslint": "~9",
+    "eslint-config-prettier": "~10",
+    "eslint-plugin-simple-import-sort": "~12",
+    "eslint-plugin-svelte": "~3",
+    "globals": "~17",
+    "prettier": "~3",
+    "prettier-plugin-packagejson": "~3",
+    "prettier-plugin-svelte": "~3",
+    "prettier-plugin-tailwindcss": "~0.7"
+  }
+}

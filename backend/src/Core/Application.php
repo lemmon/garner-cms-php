@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Garner\Core;
+
+use Garner\Content\PageRepository;
+use Garner\Content\PathIndexer;
+use Garner\Content\PathResolver;
+use Garner\Content\SiteRepository;
+use Garner\Site\CustomRoutes;
+use Garner\Site\Favicon;
+use Garner\Site\MarkdownRenderer;
+use Garner\Site\PageControllers;
+use Garner\Site\PublicSite;
+use Garner\Site\RendererInterface;
+use Garner\Site\TwigRenderer;
+use Garner\Studio\StudioApp;
+
+final class Application
+{
+    private ?CustomRoutes $customRoutes = null;
+    private ?Favicon $favicon = null;
+    private ?MarkdownRenderer $markdownRenderer = null;
+    private ?PageControllers $pageControllers = null;
+    private ?PageRepository $pageRepository = null;
+    private ?PathIndexer $pathIndexer = null;
+    private ?PathResolver $pathResolver = null;
+    private ?PublicSite $publicSite = null;
+    private ?RendererInterface $siteRenderer = null;
+    private ?SiteRepository $siteRepository = null;
+    private ?StudioApp $studioApp = null;
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public function __construct(
+        private readonly string $backendPath,
+        private readonly string $rootPath,
+        private readonly array $config = [],
+    ) {}
+
+    public function run(): void
+    {
+        (new Router($this, $this->backendPath))->dispatch();
+    }
+
+    public function backendPath(): string
+    {
+        return $this->backendPath;
+    }
+
+    public function rootPath(): string
+    {
+        return $this->rootPath;
+    }
+
+    public function projectPath(string $key): string
+    {
+        $relativePath = $this->config('app.paths.' . $key, $key);
+
+        if (!is_string($relativePath) || $relativePath === '') {
+            throw new \RuntimeException(sprintf('Invalid project path config for "%s"', $key));
+        }
+
+        return $this->rootPath . '/' . ltrim($relativePath, '/');
+    }
+
+    public function config(string $key, mixed $default = null): mixed
+    {
+        $segments = explode('.', $key);
+        $value = $this->config;
+
+        foreach ($segments as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return $default;
+            }
+
+            $value = $value[$segment];
+        }
+
+        return $value;
+    }
+
+    public function pageRepository(): PageRepository
+    {
+        return $this->pageRepository ??= new PageRepository(
+            contentPath: $this->projectPath('content'),
+            defaultTemplate: (string) $this->config('app.rendering.default_template', 'default'),
+        );
+    }
+
+    public function favicon(): Favicon
+    {
+        return $this->favicon ??= new Favicon(sitePath: $this->projectPath('site'));
+    }
+
+    public function customRoutes(): CustomRoutes
+    {
+        return $this->customRoutes ??= new CustomRoutes(
+            routesFile: $this->projectPath('site') . '/routes.php',
+        );
+    }
+
+    public function pageControllers(): PageControllers
+    {
+        return $this->pageControllers ??= new PageControllers(
+            controllersPath: $this->projectPath('site') . '/controllers',
+        );
+    }
+
+    public function markdownRenderer(): MarkdownRenderer
+    {
+        $config = $this->config('app.markdown', []);
+
+        return $this->markdownRenderer ??= new MarkdownRenderer(is_array($config) ? $config : []);
+    }
+
+    public function pathIndexer(): PathIndexer
+    {
+        return $this->pathIndexer ??= new PathIndexer(
+            siteRepository: $this->siteRepository(),
+            pageRepository: $this->pageRepository(),
+            sqlitePath: $this->projectPath('runtime') . '/index.sqlite',
+        );
+    }
+
+    public function pathResolver(): PathResolver
+    {
+        return $this->pathResolver ??= new PathResolver(
+            sqlitePath: $this->projectPath('runtime') . '/index.sqlite',
+            pageRepository: $this->pageRepository(),
+        );
+    }
+
+    public function publicSite(): PublicSite
+    {
+        return $this->publicSite ??= new PublicSite(
+            app: $this,
+            siteRepository: $this->siteRepository(),
+            pageRepository: $this->pageRepository(),
+            pathIndexer: $this->pathIndexer(),
+            pathResolver: $this->pathResolver(),
+            pageControllers: $this->pageControllers(),
+            renderer: $this->siteRenderer(),
+            indexPath: $this->projectPath('runtime') . '/index.sqlite',
+        );
+    }
+
+    public function studioApp(): StudioApp
+    {
+        $buildPath = $this->config('app.studio.build_path', 'frontend/build');
+
+        if (!is_string($buildPath) || $buildPath === '') {
+            throw new \RuntimeException('Invalid Studio build path configuration');
+        }
+
+        $prefix = (string) $this->config('app.routes.studio_prefix', '/studio');
+
+        return $this->studioApp ??= new StudioApp(
+            buildPath: $this->rootPath . '/' . ltrim($buildPath, '/'),
+            prefix: $prefix,
+        );
+    }
+
+    public function siteRepository(): SiteRepository
+    {
+        return $this->siteRepository ??= new SiteRepository(contentPath: $this->projectPath(
+            'content',
+        ));
+    }
+
+    public function siteRenderer(): RendererInterface
+    {
+        return $this->siteRenderer ??= new TwigRenderer(
+            templatesPath: $this->projectPath('site') . '/templates',
+            defaultTemplate: (string) $this->config('app.rendering.default_template', 'default'),
+            markdownRenderer: $this->markdownRenderer(),
+        );
+    }
+}

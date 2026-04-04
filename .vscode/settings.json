@@ -1,0 +1,43 @@
+{
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    ".references": true,
+    ".phpunit.cache": true,
+    ".phpunit.result.cache": true,
+    "composer.lock": true,
+    "frontend/.svelte-kit": true,
+    "frontend/build": true,
+    "frontend/node_modules": true,
+    "node_modules": true,
+    "package-lock.json": true,
+    "runtime": true,
+    "storage": true,
+    "vendor": true
+  },
+  "files.insertFinalNewline": false,
+  "files.trimFinalNewlines": false,
+  "files.trimTrailingWhitespace": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "always"
+  },
+  "prettier.configPath": ".prettierrc.json",
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "prettier.documentSelectors": ["**/*.svelte"],
+  "css.lint.unknownAtRules": "ignore",
+  "eslint.useFlatConfig": true,
+  "eslint.options": {
+    "overrideConfigFile": "eslint.config.mjs"
+  },
+  "eslint.workingDirectories": [
+    {
+      "directory": ".",
+      "changeProcessCWD": true
+    }
+  ],
+  "eslint.validate": ["javascript", "javascriptreact", "svelte"]
+}

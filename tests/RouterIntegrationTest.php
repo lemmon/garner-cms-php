@@ -1,0 +1,305 @@
+<?php
+
+declare(strict_types=1);
+
+use Garner\Content\PageRepository;
+use Garner\Content\SiteRepository;
+use PHPUnit\Framework\TestCase;
+
+final class RouterIntegrationTest extends TestCase
+{
+    private string $projectRoot;
+    private string $repoRoot;
+
+    protected function setUp(): void
+    {
+        $this->repoRoot = dirname(__DIR__);
+        $this->projectRoot =
+            sys_get_temp_dir() . '/garner-cms-router-' . bin2hex(random_bytes(6));
+
+        mkdir($this->projectRoot . '/content/pages', 0o777, true);
+        mkdir($this->projectRoot . '/frontend/build/_app/immutable/entry', 0o777, true);
+        mkdir($this->projectRoot . '/site/controllers', 0o777, true);
+        mkdir($this->projectRoot . '/site/templates', 0o777, true);
+
+        $this->writeStudioBuild();
+        $this->writeTemplate();
+        $this->writeRoutes();
+        $this->seedContent();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->deleteDirectory($this->projectRoot);
+    }
+
+    public function testRouterLetsStudioAndApiWinOverCustomRoutes(): void
+    {
+        $studio = $this->dispatch('/studio');
+        $studioAsset = $this->dispatch('/studio/_app/immutable/entry/studio.js');
+        $studioRoute = $this->dispatch('/studio/users');
+        $health = $this->dispatch('/api/meta/health');
+        $contentStatus = $this->dispatch('/api/meta/content-status');
+
+        self::assertSame('200', $studio['status']);
+        self::assertStringContainsString('<title>Test Garner Studio</title>', $studio['body']);
+        self::assertStringContainsString('/studio/_app/immutable/entry/studio.js', $studio['body']);
+        self::assertStringNotContainsString('custom studio route', $studio['body']);
+
+        self::assertSame('200', $studioAsset['status']);
+        self::assertStringContainsString('console.log("studio asset");', $studioAsset['body']);
+
+        self::assertSame('200', $studioRoute['status']);
+        self::assertStringContainsString('<title>Test Garner Studio</title>', $studioRoute['body']);
+
+        self::assertSame('200', $health['status']);
+        self::assertStringContainsString('"ok": true', $health['body']);
+        self::assertStringContainsString('"studio_prefix": "/studio"', $health['body']);
+        self::assertStringNotContainsString('custom api route', $health['body']);
+
+        self::assertSame('200', $contentStatus['status']);
+        self::assertStringContainsString('"page_count": 3', $contentStatus['body']);
+        self::assertStringContainsString('"/about"', $contentStatus['body']);
+    }
+
+    public function testRouterLetsCustomRoutesWinOverPublicPages(): void
+    {
+        $response = $this->dispatch('/example.txt');
+
+        self::assertSame('200', $response['status']);
+        self::assertStringContainsString('Custom example route', $response['body']);
+        self::assertStringNotContainsString('<h1>Example Page</h1>', $response['body']);
+    }
+
+    public function testRouterReturnsJsonErrorsForInvalidAndMissingActions(): void
+    {
+        $invalid = $this->dispatch('/api/invalid!');
+        $missing = $this->dispatch('/api/meta/missing');
+
+        self::assertSame('400', $invalid['status']);
+        self::assertStringContainsString('"message": "Invalid action name"', $invalid['body']);
+
+        self::assertSame('404', $missing['status']);
+        self::assertStringContainsString('"message": "Action \"meta/missing\" not found"', $missing['body']);
+    }
+
+    /**
+     * @return array{body: string, status: string}
+     */
+    private function dispatch(string $path): array
+    {
+        $runner = $this->projectRoot . '/router-runner.php';
+        $statusFile = $this->projectRoot . '/router-status.txt';
+
+        file_put_contents($runner, $this->runnerScript($path, $statusFile));
+
+        $output = [];
+        $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner);
+        exec($command, $output);
+
+        $status = file_get_contents($statusFile);
+
+        return [
+            'body' => implode("\n", $output),
+            'status' => is_string($status) ? $status : '',
+        ];
+    }
+
+    private function runnerScript(string $path, string $statusFile): string
+    {
+        $autoload = var_export($this->repoRoot . '/vendor/autoload.php', true);
+        $backendPath = var_export($this->repoRoot . '/backend', true);
+        $projectRoot = var_export($this->projectRoot, true);
+        $requestPath = var_export($path, true);
+        $statusPath = var_export($statusFile, true);
+        $config = var_export([
+            'app' => [
+                'name' => 'Test Garner',
+                'default_action' => 'meta/health',
+                'paths' => [
+                    'content' => 'content',
+                    'runtime' => 'runtime',
+                    'site' => 'site',
+                    'storage' => 'storage',
+                ],
+                'routes' => [
+                    'api_prefix' => '/api',
+                    'studio_prefix' => '/studio',
+                ],
+                'rendering' => [
+                    'default_template' => 'default',
+                    'engine' => 'twig',
+                ],
+                'markdown' => [
+                    'allow_unsafe_links' => false,
+                    'html_input' => 'strip',
+                ],
+            ],
+        ], true);
+
+        return <<<PHP
+<?php
+
+declare(strict_types=1);
+
+require {$autoload};
+
+\$_SERVER['REQUEST_URI'] = {$requestPath};
+\$_SERVER['REQUEST_METHOD'] = 'GET';
+
+register_shutdown_function(static function (): void {
+    file_put_contents({$statusPath}, (string) http_response_code());
+});
+
+\$app = new \Garner\Core\Application(
+    backendPath: {$backendPath},
+    rootPath: {$projectRoot},
+    config: {$config},
+);
+
+(new \Garner\Core\Router(\$app, {$backendPath}))->dispatch();
+PHP;
+    }
+
+    private function seedContent(): void
+    {
+        $site = new SiteRepository($this->projectRoot . '/content');
+        $pages = new PageRepository($this->projectRoot . '/content');
+
+        $site->save([
+            'home_page_id' => 'home-page',
+            'title' => 'Test Garner',
+        ]);
+
+        $pages->save([
+            'id' => 'home-page',
+            'slug' => 'home',
+            'status' => 'listed',
+            'sort' => 1,
+            'template' => 'default',
+            'fields' => [
+                'title' => 'Home',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'about-page',
+            'parent_id' => 'home-page',
+            'slug' => 'about',
+            'status' => 'listed',
+            'sort' => 10,
+            'template' => 'default',
+            'fields' => [
+                'title' => 'About',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'example-page',
+            'parent_id' => 'home-page',
+            'slug' => 'example.txt',
+            'status' => 'listed',
+            'sort' => 20,
+            'template' => 'default',
+            'fields' => [
+                'title' => 'Example Page',
+            ],
+        ]);
+    }
+
+    private function writeTemplate(): void
+    {
+        file_put_contents(
+            $this->projectRoot . '/site/templates/default.twig',
+            <<<'TWIG'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ page.title }} | {{ site.title }}</title>
+  </head>
+  <body>
+    <main>
+      <h1>{{ page.title }}</h1>
+    </main>
+  </body>
+</html>
+TWIG,
+        );
+    }
+
+    private function writeStudioBuild(): void
+    {
+        file_put_contents(
+            $this->projectRoot . '/frontend/build/index.html',
+            <<<'HTML'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Test Garner Studio</title>
+    <script type="module" src="/studio/_app/immutable/entry/studio.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
+HTML,
+        );
+
+        file_put_contents(
+            $this->projectRoot . '/frontend/build/_app/immutable/entry/studio.js',
+            'console.log("studio asset");',
+        );
+    }
+
+    private function writeRoutes(): void
+    {
+        file_put_contents(
+            $this->projectRoot . '/site/routes.php',
+            <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+use Garner\Core\Application;
+use Garner\Site\RenderedResponse;
+
+return [
+    '/api/meta/health' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom api route'),
+    '/example.txt' => static fn(Application $app): RenderedResponse => RenderedResponse::text('Custom example route'),
+    '/studio' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom studio route'),
+];
+PHP,
+        );
+    }
+
+    private function deleteDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $items = scandir($path);
+        if ($items === false) {
+            return;
+        }
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $path . '/' . $item;
+
+            if (is_dir($itemPath)) {
+                $this->deleteDirectory($itemPath);
+                continue;
+            }
+
+            unlink($itemPath);
+        }
+
+        rmdir($path);
+    }
+}

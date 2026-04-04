@@ -1,0 +1,10 @@
+.DS_Store
+node_modules
+/.references/
+/vendor/
+/storage/
+/runtime/
+/frontend/node_modules/
+/frontend/.svelte-kit/
+/frontend/build/
+/.phpunit.result.cache

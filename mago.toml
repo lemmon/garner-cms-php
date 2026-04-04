@@ -1,0 +1,27 @@
+php-version = "8.3.0"
+
+[source]
+paths = ["backend", "site", "tests"]
+excludes = [
+  ".references",
+  "frontend",
+  "node_modules",
+  "runtime",
+  "storage",
+  "vendor",
+]
+
+[formatter]
+print-width = 100
+tab-width = 4
+use-tabs = false
+trailing-comma = true
+remove-trailing-close-tag = true
+
+[linter.rules]
+cyclomatic-complexity = { enabled = false }
+excessive-parameter-list = { enabled = false }  # https://github.com/carthage-software/mago/issues/206
+literal-named-argument = { enabled = false }
+no-boolean-flag-parameter = { enabled = false }
+tagged-todo = { enabled = false }
+too-many-methods = { threshold = 20 }

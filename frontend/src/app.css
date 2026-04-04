@@ -1,0 +1,40 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-text: var(--color-neutral-950);
+  --color-background: var(--color-white);
+
+  --color-blue: #00f;
+  --color-red: #f00;
+  --color-green: #0a0;
+  --color-yellow: #fc0;
+  --color-purple: #a0f;
+  --color-orange: #f90;
+  --color-pink: #f06;
+
+  --text-base--line-height: 1.25;
+  --text-lg--line-height: 1.25;
+  --text-xl--line-height: 1.25;
+  --text-2xl--line-height: 1.25;
+
+  --animate-spin: spin 600ms linear infinite;
+}
+
+@utility grid-cols-fill-* {
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(calc(var(--spacing) * --value(integer)), 100%), 1fr)
+  );
+}
+
+@layer base {
+  body {
+    color: var(--color-text);
+    background-color: var(--color-background);
+    line-height: 1;
+    text-underline-offset: 2px;
+    & * {
+      text-decoration-thickness: 1px;
+    }
+  }
+}

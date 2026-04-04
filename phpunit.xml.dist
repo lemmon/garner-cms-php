@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="backend/bootstrap.php" colors="true">
+    <testsuites>
+        <testsuite name="Garner CMS">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

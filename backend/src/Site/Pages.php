@@ -36,12 +36,35 @@ final class Pages
     /**
      * @return Collection<int, Page>
      */
-    public function childrenOf(string $parentId): Collection
+    public function childrenOf(string $parentId, bool $drafts = false): Collection
     {
         return $this
             ->all()
-            ->filter(static fn(Page $page): bool => $page->parentId() === $parentId)
+            ->filter(
+                static fn(Page $page): bool => (
+                    $page->parentId() === $parentId
+                    && ($drafts || $page->status() !== 'draft')
+                ),
+            )
             ->values();
+    }
+
+    /**
+     * @return Collection<int, Page>
+     */
+    public function indexOf(string $parentId, bool $drafts = false): Collection
+    {
+        $pages = new Collection();
+
+        foreach ($this->childrenOf($parentId, $drafts) as $child) {
+            $pages->push($child);
+
+            foreach ($this->indexOf($child->id(), $drafts) as $descendant) {
+                $pages->push($descendant);
+            }
+        }
+
+        return $pages->values();
     }
 
     /**
@@ -75,6 +98,6 @@ final class Pages
             $page['resolved_path'] = $this->pathResolver->pathForId((string) ($page['id'] ?? ''));
         }
 
-        return new Page($page);
+        return new Page($page, $this);
     }
 }

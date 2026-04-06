@@ -57,7 +57,10 @@ final class StudioApp
         $asset = file_get_contents($assetPath);
 
         if (!is_string($asset)) {
-            throw new RuntimeException(sprintf('Unable to read Studio asset "%s"', $normalizedPath));
+            throw new RuntimeException(sprintf(
+                'Unable to read Studio asset "%s"',
+                $normalizedPath,
+            ));
         }
 
         return new RenderedResponse(
@@ -108,7 +111,8 @@ final class StudioApp
             ? $detected
             : 'application/octet-stream';
 
-        $needsCharset = str_starts_with($contentType, 'text/')
+        $needsCharset =
+            str_starts_with($contentType, 'text/')
             || $contentType === 'application/javascript'
             || $contentType === 'application/json'
             || $contentType === 'image/svg+xml';

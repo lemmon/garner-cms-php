@@ -8,6 +8,7 @@
         "illuminate/support": "^12.0",
         "league/commonmark": "^2.8",
         "lemmon/validator": "^0.13.0",
+        "symfony/yaml": "^7.4",
         "twig/twig": "^3.0"
     },
     "require-dev": {

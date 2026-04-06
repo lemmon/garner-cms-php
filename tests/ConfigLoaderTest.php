@@ -54,10 +54,13 @@ final class ConfigLoaderTest extends TestCase
 
         $config = ConfigLoader::load($this->configPath);
 
-        self::assertSame([
-            'app' => [
-                'name' => 'Test Garner',
+        self::assertSame(
+            [
+                'app' => [
+                    'name' => 'Test Garner',
+                ],
             ],
-        ], $config);
+            $config,
+        );
     }
 }

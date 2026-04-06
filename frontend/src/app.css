@@ -20,6 +20,22 @@
   --animate-spin: spin 600ms linear infinite;
 }
 
+@utility p-border-* {
+  padding: calc(var(--spacing) * --value(integer) - var(--border-width, 1px));
+}
+
+@utility px-border-* {
+  padding-inline: calc(
+    var(--spacing) * --value(integer) - var(--border-width, 1px)
+  );
+}
+
+@utility py-border-* {
+  padding-block: calc(
+    var(--spacing) * --value(integer) - var(--border-width, 1px)
+  );
+}
+
 @utility grid-cols-fill-* {
   grid-template-columns: repeat(
     auto-fill,

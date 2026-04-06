@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Garner\Site;
 
+use Illuminate\Support\Collection;
+
 final class Page
 {
     /**
@@ -11,6 +13,7 @@ final class Page
      */
     public function __construct(
         private readonly array $data,
+        private readonly ?Pages $pages = null,
     ) {}
 
     /**
@@ -51,9 +54,9 @@ final class Page
         return is_string($this->data['slug'] ?? null) ? $this->data['slug'] : null;
     }
 
-    public function status(): string
+    public function status(): ?string
     {
-        return (string) ($this->data['status'] ?? 'draft');
+        return is_string($this->data['status'] ?? null) ? $this->data['status'] : null;
     }
 
     public function template(): string
@@ -73,6 +76,30 @@ final class Page
     public function url(): string
     {
         return $this->resolvedPath() ?? '#';
+    }
+
+    /**
+     * @return Collection<int, Page>
+     */
+    public function children(bool $drafts = false): Collection
+    {
+        if ($this->pages === null) {
+            return new Collection();
+        }
+
+        return $this->pages->childrenOf($this->id(), $drafts);
+    }
+
+    /**
+     * @return Collection<int, Page>
+     */
+    public function index(bool $drafts = false): Collection
+    {
+        if ($this->pages === null) {
+            return new Collection();
+        }
+
+        return $this->pages->indexOf($this->id(), $drafts);
     }
 
     public function value(string $key, mixed $default = null): mixed

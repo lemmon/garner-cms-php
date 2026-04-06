@@ -86,7 +86,7 @@ final class PathIndexer
                 slug TEXT NULL,
                 blueprint TEXT NOT NULL,
                 template TEXT NOT NULL,
-                status TEXT NOT NULL,
+                status TEXT NULL,
                 sort INTEGER NULL,
                 updated_at TEXT NOT NULL,
                 content_hash TEXT NOT NULL
@@ -164,7 +164,7 @@ final class PathIndexer
                 ':slug' => $this->normalizedSlug($page),
                 ':blueprint' => (string) ($page['blueprint'] ?? 'default'),
                 ':template' => (string) ($page['template'] ?? 'default'),
-                ':status' => (string) ($page['status'] ?? 'draft'),
+                ':status' => is_string($page['status'] ?? null) ? $page['status'] : null,
                 ':sort' => is_int($page['sort'] ?? null) ? $page['sort'] : null,
                 ':updated_at' => (string) ($page['updated_at'] ?? ''),
                 ':content_hash' => sha1($pageJson),
@@ -217,13 +217,13 @@ final class PathIndexer
             return null;
         }
 
-        $status = (string) ($page['status'] ?? 'draft');
-        if ($status === 'draft') {
-            return $pathCache[$pageId] = null;
-        }
-
         if ($homePageId !== null && $pageId === $homePageId) {
             return $pathCache[$pageId] = '/';
+        }
+
+        $status = is_string($page['status'] ?? null) ? $page['status'] : null;
+        if ($status === null || $status === 'draft') {
+            return $pathCache[$pageId] = null;
         }
 
         $parentId = is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null;

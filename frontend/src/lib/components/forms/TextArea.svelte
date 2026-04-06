@@ -25,7 +25,7 @@
 
   <textarea
     class={[
-      'w-full rounded-[1.15rem] border border-neutral-900/12 bg-white/80 px-5 py-4 text-base/6 transition-colors outline-none',
+      'w-full border border-neutral-900/12 bg-white/80 px-5 py-4 text-base/6 transition-colors outline-none',
       'focus:border-blue focus:ring-blue/20 focus:ring-2',
       error ? 'border-red-500/70 ring-2 ring-red-500/10' : '',
       disabled ? 'cursor-not-allowed text-current/40' : '',

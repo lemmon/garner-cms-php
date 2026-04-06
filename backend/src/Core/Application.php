@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Core;
 
+use Garner\Blueprint\BlueprintLoader;
 use Garner\Content\PageRepository;
 use Garner\Content\PathIndexer;
 use Garner\Content\PathResolver;
@@ -19,7 +20,9 @@ use Garner\Studio\StudioApp;
 
 final class Application
 {
+    private ?BlueprintLoader $blueprintLoader = null;
     private ?CustomRoutes $customRoutes = null;
+    private ErrorHandler $errorHandler;
     private ?Favicon $favicon = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?PageControllers $pageControllers = null;
@@ -38,10 +41,13 @@ final class Application
         private readonly string $backendPath,
         private readonly string $rootPath,
         private readonly array $config = [],
-    ) {}
+    ) {
+        $this->errorHandler = new ErrorHandler($this);
+    }
 
     public function run(): void
     {
+        $this->errorHandler->register();
         (new Router($this, $this->backendPath))->dispatch();
     }
 
@@ -87,6 +93,13 @@ final class Application
         return $this->pageRepository ??= new PageRepository(
             contentPath: $this->projectPath('content'),
             defaultTemplate: (string) $this->config('app.rendering.default_template', 'default'),
+        );
+    }
+
+    public function blueprintLoader(): BlueprintLoader
+    {
+        return $this->blueprintLoader ??= new BlueprintLoader(
+            blueprintsPath: $this->projectPath('site') . '/blueprints',
         );
     }
 

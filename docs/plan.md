@@ -63,6 +63,7 @@ Deliver:
 - JSON entry model
 - ID generator abstraction plus `uuid_v7` default implementation
 - filesystem store using `content/pages/{uuid}/+page.json`
+- site metadata in `content/+site.json`, including home and error system page pointers
 - SQLite index builder writing to `runtime/index.sqlite`
 - repository/query interfaces
 - adopted collection/string utility dependencies
@@ -101,6 +102,14 @@ Exit criteria:
 
 ## Phase 4: Blueprint System
 
+Groundwork already exists:
+
+- YAML blueprint parsing via `symfony/yaml`
+- initial site blueprint at `site/blueprints/site.yml`
+- initial `home` and `error` system blueprints
+- load-time validation of the current supported blueprint subset via `lemmon/validator`
+- first Studio blueprint endpoint at `/api/studio/blueprints/site`
+
 Deliver:
 
 - YAML blueprint loader
@@ -112,6 +121,7 @@ Deliver:
 Exit criteria:
 
 - a blueprint can define content fields and sidebar-like collections in one schema tree
+- semantic list nodes such as `page_list.source` and `file_list.source` are supported
 - backend can validate content payloads against blueprint rules
 - validation is powered by `lemmon/validator` without leaking raw library usage throughout the codebase
 - blueprints drive authoring and validation without being required as runtime semantic truth

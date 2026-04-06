@@ -1,11 +1,7 @@
-import { api } from '$lib/api';
+import { redirect } from '@sveltejs/kit';
+
+import { resolve } from '$app/paths';
 
 export async function load() {
-  const data = await api('studio/bootstrap');
-
-  return {
-    site: data.site,
-    pages: data.pages,
-    stats: data.stats,
-  };
+  redirect(307, resolve('/site'));
 }

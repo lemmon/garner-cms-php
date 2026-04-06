@@ -14,15 +14,16 @@ final class RouterIntegrationTest extends TestCase
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__);
-        $this->projectRoot =
-            sys_get_temp_dir() . '/garner-cms-router-' . bin2hex(random_bytes(6));
+        $this->projectRoot = sys_get_temp_dir() . '/garner-cms-router-' . bin2hex(random_bytes(6));
 
         mkdir($this->projectRoot . '/content/pages', 0o777, true);
         mkdir($this->projectRoot . '/frontend/build/_app/immutable/entry', 0o777, true);
+        mkdir($this->projectRoot . '/site/blueprints', 0o777, true);
         mkdir($this->projectRoot . '/site/controllers', 0o777, true);
         mkdir($this->projectRoot . '/site/templates', 0o777, true);
 
         $this->writeStudioBuild();
+        $this->writeBlueprint();
         $this->writeTemplate();
         $this->writeRoutes();
         $this->seedContent();
@@ -40,6 +41,8 @@ final class RouterIntegrationTest extends TestCase
         $studioRoute = $this->dispatch('/studio/users');
         $health = $this->dispatch('/api/meta/health');
         $contentStatus = $this->dispatch('/api/meta/content-status');
+        $studioSite = $this->dispatch('/api/studio/site');
+        $siteBlueprint = $this->dispatch('/api/studio/blueprints/site');
 
         self::assertSame('200', $studio['status']);
         self::assertStringContainsString('<title>Test Garner Studio</title>', $studio['body']);
@@ -60,6 +63,15 @@ final class RouterIntegrationTest extends TestCase
         self::assertSame('200', $contentStatus['status']);
         self::assertStringContainsString('"page_count": 3', $contentStatus['body']);
         self::assertStringContainsString('"/about"', $contentStatus['body']);
+
+        self::assertSame('200', $studioSite['status']);
+        self::assertStringContainsString('"title": "Test Garner"', $studioSite['body']);
+        self::assertStringContainsString('"home_page_id": "home-page"', $studioSite['body']);
+
+        self::assertSame('200', $siteBlueprint['status']);
+        self::assertStringContainsString('"name": "site"', $siteBlueprint['body']);
+        self::assertStringContainsString('"title": "Site"', $siteBlueprint['body']);
+        self::assertStringContainsString('"type": "page_list"', $siteBlueprint['body']);
     }
 
     public function testRouterLetsCustomRoutesWinOverPublicPages(): void
@@ -80,38 +92,131 @@ final class RouterIntegrationTest extends TestCase
         self::assertStringContainsString('"message": "Invalid action name"', $invalid['body']);
 
         self::assertSame('404', $missing['status']);
-        self::assertStringContainsString('"message": "Action \"meta/missing\" not found"', $missing['body']);
+        self::assertStringContainsString(
+            '"message": "Action \"meta/missing\" not found"',
+            $missing['body'],
+        );
+    }
+
+    public function testRouterUsesGlobalErrorHandlerForInvalidJsonPayloads(): void
+    {
+        $response = $this->dispatch(
+            path: '/api/studio/nodes/query',
+            method: 'POST',
+            body: '{"type":"page_list"',
+            contentType: 'application/json',
+        );
+
+        self::assertSame('400', $response['status']);
+        self::assertStringContainsString('"error": true', $response['body']);
+        self::assertStringContainsString('"message": "Syntax error"', $response['body']);
+    }
+
+    public function testRouterUsesValidatorForStudioNodeQueryPayloads(): void
+    {
+        $response = $this->dispatch(
+            path: '/api/studio/nodes/query',
+            method: 'POST',
+            body: '{"type":"page_list"}',
+            contentType: 'application/json',
+        );
+
+        self::assertSame('400', $response['status']);
+        self::assertStringContainsString('"invalid": true', $response['body']);
+        self::assertStringContainsString('"path": "source"', $response['body']);
+    }
+
+    public function testRouterReturnsErrorResponsesForStudioServiceFailures(): void
+    {
+        $response = $this->dispatch(
+            path: '/api/studio/nodes/query',
+            method: 'POST',
+            body: json_encode([
+                'type' => 'page_list',
+                'source' => 'site',
+                'query' => 'source.unsupported()',
+            ], JSON_THROW_ON_ERROR),
+            contentType: 'application/json',
+        );
+
+        self::assertSame('400', $response['status']);
+        self::assertStringContainsString('"error": true', $response['body']);
+        self::assertStringNotContainsString('"invalid": true', $response['body']);
+        self::assertStringContainsString('Unsupported page list query', $response['body']);
     }
 
     /**
      * @return array{body: string, status: string}
      */
-    private function dispatch(string $path): array
-    {
+    private function dispatch(
+        string $path,
+        string $method = 'GET',
+        string $body = '',
+        string $contentType = 'application/json',
+    ): array {
         $runner = $this->projectRoot . '/router-runner.php';
         $statusFile = $this->projectRoot . '/router-status.txt';
 
-        file_put_contents($runner, $this->runnerScript($path, $statusFile));
+        file_put_contents($runner, $this->runnerScript(
+            $path,
+            $statusFile,
+            $method,
+            $contentType,
+            $body,
+        ));
 
-        $output = [];
-        $command = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runner);
-        exec($command, $output);
+        $process = proc_open(
+            [PHP_BINARY, $runner],
+            [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ],
+            $pipes,
+        );
+
+        if (!is_resource($process)) {
+            self::fail('Failed to start router runner process');
+        }
+
+        fwrite($pipes[0], $body);
+        fclose($pipes[0]);
+
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+
+        $exitCode = proc_close($process);
+
+        if ($exitCode !== 0) {
+            self::fail('Router runner failed with exit code ' . $exitCode . ': ' . $stderr);
+        }
 
         $status = file_get_contents($statusFile);
 
         return [
-            'body' => implode("\n", $output),
+            'body' => is_string($stdout) ? $stdout : '',
             'status' => is_string($status) ? $status : '',
         ];
     }
 
-    private function runnerScript(string $path, string $statusFile): string
-    {
+    private function runnerScript(
+        string $path,
+        string $statusFile,
+        string $method,
+        string $contentType,
+        string $body,
+    ): string {
         $autoload = var_export($this->repoRoot . '/vendor/autoload.php', true);
         $backendPath = var_export($this->repoRoot . '/backend', true);
         $projectRoot = var_export($this->projectRoot, true);
         $requestPath = var_export($path, true);
         $statusPath = var_export($statusFile, true);
+        $requestMethod = var_export($method, true);
+        $requestContentType = var_export($contentType, true);
+        $requestContentLength = var_export(strlen($body), true);
         $config = var_export([
             'app' => [
                 'name' => 'Test Garner',
@@ -138,27 +243,29 @@ final class RouterIntegrationTest extends TestCase
         ], true);
 
         return <<<PHP
-<?php
+            <?php
 
-declare(strict_types=1);
+            declare(strict_types=1);
 
-require {$autoload};
+            require {$autoload};
 
-\$_SERVER['REQUEST_URI'] = {$requestPath};
-\$_SERVER['REQUEST_METHOD'] = 'GET';
+            \$_SERVER['REQUEST_URI'] = {$requestPath};
+            \$_SERVER['REQUEST_METHOD'] = {$requestMethod};
+            \$_SERVER['CONTENT_TYPE'] = {$requestContentType};
+            \$_SERVER['CONTENT_LENGTH'] = {$requestContentLength};
 
-register_shutdown_function(static function (): void {
-    file_put_contents({$statusPath}, (string) http_response_code());
-});
+            register_shutdown_function(static function (): void {
+                file_put_contents({$statusPath}, (string) http_response_code());
+            });
 
-\$app = new \Garner\Core\Application(
-    backendPath: {$backendPath},
-    rootPath: {$projectRoot},
-    config: {$config},
-);
+            \$app = new \Garner\Core\Application(
+                backendPath: {$backendPath},
+                rootPath: {$projectRoot},
+                config: {$config},
+            );
 
-(new \Garner\Core\Router(\$app, {$backendPath}))->dispatch();
-PHP;
+            \$app->run();
+            PHP;
     }
 
     private function seedContent(): void
@@ -209,43 +316,65 @@ PHP;
 
     private function writeTemplate(): void
     {
-        file_put_contents(
-            $this->projectRoot . '/site/templates/default.twig',
-            <<<'TWIG'
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>{{ page.title }} | {{ site.title }}</title>
-  </head>
-  <body>
-    <main>
-      <h1>{{ page.title }}</h1>
-    </main>
-  </body>
-</html>
-TWIG,
-        );
+        file_put_contents($this->projectRoot . '/site/templates/default.twig', <<<'TWIG'
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8">
+                <title>{{ page.title }} | {{ site.title }}</title>
+              </head>
+              <body>
+                <main>
+                  <h1>{{ page.title }}</h1>
+                </main>
+              </body>
+            </html>
+            TWIG);
+    }
+
+    private function writeBlueprint(): void
+    {
+        file_put_contents($this->projectRoot . '/site/blueprints/site.yml', <<<'YAML'
+            title: Site
+
+            tabs:
+                - name: pages
+                  label: Pages
+                  nodes:
+                      - type: page_list
+                        name: pages
+                        label: Pages
+                        source: site
+                        create:
+                            enabled: true
+
+                - name: files
+                  label: Files
+                  nodes:
+                      - type: file_list
+                        name: files
+                        label: Files
+                        source: site
+                        upload:
+                            enabled: true
+            YAML);
     }
 
     private function writeStudioBuild(): void
     {
-        file_put_contents(
-            $this->projectRoot . '/frontend/build/index.html',
-            <<<'HTML'
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Test Garner Studio</title>
-    <script type="module" src="/studio/_app/immutable/entry/studio.js"></script>
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
-</html>
-HTML,
-        );
+        file_put_contents($this->projectRoot . '/frontend/build/index.html', <<<'HTML'
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8">
+                <title>Test Garner Studio</title>
+                <script type="module" src="/studio/_app/immutable/entry/studio.js"></script>
+              </head>
+              <body>
+                <div id="app"></div>
+              </body>
+            </html>
+            HTML);
 
         file_put_contents(
             $this->projectRoot . '/frontend/build/_app/immutable/entry/studio.js',
@@ -255,23 +384,20 @@ HTML,
 
     private function writeRoutes(): void
     {
-        file_put_contents(
-            $this->projectRoot . '/site/routes.php',
-            <<<'PHP'
-<?php
+        file_put_contents($this->projectRoot . '/site/routes.php', <<<'PHP'
+            <?php
 
-declare(strict_types=1);
+            declare(strict_types=1);
 
-use Garner\Core\Application;
-use Garner\Site\RenderedResponse;
+            use Garner\Core\Application;
+            use Garner\Site\RenderedResponse;
 
-return [
-    '/api/meta/health' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom api route'),
-    '/example.txt' => static fn(Application $app): RenderedResponse => RenderedResponse::text('Custom example route'),
-    '/studio' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom studio route'),
-];
-PHP,
-        );
+            return [
+                '/api/meta/health' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom api route'),
+                '/example.txt' => static fn(Application $app): RenderedResponse => RenderedResponse::text('Custom example route'),
+                '/studio' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom studio route'),
+            ];
+            PHP);
     }
 
     private function deleteDirectory(string $path): void

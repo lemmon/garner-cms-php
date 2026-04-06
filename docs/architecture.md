@@ -33,6 +33,7 @@ backend/
   index.php
   bootstrap.php
   src/
+    Blueprint/
     Content/
     Core/
     Extensions/
@@ -98,6 +99,14 @@ Canonical site metadata lives at:
 content/+site.json
 ```
 
+Important site fields:
+
+- `id`: always `site`
+- `title`: site title used by public and Studio surfaces
+- `home_page_id`: required pointer to the logical home page
+- `error_page_id`: optional pointer to the dedicated not-found page
+- `updated_at`
+
 Important page fields:
 
 - `id`: stable generated identifier
@@ -106,8 +115,8 @@ Important page fields:
 - `slug`: nullable path segment
 - `blueprint`: authoring schema name
 - `template`: runtime template/controller name
-- `status`: `draft`, `unlisted`, or `listed`
-- `sort`: nullable integer
+- `status`: `draft`, `unlisted`, or `listed` for normal public pages; omitted for system pages such as `home` and `error`
+- `sort`: nullable integer used only for listed pages
 - `fields`: plain JSON object
 - `created_at`
 - `updated_at`
@@ -118,6 +127,42 @@ Conventions:
 - content is stored as pretty-printed JSON
 - one entry equals one JSON file
 - IDs come from a configurable generator, with `uuid_v7` as the default
+
+## System Pages
+
+Garner treats some pages as system pages referenced from `content/+site.json`.
+
+Current model:
+
+- `home_page_id` points to the required home page
+- `error_page_id` may point to a dedicated not-found page
+
+Current conventions:
+
+- the home page uses the `home` blueprint and `home` template
+- the error page uses the `error` blueprint and `error` template
+- home and error pages do not persist a normal page `status`
+- the home page resolves to `/`
+- the error page is not part of the normal public tree
+
+Runtime behavior:
+
+- unresolved public requests first try the configured error page
+- if no error page is configured or the page is missing, Twig falls back to the normal `404` template path
+
+Studio and installer behavior are still expected to tighten around these system pages over time.
+
+Current site and page traversal semantics:
+
+- `Page.children(drafts: true)` returns direct children only
+- `Page.index(drafts: true)` returns all descendants on all levels, excluding self
+- `Site.children(drafts: true)` returns the editorial root slice: home plus home's direct children
+- `Site.index(drafts: true)` returns the full public tree: home plus all of its descendants
+- `Site.systemPages()` returns dedicated system pages outside the public tree, such as the error page
+- sibling ordering is: listed pages first by `sort`, then unlisted pages by `slug` with `id` fallback
+- when drafts are requested, drafts come last and are ordered by `slug` with `id` fallback
+- unlisted pages do not persist a meaningful `sort`
+- `Site.children()` and `Site.index()` still force home to the first position
 
 Path derivation:
 
@@ -185,6 +230,33 @@ Key property:
 
 - public routing does not depend on recursive filesystem traversal
 
+## Request Utilities
+
+`backend/src/Core/Request.php` is the minimal backend request helper.
+
+Current responsibilities:
+
+- detect HTTPS from proxy/server headers
+- read the current request path
+- read raw input, including a CLI stdin fallback for test runners
+- decode JSON payloads for Studio/API actions
+
+## Error Handling
+
+Garner uses a global backend error handler registered from `Application::run()`.
+
+Current behavior:
+
+- PHP warnings/notices are converted into exceptions
+- uncaught API exceptions render JSON responses
+- only uncaught `ValidationException` instances become `400` invalid responses with flattened field errors
+- action-level payload validation is the only phase that should produce `invalid: true`
+- `JsonException` and `InvalidArgumentException` become `400` API error responses with `error: true`
+- service/runtime failures from `backend/src/` must not return `invalid: true`
+- other uncaught API exceptions become generic `500` JSON responses
+- non-API uncaught exceptions render a generic HTML `500` page
+- exceptions are logged through `error_log()`
+
 ## Rendering Surfaces
 
 Garner uses Twig for page templates.
@@ -214,6 +286,11 @@ without introducing a separate rendering mode.
 
 Blueprints are authoring-time schema.
 
+They are loaded from `site/blueprints/*.yml` through a Garner loader built on:
+
+- `symfony/yaml` for parsing
+- `lemmon/validator` for validation of the currently supported blueprint subset
+
 They drive:
 
 - Studio editing UI
@@ -229,6 +306,59 @@ Runtime code should:
 - use explicit helpers, factories, or DTOs when semantics are needed
 - avoid universal coercion APIs
 
+In the unified schema tree, node kinds stay explicit.
+
+Examples:
+
+- `text`, `textarea`, `pages`, `files`: input and picker nodes
+- `page_list`, `file_list`: listing and manipulation nodes
+- `tabs`, `group`: layout/container nodes
+
+Current list-node semantics:
+
+- `page_list.source` identifies the semantic source object for the listing
+- the default page-list query is `source.children(drafts: true)`
+- for `source: site`, that means the editorial root slice: home plus home's direct children
+- the `source` object is also the default create target unless a future override says otherwise
+- `file_list.source` identifies the semantic source/owner for file management
+
+Top-level blueprint metadata may also describe the Studio screen itself.
+
+Current example:
+
+- `title`: required blueprint title
+- `description`: optional Studio-facing intro copy for the screen that uses the blueprint
+- `tabs`: ordered array of named tab objects, not an associative mapping
+
+This preserves the important distinction between a relation picker and an editorial listing without bringing back Kirby's separate fields-versus-sections model.
+
+Current API surface:
+
+- `/api/studio/site`: returns minimal site metadata for Studio shell use
+- `/api/studio/blueprints/site`: returns the parsed site blueprint as JSON for Studio consumption
+- `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
+
+Current `nodes/query` payload contract:
+
+- `type`: currently `page_list` is supported
+- `source`: semantic source such as `site`, `site.home`, or `site.page("about-page")`
+- `query`: optional override string; defaults to `source.children(drafts: true)`
+
+Current supported page-list queries:
+
+- `source.children(drafts: true)`
+- `source.index(drafts: true)`
+- `source.system_pages`
+
+Current validation boundary:
+
+- validate blueprint files at load time
+- validate Studio node-query payload shape at the action boundary with `lemmon/validator`
+- resolve source/query semantics in the Studio service layer
+- keep validation intentionally narrow to the node kinds currently supported by Studio
+- preserve unknown blueprint keys in the returned payload instead of normalizing them away
+- treat the current validation layer as intentionally incomplete, not as the final blueprint spec
+
 ## Studio and API
 
 Garner Studio is a SvelteKit SPA under `/studio`.
@@ -240,6 +370,8 @@ Backend APIs are plain PHP actions under `backend/actions/`.
 Initial Studio/backend responsibilities:
 
 - authentication
+- site metadata endpoint for Studio shell state
+- blueprint fetch endpoints
 - page tree and page detail endpoints
 - validation through a Garner layer backed by `lemmon/validator`
 - CRUD flows built on the same content services as the public runtime
@@ -264,6 +396,7 @@ Current direction:
 - `twig/twig`: page rendering
 - `league/commonmark`: Markdown parsing
 - `illuminate/support`: collections and string helpers
+- `symfony/yaml`: blueprint parsing
 - `lemmon/validator`: validation engine behind a Garner adapter
 
 Do not build Garner clones of generic utility libraries.

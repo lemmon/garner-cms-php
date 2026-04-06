@@ -1,0 +1,35 @@
+title: Site
+description: Manage the site tree, system pages, and site-owned files.
+
+tabs:
+  - name: pages
+    label: Pages
+    nodes:
+      # Listing/manipulation node for existing pages.
+      # This is intentionally distinct from a future `pages` picker node.
+      - type: page_list
+        name: pages
+        label: Pages
+        source: site
+        create:
+          enabled: true
+        empty: No site pages yet.
+
+      - type: page_list
+        name: system_pages
+        label: System Pages
+        source: site
+        query: source.system_pages
+
+  - name: files
+    label: Files
+    nodes:
+      # Listing/manipulation node for existing site files.
+      # This is intentionally distinct from a future `files` picker node.
+      - type: file_list
+        name: files
+        label: Files
+        source: site
+        upload:
+          enabled: true
+        empty: Upload the first site file.

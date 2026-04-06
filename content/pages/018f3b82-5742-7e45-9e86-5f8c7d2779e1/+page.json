@@ -3,9 +3,8 @@
     "kind": "page",
     "parent_id": null,
     "slug": "home",
-    "blueprint": "default",
-    "template": "default",
-    "status": "listed",
+    "blueprint": "home",
+    "template": "home",
     "sort": 1,
     "fields": {
         "title": "Home",

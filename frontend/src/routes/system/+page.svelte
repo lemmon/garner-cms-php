@@ -1,5 +1,9 @@
+<script>
+  let { data } = $props();
+</script>
+
 <svelte:head>
-  <title>System | Garner Studio</title>
+  <title>System | {data.site.title}</title>
 </svelte:head>
 
 <div class="space-y-12 p-12">

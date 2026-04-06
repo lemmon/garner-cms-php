@@ -23,13 +23,7 @@ final class PageRepository
 
         return Collection::make($files === false ? [] : $files)
             ->map($this->decodeFile(...))
-            ->sortBy([
-                static fn(array $page): string => (string) ($page['parent_id'] ?? ''),
-                static fn(array $page): int => is_int($page['sort'] ?? null)
-                    ? $page['sort']
-                    : PHP_INT_MAX,
-                static fn(array $page): string => (string) ($page['slug'] ?? ''),
-            ])
+            ->sort(self::comparePages(...))
             ->values();
     }
 
@@ -113,7 +107,7 @@ final class PageRepository
         $template = $page['template'] ?? $blueprint;
         $now = gmdate(DATE_ATOM);
         $normalizedSlug = is_string($slug) ? trim($slug, '/') : null;
-        $sort = $page['sort'] ?? null;
+        $status = $this->normalizeStatus($page, $blueprint, $template);
 
         if ($normalizedSlug === '') {
             $normalizedSlug = null;
@@ -126,11 +120,120 @@ final class PageRepository
             'slug' => $normalizedSlug,
             'blueprint' => is_string($blueprint) ? $blueprint : 'default',
             'template' => is_string($template) ? $template : $this->defaultTemplate,
-            'status' => is_string($page['status'] ?? null) ? $page['status'] : 'draft',
-            'sort' => $sort !== null ? (int) $sort : null,
+            'status' => $status,
+            'sort' => $this->normalizeSort($page['sort'] ?? null, $status),
             'fields' => is_array($page['fields'] ?? null) ? $page['fields'] : [],
             'created_at' => is_string($page['created_at'] ?? null) ? $page['created_at'] : $now,
             'updated_at' => is_string($page['updated_at'] ?? null) ? $page['updated_at'] : $now,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     */
+    private function normalizeStatus(array $page, mixed $blueprint, mixed $template): ?string
+    {
+        if (is_string($page['status'] ?? null)) {
+            return $page['status'];
+        }
+
+        $blueprintName = is_string($blueprint) ? $blueprint : '';
+        $templateName = is_string($template) ? $template : '';
+
+        if (in_array($blueprintName, ['home', 'error'], true)) {
+            return null;
+        }
+
+        if (in_array($templateName, ['home', 'error'], true)) {
+            return null;
+        }
+
+        return 'draft';
+    }
+
+    private function normalizeSort(mixed $sort, ?string $status): ?int
+    {
+        if ($status === null || $status === 'unlisted') {
+            return null;
+        }
+
+        return $sort !== null ? (int) $sort : null;
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     */
+    private static function systemRank(array $page): int
+    {
+        $blueprint = is_string($page['blueprint'] ?? null) ? $page['blueprint'] : '';
+        $template = is_string($page['template'] ?? null) ? $page['template'] : '';
+
+        if ($blueprint === 'home' || $template === 'home') {
+            return 0;
+        }
+
+        if ($blueprint === 'error' || $template === 'error') {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     */
+    private static function statusRank(array $page): int
+    {
+        return match ($page['status'] ?? null) {
+            'listed' => 0,
+            'unlisted' => 1,
+            'draft' => 2,
+            default => 3,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     */
+    private static function listedSortKey(array $page): int
+    {
+        if (($page['status'] ?? null) !== 'listed') {
+            return PHP_INT_MAX;
+        }
+
+        return is_int($page['sort'] ?? null) ? $page['sort'] : PHP_INT_MAX;
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     */
+    private static function slugOrId(array $page): string
+    {
+        $slug = is_string($page['slug'] ?? null) ? $page['slug'] : '';
+
+        if ($slug !== '') {
+            return $slug;
+        }
+
+        return is_string($page['id'] ?? null) ? $page['id'] : '';
+    }
+
+    /**
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
+    private static function comparePages(array $left, array $right): int
+    {
+        return (
+            (string) ($left['parent_id'] ?? '') <=> (string) ($right['parent_id'] ?? '')
+            // @mago-expect lint:no-shorthand-ternary
+            ?: self::systemRank($left) <=> self::systemRank($right)
+            // @mago-expect lint:no-shorthand-ternary
+            ?: self::statusRank($left) <=> self::statusRank($right)
+            // @mago-expect lint:no-shorthand-ternary
+            ?: self::listedSortKey($left) <=> self::listedSortKey($right)
+            // @mago-expect lint:no-shorthand-ternary
+            ?: self::slugOrId($left) <=> self::slugOrId($right)
+        );
     }
 }

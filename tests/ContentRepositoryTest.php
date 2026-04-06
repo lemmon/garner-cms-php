@@ -55,6 +55,30 @@ final class ContentRepositoryTest extends TestCase
         self::assertSame('listed', $stored['status']);
     }
 
+    public function testPageRepositoryDropsSortForUnlistedPages(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+
+        $pages->save([
+            'id' => 'privacy-page',
+            'slug' => 'privacy',
+            'status' => 'unlisted',
+            'sort' => 20,
+            'fields' => [
+                'title' => 'Privacy',
+            ],
+        ]);
+
+        $stored = $pages->find('privacy-page');
+
+        if (!is_array($stored)) {
+            self::fail('Stored page JSON must decode to an array.');
+        }
+
+        self::assertSame('unlisted', $stored['status']);
+        self::assertNull($stored['sort']);
+    }
+
     public function testIndexerBuildsPublicPathsAndResolverSkipsDrafts(): void
     {
         $pages = new PageRepository($this->projectRoot . '/content');

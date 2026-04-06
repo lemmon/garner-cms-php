@@ -21,6 +21,7 @@ final class SiteRepository
 
         if (!is_file($file)) {
             return [
+                'error_page_id' => null,
                 'id' => 'site',
                 'home_page_id' => null,
                 'title' => 'Garner CMS',
@@ -55,6 +56,9 @@ final class SiteRepository
         $document = [
             'id' => 'site',
             'title' => is_string($site['title'] ?? null) ? $site['title'] : 'Garner CMS',
+            'error_page_id' => is_string($site['error_page_id'] ?? null)
+                ? $site['error_page_id']
+                : null,
             'home_page_id' => is_string($site['home_page_id'] ?? null)
                 ? $site['home_page_id']
                 : null,

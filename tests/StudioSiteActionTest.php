@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use Garner\Content\PageRepository;
 use Garner\Content\SiteRepository;
 use Garner\Core\Application;
 use PHPUnit\Framework\TestCase;
 
-final class StudioBootstrapActionTest extends TestCase
+final class StudioSiteActionTest extends TestCase
 {
     private string $projectRoot;
     private string $repoRoot;
@@ -16,9 +15,9 @@ final class StudioBootstrapActionTest extends TestCase
     {
         $this->repoRoot = dirname(__DIR__);
         $this->projectRoot =
-            sys_get_temp_dir() . '/garner-cms-studio-bootstrap-' . bin2hex(random_bytes(6));
+            sys_get_temp_dir() . '/garner-cms-studio-site-' . bin2hex(random_bytes(6));
 
-        mkdir($this->projectRoot . '/content/pages', 0o777, true);
+        mkdir($this->projectRoot . '/content', 0o777, true);
     }
 
     protected function tearDown(): void
@@ -26,71 +25,24 @@ final class StudioBootstrapActionTest extends TestCase
         $this->deleteDirectory($this->projectRoot);
     }
 
-    public function testStudioBootstrapReturnsSiteStatsAndPages(): void
+    public function testStudioSiteReturnsMinimalSiteData(): void
     {
         $site = new SiteRepository($this->projectRoot . '/content');
-        $pages = new PageRepository($this->projectRoot . '/content');
 
         $site->save([
             'title' => 'Test Garner',
+            'error_page_id' => 'error-page',
             'home_page_id' => 'home-page',
         ]);
 
-        $pages->save([
-            'id' => 'home-page',
-            'slug' => 'home',
-            'status' => 'listed',
-            'sort' => 1,
-            'template' => 'default',
-            'fields' => [
-                'title' => 'Home',
-            ],
-        ]);
-
-        $pages->save([
-            'id' => 'about-page',
-            'parent_id' => 'home-page',
-            'slug' => 'about',
-            'status' => 'listed',
-            'sort' => 10,
-            'template' => 'default',
-            'fields' => [
-                'title' => 'About',
-            ],
-        ]);
-
-        $pages->save([
-            'id' => 'draft-page',
-            'parent_id' => 'home-page',
-            'slug' => 'draft',
-            'status' => 'draft',
-            'sort' => 20,
-            'template' => 'default',
-            'fields' => [
-                'title' => 'Draft',
-            ],
-        ]);
-
-        $handler = require $this->repoRoot . '/backend/actions/studio/bootstrap.php';
+        $handler = require $this->repoRoot . '/backend/actions/studio/site.php';
         $payload = $handler($this->makeApplication());
 
         self::assertTrue($payload['ok']);
+        self::assertSame('site', $payload['site']['id']);
         self::assertSame('Test Garner', $payload['site']['title']);
+        self::assertSame('error-page', $payload['site']['error_page_id']);
         self::assertSame('home-page', $payload['site']['home_page_id']);
-        self::assertSame(3, $payload['stats']['page_count']);
-        self::assertSame(2, $payload['stats']['listed_count']);
-        self::assertSame(1, $payload['stats']['draft_count']);
-
-        $indexedPages = [];
-
-        foreach ($payload['pages'] as $page) {
-            $indexedPages[$page['id']] = $page;
-        }
-
-        self::assertSame('/', $indexedPages['home-page']['path']);
-        self::assertTrue($indexedPages['home-page']['is_home']);
-        self::assertSame('/about', $indexedPages['about-page']['path']);
-        self::assertNull($indexedPages['draft-page']['path']);
     }
 
     private function makeApplication(): Application

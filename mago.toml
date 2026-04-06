@@ -21,7 +21,10 @@ remove-trailing-close-tag = true
 [linter.rules]
 cyclomatic-complexity = { enabled = false }
 excessive-parameter-list = { enabled = false }  # https://github.com/carthage-software/mago/issues/206
+halstead = { enabled = false }
 literal-named-argument = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
+no-ini-set = { enabled = false }
 tagged-todo = { enabled = false }
 too-many-methods = { threshold = 20 }
+too-many-properties = { enabled = false }

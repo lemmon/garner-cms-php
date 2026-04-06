@@ -37,8 +37,16 @@ Important page fields:
 - `parent_id`: nullable parent reference
 - `slug`: nullable path segment
 - `template`: runtime template/controller name
-- `status`: `draft`, `unlisted`, or `listed`
+- `status`: `draft`, `unlisted`, or `listed` for normal public pages; omitted for system pages like `home` and `error`
+- `sort`: meaningful only for listed pages
 - `fields`: plain JSON object with persisted content
+
+Important site fields:
+
+- `id`: always `site`
+- `title`: site title
+- `home_page_id`: configured home page pointer
+- `error_page_id`: configured not-found page pointer
 
 Path rules:
 
@@ -70,6 +78,14 @@ This means Garner supports both:
 - route-style responses from `site/routes.php`
 - page-controller-style responses tied to content pages
 
+System pages:
+
+- the home page is a real content page referenced by `content/+site.json`
+- the error page may be a real content page referenced by `content/+site.json`
+- home and error pages do not persist a normal page `status`
+- unresolved public requests try the configured error page first
+- if no error page exists, runtime falls back safely to normal 404 template rendering
+
 ## Site Extension Points
 
 Use these first:
@@ -86,6 +102,17 @@ Use these first:
 - blueprints are authoring-time schema, not runtime semantic truth
 - use explicit helpers/factories or DTOs when semantics are needed
 - do not recreate generic helpers that already exist in the PHP ecosystem
+
+Current traversal semantics:
+
+- `Page.children(drafts: true)` returns direct children only
+- `Page.index(drafts: true)` returns all descendants on all levels, excluding self
+- `Site.children(drafts: true)` returns home plus home's direct children
+- `Site.index(drafts: true)` returns home plus all of its descendants
+- `Site.systemPages()` returns system pages outside the public tree
+- sibling ordering is listed by `sort`, then unlisted by `slug` with `id` fallback
+- when drafts are included, drafts come last and are ordered by `slug` with `id` fallback
+- unlisted pages do not persist `sort`
 
 ## Files and Media
 
@@ -107,18 +134,61 @@ But ownership and accessibility are separate:
 - `carthage-software/mago`: PHP formatting and linting
 - `phpstan/phpstan`: static analysis
 - `tailwindcss`: Studio styling and component foundation
-- `lemmon/validator`: planned validation engine
+- `symfony/yaml`: blueprint parsing
+- `lemmon/validator`: blueprint validation engine behind a Garner adapter boundary
 
 Use Garner code for CMS-specific behavior and ecosystem libraries for generic behavior.
+
+## Request Notes
+
+- `backend/src/Core/Request.php` handles HTTPS detection, request path lookup, raw input, and JSON payload decoding
+- raw input falls back to `php://stdin` under CLI so request-body tests can exercise the same code path
+- Studio/API actions can read JSON bodies through `Request::getPayload()`
+
+## Error Handling Notes
+
+- backend runtime error handling is centralized in `backend/src/Core/ErrorHandler.php`
+- `Application::run()` registers the global handler; constructing `Application` alone should stay side-effect light
+- API payload/input exceptions should not be handled ad hoc in every route
+- only route/action boundary validation should return `invalid: true`
+- `Lemmon\\Validator\\ValidationException` maps to `400` invalid API responses with flattened field errors
+- `JsonException` and `InvalidArgumentException` map to `400` API error responses with `error: true`
+- service/runtime failures from `backend/src/` must not be reported as invalid form state
 
 ## Studio Frontend Notes
 
 - the PHP backend serves the built Studio app from `frontend/build/`
 - the Studio base path is currently fixed at `/studio` and must match the backend prefix
+- `/studio` redirects to `/studio/site`
+- `frontend/src/routes/+layout.js` loads `/api/studio/site` for shell-level site metadata
+- the current site overview screen lives at `frontend/src/routes/site/+page.svelte`
 - root `eslint.config.mjs` owns JS and Svelte linting
 - shared Studio UI primitives live in `frontend/src/lib/components/`
 - form primitives live in `frontend/src/lib/components/forms/`
+- do not use rounded corners in Studio UI
 - prefer those primitives over ad-hoc repeated markup when Studio starts growing
+
+## Blueprint Notes
+
+- blueprints live under `site/blueprints/`
+- the first example blueprint is `site/blueprints/site.yml`
+- `/api/studio/site` returns minimal site metadata for Studio UI
+- `/api/studio/blueprints/site` returns the parsed site blueprint as JSON
+- `/api/studio/nodes/query` resolves list-node payloads for Studio
+- top-level blueprint `description` is optional and may be used for Studio screen intro copy
+- `tabs` is an ordered array of named tab objects, not an associative mapping
+- the backend validates the currently supported blueprint subset at load time
+- blueprint validation is intentionally incomplete for now and should not be treated as the final schema contract
+- input/picker nodes and listing/manipulation nodes are distinct node kinds in one schema tree
+- use `pages` and `files` for picker-style nodes
+- use `page_list` and `file_list` for editorial listing/manipulation nodes
+- `page_list.source` identifies the semantic source object for a page listing
+- `file_list.source` identifies the semantic source object for a file listing
+- the default page-list query is `source.children(drafts: true)`
+- current supported page-list sources include `site`, `site.home`, and `site.page("...")`
+- current supported page-list queries include `source.children(drafts: true)`, `source.index(drafts: true)`, and `source.system_pages`
+- action payload shape for node queries is validated with `lemmon/validator` before the Studio service runs
+- system blueprints currently exist for `home` and `error`
 
 ## Current Commands
 

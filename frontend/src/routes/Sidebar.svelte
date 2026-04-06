@@ -8,7 +8,7 @@
 
   const items = [
     {
-      href: '/',
+      href: '/site',
       label: 'Pages',
       icon: GlobeIcon,
     },
@@ -33,7 +33,7 @@
       {#each items as item (item.href)}
         {@const resolvedHref = resolve(item.href)}
         {@const active =
-          item.href === '/'
+          item.href === '/site'
             ? page.url.pathname === resolvedHref
             : page.url.pathname === resolvedHref ||
               page.url.pathname.startsWith(resolvedHref + '/')}
@@ -43,7 +43,7 @@
               'flex p-3 transition-colors',
               active
                 ? 'text-blue bg-blue/5'
-                : 'text-current/60 hover:bg-neutral-100 hover:text-current',
+                : 'text-neutral-600 hover:bg-neutral-100 hover:text-current',
             ]}
             href={resolvedHref}
             aria-current={active ? 'page' : undefined}

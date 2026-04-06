@@ -3,8 +3,12 @@
 
   import Sidebar from './Sidebar.svelte';
 
-  let { children } = $props();
+  let { children, data } = $props();
 </script>
+
+<svelte:head>
+  <title>{data.site.title}</title>
+</svelte:head>
 
 <div class="bg-background text-text flex h-dvh overflow-hidden">
   <Sidebar />

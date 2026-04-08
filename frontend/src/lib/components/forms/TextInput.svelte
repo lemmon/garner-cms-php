@@ -10,6 +10,9 @@
     error,
     optional,
     required,
+    name,
+    value = $bindable(''),
+    placeholder,
     ...props
   } = $props();
 
@@ -32,6 +35,9 @@
       'disabled:cursor-not-allowed disabled:text-current/20 disabled:outline-neutral-500/10'
     )}
     id={inputId}
+    {name}
+    {placeholder}
+    bind:value
     aria-invalid={error ? 'true' : undefined}
     aria-describedby={error ? errorId : undefined}
     aria-required={required ? 'true' : undefined}

@@ -1,14 +1,15 @@
 <script>
   import TextInput from '$lib/components/forms/TextInput.svelte';
 
-  let { node, value = $bindable('') } = $props();
+  let { node, value = '' } = $props();
 </script>
 
 <div class="space-y-2">
   <TextInput
     label={node.label}
+    name={node.name}
     placeholder={node.placeholder ?? ''}
-    bind:value
+    {value}
   />
 
   {#if node.help}

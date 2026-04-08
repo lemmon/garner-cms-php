@@ -1,15 +1,16 @@
 <script>
   import TextArea from '$lib/components/forms/TextArea.svelte';
 
-  let { node, value = $bindable('') } = $props();
+  let { node, value = '' } = $props();
 </script>
 
 <div class="space-y-2">
   <TextArea
     label={node.label}
+    name={node.name}
     placeholder={node.placeholder ?? ''}
     rows={node.rows ?? 8}
-    bind:value
+    {value}
   />
 
   {#if node.help}

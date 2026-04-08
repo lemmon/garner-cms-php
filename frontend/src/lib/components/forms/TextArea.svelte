@@ -9,13 +9,17 @@
     disabled,
     error,
     required,
-    value = $bindable(undefined),
+    name,
+    value = $bindable(''),
+    rows,
+    placeholder,
     ...props
   } = $props();
 
   const uid = $props.id();
   const inputId = `form-input-${uid}`;
   const errorId = `form-input-error-${uid}`;
+
   let mirrorValue = $derived(
     (value ?? '') === '' ? '\u200b' : `${value ?? ''}\n`
   );
@@ -36,6 +40,9 @@
         'disabled:cursor-not-allowed disabled:text-current/20 disabled:outline-neutral-500/10',
       ]}
       id={inputId}
+      {name}
+      {placeholder}
+      rows={rows ?? undefined}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={error ? errorId : undefined}
       aria-required={required ? 'true' : undefined}

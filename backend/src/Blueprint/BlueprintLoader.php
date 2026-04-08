@@ -26,9 +26,10 @@ final class BlueprintLoader
         $blueprint = $this->resolveValue($this->parseBlueprintFile($name), [$name]);
 
         if (!is_array($blueprint) || array_is_list($blueprint)) {
-            throw new BlueprintException(
-                sprintf('Blueprint "%s" must parse to a top-level mapping', $name),
-            );
+            throw new BlueprintException(sprintf(
+                'Blueprint "%s" must parse to a top-level mapping',
+                $name,
+            ));
         }
 
         $this->validateBlueprint($name, $blueprint);
@@ -56,10 +57,7 @@ final class BlueprintLoader
 
     private function assertBlueprintReference(string $name): void
     {
-        if (
-            $name === '' ||
-            preg_match('/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/', $name) !== 1
-        ) {
+        if ($name === '' || preg_match('/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/', $name) !== 1) {
             throw new BlueprintException(sprintf('Invalid blueprint reference "%s"', $name));
         }
     }
@@ -98,7 +96,7 @@ final class BlueprintLoader
         }
 
         if (array_is_list($value)) {
-            return array_map(fn (mixed $item): mixed => $this->resolveValue($item, $stack), $value);
+            return array_map(fn(mixed $item): mixed => $this->resolveValue($item, $stack), $value);
         }
 
         $resolved = [];
@@ -117,13 +115,11 @@ final class BlueprintLoader
         $this->assertBlueprintReference($reference);
 
         if (in_array($reference, $stack, true)) {
-            throw new BlueprintException(
-                sprintf(
-                    'Blueprint "%s" creates a cyclic extends chain: %s',
-                    $stack[0],
-                    implode(' -> ', [...$stack, $reference]),
-                ),
-            );
+            throw new BlueprintException(sprintf(
+                'Blueprint "%s" creates a cyclic extends chain: %s',
+                $stack[0],
+                implode(' -> ', [...$stack, $reference]),
+            ));
         }
 
         $base = $this->resolveValue($this->parseBlueprintFile($reference), [...$stack, $reference]);
@@ -153,10 +149,10 @@ final class BlueprintLoader
             $current = $merged[$key] ?? null;
 
             if (
-                is_array($current) &&
-                !array_is_list($current) &&
-                is_array($value) &&
-                !array_is_list($value)
+                is_array($current)
+                && !array_is_list($current)
+                && is_array($value)
+                && !array_is_list($value)
             ) {
                 $merged[$key] = $this->mergeMappings($current, $value);
                 continue;

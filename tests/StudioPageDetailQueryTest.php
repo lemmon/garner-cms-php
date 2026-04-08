@@ -16,15 +16,16 @@ final class StudioPageDetailQueryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->projectRoot = sys_get_temp_dir() . '/garner-cms-studio-page-detail-' . bin2hex(random_bytes(6));
+        $this->projectRoot =
+            sys_get_temp_dir() . '/garner-cms-studio-page-detail-' . bin2hex(random_bytes(6));
 
         mkdir($this->projectRoot . '/content/pages', 0o777, true);
         mkdir($this->projectRoot . '/site/blueprints/pages', 0o777, true);
 
         file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', <<<'YAML'
-title: Page
-tabs: []
-YAML);
+            title: Page
+            tabs: []
+            YAML);
     }
 
     protected function tearDown(): void

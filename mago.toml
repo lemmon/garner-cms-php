@@ -22,6 +22,7 @@ remove-trailing-close-tag = true
 cyclomatic-complexity = { enabled = false }
 excessive-parameter-list = { enabled = false }  # https://github.com/carthage-software/mago/issues/206
 halstead = { enabled = false }
+kan-defect = { enabled = false }
 literal-named-argument = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 no-ini-set = { enabled = false }

@@ -14,8 +14,6 @@ return static fn(
     Pages $pages,
     Application $app,
 ): RenderedResponse => RenderedResponse::text(
-    rtrim((string) $page->value(
-        'text',
-        sprintf("Controller response for %s.\n", $page->title()),
-    )) . "\n",
+    rtrim((string) $page->value('text', sprintf("Controller response for %s.\n", $page->title())))
+        . "\n",
 );

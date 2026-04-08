@@ -9,7 +9,10 @@ use Lemmon\Validator\Validator;
 
 return static function (Application $app): array {
     $schema = Validator::isAssociative([
-        'id' => Validator::isString()->pipe(trim(...))->required()->notEmpty(),
+        'id' => Validator::isString()
+            ->pipe(trim(...))
+            ->required()
+            ->notEmpty(),
     ]);
 
     $payload = $schema->validate(Request::getPayload());

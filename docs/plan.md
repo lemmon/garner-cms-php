@@ -133,7 +133,7 @@ Deliver:
 - authentication with persistent account storage
 - runtime session storage
 - page tree endpoint
-- page detail endpoint
+- page detail endpoint and initial blueprint-driven edit shell
 - API request validation using the Garner validation layer
 - SvelteKit Studio navigation and edit view shell
 
@@ -141,7 +141,7 @@ Exit criteria:
 
 - log in to Studio
 - browse page tree
-- open a page and read editable data
+- open a page and inspect blueprint-driven field inputs before save is introduced
 
 ## Phase 6: Editing and Media
 

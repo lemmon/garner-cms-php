@@ -21,29 +21,14 @@ final class BlueprintLoader
      */
     public function load(string $name): array
     {
-        $this->assertBlueprintName($name);
+        $this->assertBlueprintReference($name);
 
-        $path = $this->blueprintPath($name);
+        $blueprint = $this->resolveValue($this->parseBlueprintFile($name), [$name]);
 
-        if (!is_file($path)) {
-            throw new BlueprintException(sprintf('Blueprint "%s" was not found', $name));
-        }
-
-        try {
-            $blueprint = Yaml::parseFile($path);
-        } catch (ParseException $exception) {
+        if (!is_array($blueprint) || array_is_list($blueprint)) {
             throw new BlueprintException(
-                sprintf('Blueprint "%s" could not be parsed: %s', $name, $exception->getMessage()),
-                0,
-                $exception,
+                sprintf('Blueprint "%s" must parse to a top-level mapping', $name),
             );
-        }
-
-        if (!is_array($blueprint)) {
-            throw new BlueprintException(sprintf(
-                'Blueprint "%s" must parse to a top-level mapping',
-                $name,
-            ));
         }
 
         $this->validateBlueprint($name, $blueprint);
@@ -51,16 +36,136 @@ final class BlueprintLoader
         return $blueprint;
     }
 
-    private function assertBlueprintName(string $name): void
+    /**
+     * @return array<string, mixed>
+     */
+    public function loadSite(): array
     {
-        if ($name === '' || preg_match('/^[A-Za-z0-9_-]+$/', $name) !== 1) {
-            throw new BlueprintException(sprintf('Invalid blueprint name "%s"', $name));
+        return $this->load('site');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function loadPage(string $name): array
+    {
+        $this->assertBlueprintReference($name);
+
+        return $this->load('pages/' . $name);
+    }
+
+    private function assertBlueprintReference(string $name): void
+    {
+        if (
+            $name === '' ||
+            preg_match('/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/', $name) !== 1
+        ) {
+            throw new BlueprintException(sprintf('Invalid blueprint reference "%s"', $name));
         }
     }
 
     private function blueprintPath(string $name): string
     {
         return $this->blueprintsPath . '/' . $name . '.yml';
+    }
+
+    private function parseBlueprintFile(string $name): mixed
+    {
+        $path = $this->blueprintPath($name);
+
+        if (!is_file($path)) {
+            throw new BlueprintException(sprintf('Blueprint "%s" was not found', $name));
+        }
+
+        try {
+            return Yaml::parseFile($path);
+        } catch (ParseException $exception) {
+            throw new BlueprintException(
+                sprintf('Blueprint "%s" could not be parsed: %s', $name, $exception->getMessage()),
+                0,
+                $exception,
+            );
+        }
+    }
+
+    /**
+     * @param list<string> $stack
+     */
+    private function resolveValue(mixed $value, array $stack): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        if (array_is_list($value)) {
+            return array_map(fn (mixed $item): mixed => $this->resolveValue($item, $stack), $value);
+        }
+
+        $resolved = [];
+
+        foreach ($value as $key => $item) {
+            $resolved[$key] = $this->resolveValue($item, $stack);
+        }
+
+        $extends = $resolved['extends'] ?? null;
+
+        if (!is_string($extends) || trim($extends) === '') {
+            return $resolved;
+        }
+
+        $reference = trim($extends);
+        $this->assertBlueprintReference($reference);
+
+        if (in_array($reference, $stack, true)) {
+            throw new BlueprintException(
+                sprintf(
+                    'Blueprint "%s" creates a cyclic extends chain: %s',
+                    $stack[0],
+                    implode(' -> ', [...$stack, $reference]),
+                ),
+            );
+        }
+
+        $base = $this->resolveValue($this->parseBlueprintFile($reference), [...$stack, $reference]);
+
+        if (!is_array($base) || array_is_list($base)) {
+            throw new BlueprintException(sprintf(
+                'Blueprint fragment "%s" must resolve to a mapping',
+                $reference,
+            ));
+        }
+
+        unset($resolved['extends']);
+
+        return $this->mergeMappings($base, $resolved);
+    }
+
+    /**
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private function mergeMappings(array $base, array $overrides): array
+    {
+        $merged = $base;
+
+        foreach ($overrides as $key => $value) {
+            $current = $merged[$key] ?? null;
+
+            if (
+                is_array($current) &&
+                !array_is_list($current) &&
+                is_array($value) &&
+                !array_is_list($value)
+            ) {
+                $merged[$key] = $this->mergeMappings($current, $value);
+                continue;
+            }
+
+            $merged[$key] = $value;
+        }
+
+        return $merged;
     }
 
     /**
@@ -118,6 +223,14 @@ final class BlueprintLoader
         }
 
         return match ($type) {
+            'text' => [
+                ...$errors,
+                ...$this->validationMessages($path, $node, $this->textNodeValidator()),
+            ],
+            'textarea' => [
+                ...$errors,
+                ...$this->validationMessages($path, $node, $this->textareaNodeValidator()),
+            ],
             'page_list' => [
                 ...$errors,
                 ...$this->validationMessages($path, $node, $this->pageListValidator()),
@@ -173,6 +286,29 @@ final class BlueprintLoader
             ]),
             'empty' => Validator::isString(),
             'help' => Validator::isString(),
+        ]);
+    }
+
+    private function textNodeValidator(): FieldValidator
+    {
+        return Validator::isAssociative([
+            'type' => Validator::isString()->const('text')->required(),
+            'name' => Validator::isString()->required()->notEmpty(),
+            'label' => Validator::isString()->required()->notEmpty(),
+            'help' => Validator::isString(),
+            'placeholder' => Validator::isString(),
+        ]);
+    }
+
+    private function textareaNodeValidator(): FieldValidator
+    {
+        return Validator::isAssociative([
+            'type' => Validator::isString()->const('textarea')->required(),
+            'name' => Validator::isString()->required()->notEmpty(),
+            'label' => Validator::isString()->required()->notEmpty(),
+            'help' => Validator::isString(),
+            'placeholder' => Validator::isString(),
+            'rows' => Validator::isInt(),
         ]);
     }
 

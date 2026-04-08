@@ -1,0 +1,11 @@
+title: Home
+description: System blueprint for the required home page.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Intro
+        rows: 8

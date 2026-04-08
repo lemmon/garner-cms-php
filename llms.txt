@@ -162,6 +162,7 @@ Use Garner code for CMS-specific behavior and ecosystem libraries for generic be
 - `/studio` redirects to `/studio/site`
 - `frontend/src/routes/+layout.js` loads `/api/studio/site` for shell-level site metadata
 - the current site overview screen lives at `frontend/src/routes/site/+page.svelte`
+- page detail lives at `frontend/src/routes/site/pages/[id]/+page.svelte`
 - root `eslint.config.mjs` owns JS and Svelte linting
 - shared Studio UI primitives live in `frontend/src/lib/components/`
 - form primitives live in `frontend/src/lib/components/forms/`
@@ -172,9 +173,16 @@ Use Garner code for CMS-specific behavior and ecosystem libraries for generic be
 
 - blueprints live under `site/blueprints/`
 - the first example blueprint is `site/blueprints/site.yml`
+- page blueprints live under `site/blueprints/pages/`
+- reusable fragments such as shared tabs live under paths like `site/blueprints/tabs/`
+- blueprint mappings may use `extends: some/path` to reuse and override another blueprint fragment
 - `/api/studio/site` returns minimal site metadata for Studio UI
 - `/api/studio/blueprints/site` returns the parsed site blueprint as JSON
 - `/api/studio/nodes/query` resolves list-node payloads for Studio
+- `/api/studio/pages/show` returns page detail plus the loaded blueprint when available
+- Studio keeps page metadata loaded but does not display it yet
+- page title is implicit for every page and is not declared in blueprints
+- title and slug editing should use a separate page-level affordance, not blueprint field nodes
 - top-level blueprint `description` is optional and may be used for Studio screen intro copy
 - `tabs` is an ordered array of named tab objects, not an associative mapping
 - the backend validates the currently supported blueprint subset at load time
@@ -182,12 +190,15 @@ Use Garner code for CMS-specific behavior and ecosystem libraries for generic be
 - input/picker nodes and listing/manipulation nodes are distinct node kinds in one schema tree
 - use `pages` and `files` for picker-style nodes
 - use `page_list` and `file_list` for editorial listing/manipulation nodes
+- supported field nodes currently include `text` and `textarea`
 - `page_list.source` identifies the semantic source object for a page listing
 - `file_list.source` identifies the semantic source object for a file listing
 - the default page-list query is `source.children(drafts: true)`
 - current supported page-list sources include `site`, `site.home`, and `site.page("...")`
 - current supported page-list queries include `source.children(drafts: true)`, `source.index(drafts: true)`, and `source.system_pages`
 - action payload shape for node queries is validated with `lemmon/validator` before the Studio service runs
+- Studio page detail tolerates missing page blueprints by returning `blueprint: null` plus a `blueprint_issue`
+- Studio page detail currently renders blueprint fields but does not save them yet
 - system blueprints currently exist for `home` and `error`
 
 ## Current Commands

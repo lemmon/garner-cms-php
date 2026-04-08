@@ -33,10 +33,8 @@
       {#each items as item (item.href)}
         {@const resolvedHref = resolve(item.href)}
         {@const active =
-          item.href === '/site'
-            ? page.url.pathname === resolvedHref
-            : page.url.pathname === resolvedHref ||
-              page.url.pathname.startsWith(resolvedHref + '/')}
+          page.url.pathname === resolvedHref ||
+          page.url.pathname.startsWith(resolvedHref + '/')}
         <li>
           <a
             class={[

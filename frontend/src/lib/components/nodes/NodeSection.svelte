@@ -6,7 +6,7 @@
   {#if label || meta}
     <header class="flex items-end justify-between gap-6">
       {#if label}
-        <h2 class="text-lg/6 font-medium tracking-tight">{label}</h2>
+        <h2 class="text-lg/6 font-medium">{label}</h2>
       {/if}
 
       {#if meta}

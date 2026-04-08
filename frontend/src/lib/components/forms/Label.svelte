@@ -1,7 +1,9 @@
 <script>
+  import { twMerge } from 'tailwind-merge';
+
   let {
-    class: classname = '',
-    disabled = false,
+    class: classname,
+    disabled,
     optional = false,
     children,
     ...props
@@ -9,11 +11,11 @@
 </script>
 
 <label
-  class={[
-    'block text-base/5 font-medium tracking-tight',
-    disabled ? 'text-current/40' : 'text-current',
-    classname,
-  ]}
+  class={twMerge(
+    'block text-lg/6 font-medium data-disabled:text-current/20',
+    classname
+  )}
+  data-disabled={disabled}
   {...props}
 >
   {@render children()}

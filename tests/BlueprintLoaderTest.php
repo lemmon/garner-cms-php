@@ -40,18 +40,22 @@ final class BlueprintLoaderTest extends TestCase
                         create:
                             enabled: true
 
-                - name: files
-                  label: Files
-                  nodes:
-                      - type: file_list
-                        name: files
-                        label: Files
-                        source: site
-                        upload:
-                            enabled: true
+                - extends: tabs/files
             YAML);
 
-        $blueprint = $this->makeLoader()->load('site');
+        $this->writeFile('site/blueprints/tabs/files.yml', <<<'YAML'
+            name: files
+            label: Files
+            nodes:
+                - type: file_list
+                  name: files
+                  label: Files
+                  source: site
+                  upload:
+                      enabled: true
+            YAML);
+
+        $blueprint = $this->makeLoader()->loadSite();
 
         self::assertSame('Site', $blueprint['title']);
         self::assertSame('Site-level editorial overview.', $blueprint['description']);
@@ -60,6 +64,33 @@ final class BlueprintLoaderTest extends TestCase
         self::assertSame('page_list', $blueprint['tabs'][0]['nodes'][0]['type']);
         self::assertTrue($blueprint['tabs'][0]['nodes'][0]['create']['enabled']);
         self::assertSame('file_list', $blueprint['tabs'][1]['nodes'][0]['type']);
+    }
+
+    public function testLoaderParsesSimpleFieldNodes(): void
+    {
+        $this->writeFile('site/blueprints/pages/page.yml', <<<'YAML'
+            title: Page
+
+            tabs:
+                - name: content
+                  label: Content
+                  nodes:
+                      - type: text
+                        name: summary
+                        label: Summary
+
+                      - type: textarea
+                        name: text
+                        label: Text
+                        rows: 10
+            YAML);
+
+        $blueprint = $this->makeLoader()->loadPage('page');
+
+        self::assertSame('Page', $blueprint['title']);
+        self::assertSame('text', $blueprint['tabs'][0]['nodes'][0]['type']);
+        self::assertSame('textarea', $blueprint['tabs'][0]['nodes'][1]['type']);
+        self::assertSame(10, $blueprint['tabs'][0]['nodes'][1]['rows']);
     }
 
     public function testLoaderRejectsInvalidBlueprintStructure(): void
@@ -79,7 +110,7 @@ final class BlueprintLoaderTest extends TestCase
         $this->expectException(BlueprintException::class);
         $this->expectExceptionMessage('tabs.0.nodes.0.source');
 
-        $this->makeLoader()->load('site');
+        $this->makeLoader()->loadSite();
     }
 
     private function makeLoader(): BlueprintLoader

@@ -51,6 +51,7 @@ final class ContentRepositoryTest extends TestCase
         self::assertArrayHasKey('slug', $stored);
         self::assertArrayHasKey('created_at', $stored);
         self::assertNull($stored['slug']);
+        self::assertSame('page', $stored['blueprint']);
         self::assertSame('default', $stored['template']);
         self::assertSame('listed', $stored['status']);
     }

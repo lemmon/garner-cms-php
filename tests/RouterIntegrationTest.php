@@ -18,7 +18,8 @@ final class RouterIntegrationTest extends TestCase
 
         mkdir($this->projectRoot . '/content/pages', 0o777, true);
         mkdir($this->projectRoot . '/frontend/build/_app/immutable/entry', 0o777, true);
-        mkdir($this->projectRoot . '/site/blueprints', 0o777, true);
+        mkdir($this->projectRoot . '/site/blueprints/pages', 0o777, true);
+        mkdir($this->projectRoot . '/site/blueprints/tabs', 0o777, true);
         mkdir($this->projectRoot . '/site/controllers', 0o777, true);
         mkdir($this->projectRoot . '/site/templates', 0o777, true);
 
@@ -43,6 +44,12 @@ final class RouterIntegrationTest extends TestCase
         $contentStatus = $this->dispatch('/api/meta/content-status');
         $studioSite = $this->dispatch('/api/studio/site');
         $siteBlueprint = $this->dispatch('/api/studio/blueprints/site');
+        $pageShow = $this->dispatch(
+            '/api/studio/pages/show',
+            'POST',
+            '{"id":"about-page"}',
+            'application/json',
+        );
 
         self::assertSame('200', $studio['status']);
         self::assertStringContainsString('<title>Test Garner Studio</title>', $studio['body']);
@@ -72,6 +79,12 @@ final class RouterIntegrationTest extends TestCase
         self::assertStringContainsString('"name": "site"', $siteBlueprint['body']);
         self::assertStringContainsString('"title": "Site"', $siteBlueprint['body']);
         self::assertStringContainsString('"type": "page_list"', $siteBlueprint['body']);
+
+        self::assertSame('200', $pageShow['status']);
+        self::assertStringContainsString('"id": "about-page"', $pageShow['body']);
+        self::assertStringContainsString('"blueprint": "page"', $pageShow['body']);
+        self::assertStringContainsString('"path": "/about"', $pageShow['body']);
+        self::assertStringContainsString('"title": "Page"', $pageShow['body']);
     }
 
     public function testRouterLetsCustomRoutesWinOverPublicPages(): void
@@ -348,15 +361,24 @@ final class RouterIntegrationTest extends TestCase
                         create:
                             enabled: true
 
-                - name: files
+                - extends: tabs/files
+            YAML);
+
+        file_put_contents($this->projectRoot . '/site/blueprints/tabs/files.yml', <<<'YAML'
+            name: files
+            label: Files
+            nodes:
+                - type: file_list
+                  name: files
                   label: Files
-                  nodes:
-                      - type: file_list
-                        name: files
-                        label: Files
-                        source: site
-                        upload:
-                            enabled: true
+                  source: site
+                  upload:
+                      enabled: true
+            YAML);
+
+        file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', <<<'YAML'
+            title: Page
+            tabs: []
             YAML);
     }
 

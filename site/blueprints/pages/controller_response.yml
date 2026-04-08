@@ -1,0 +1,11 @@
+title: Controller Response
+description: Content page that returns a direct response from its controller.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Response
+        rows: 10

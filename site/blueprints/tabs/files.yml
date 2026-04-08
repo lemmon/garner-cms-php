@@ -1,0 +1,10 @@
+name: files
+label: Files
+nodes:
+  - type: file_list
+    name: files
+    label: Files
+    source: site
+    upload:
+      enabled: true
+    empty: Upload the first site file.

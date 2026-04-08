@@ -162,7 +162,7 @@ final class PathIndexer
                 ':kind' => (string) ($page['kind'] ?? 'page'),
                 ':parent_id' => is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null,
                 ':slug' => $this->normalizedSlug($page),
-                ':blueprint' => (string) ($page['blueprint'] ?? 'default'),
+                ':blueprint' => (string) ($page['blueprint'] ?? 'page'),
                 ':template' => (string) ($page['template'] ?? 'default'),
                 ':status' => is_string($page['status'] ?? null) ? $page['status'] : null,
                 ':sort' => is_int($page['sort'] ?? null) ? $page['sort'] : null,

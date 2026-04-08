@@ -286,7 +286,7 @@ without introducing a separate rendering mode.
 
 Blueprints are authoring-time schema.
 
-They are loaded from `site/blueprints/*.yml` through a Garner loader built on:
+They are loaded from `site/blueprints/**/*.yml` through a Garner loader built on:
 
 - `symfony/yaml` for parsing
 - `lemmon/validator` for validation of the currently supported blueprint subset
@@ -329,6 +329,10 @@ Current example:
 - `title`: required blueprint title
 - `description`: optional Studio-facing intro copy for the screen that uses the blueprint
 - `tabs`: ordered array of named tab objects, not an associative mapping
+- site blueprint lives at `site/blueprints/site.yml`
+- page blueprints live under `site/blueprints/pages/*.yml`
+- reusable fragments such as shared tabs may live under paths like `site/blueprints/tabs/*.yml`
+- blueprint mappings may use `extends: some/path` to reuse and override another blueprint fragment
 
 This preserves the important distinction between a relation picker and an editorial listing without bringing back Kirby's separate fields-versus-sections model.
 
@@ -337,6 +341,7 @@ Current API surface:
 - `/api/studio/site`: returns minimal site metadata for Studio shell use
 - `/api/studio/blueprints/site`: returns the parsed site blueprint as JSON for Studio consumption
 - `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
+- `/api/studio/pages/show`: returns page detail plus the resolved blueprint payload when available
 
 Current `nodes/query` payload contract:
 
@@ -349,6 +354,19 @@ Current supported page-list queries:
 - `source.children(drafts: true)`
 - `source.index(drafts: true)`
 - `source.system_pages`
+
+Current Studio page-detail behavior:
+
+- page detail lives under `/studio/site/pages/[id]`
+- the page list links directly to that nested Studio route
+- the detail endpoint returns stored page metadata, raw `fields`, and the loaded blueprint when present
+- Studio keeps page metadata loaded but does not display it yet
+- page title is implicit for every page and is not declared as a blueprint node
+- title and slug editing should use a separate page-level affordance, not blueprint field nodes
+- the current detail screen renders supported field nodes from the loaded blueprint
+- supported field nodes currently include `text` and `textarea`
+- save/update behavior is not implemented yet
+- missing page blueprints do not fail the entire detail view; they return `blueprint: null` with a `blueprint_issue`
 
 Current validation boundary:
 

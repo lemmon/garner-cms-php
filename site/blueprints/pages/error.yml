@@ -1,0 +1,11 @@
+title: Error
+description: System blueprint for the dedicated not-found page.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Message
+        rows: 8

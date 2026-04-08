@@ -7,5 +7,5 @@ use Garner\Core\Application;
 return static fn(Application $app): array => [
     'ok' => true,
     'name' => 'site',
-    'blueprint' => $app->blueprintLoader()->load('site'),
+    'blueprint' => $app->blueprintLoader()->loadSite(),
 ];

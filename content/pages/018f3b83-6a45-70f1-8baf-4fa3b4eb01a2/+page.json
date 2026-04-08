@@ -3,7 +3,7 @@
     "kind": "page",
     "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
     "slug": "about",
-    "blueprint": "default",
+    "blueprint": "page",
     "template": "default",
     "status": "listed",
     "sort": 10,

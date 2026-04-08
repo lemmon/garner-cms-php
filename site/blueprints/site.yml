@@ -21,15 +21,4 @@ tabs:
         source: site
         query: source.system_pages
 
-  - name: files
-    label: Files
-    nodes:
-      # Listing/manipulation node for existing site files.
-      # This is intentionally distinct from a future `files` picker node.
-      - type: file_list
-        name: files
-        label: Files
-        source: site
-        upload:
-          enabled: true
-        empty: Upload the first site file.
+  - extends: tabs/files

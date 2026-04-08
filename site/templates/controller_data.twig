@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ page.title }} | {{ site.title }}</title>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>{{ page.title }}</h1>
+        <p>{{ controller_message }}</p>
+        {% set text = page.value('text') %}
+        {% if text %}
+          {{ text|markdown }}
+        {% endif %}
+      </article>
+    </main>
+  </body>
+</html>

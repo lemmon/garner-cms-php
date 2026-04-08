@@ -1,0 +1,11 @@
+title: Page
+description: Default blueprint for standard content pages.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Text
+        rows: 12

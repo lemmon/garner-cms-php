@@ -1,0 +1,11 @@
+title: Markdown
+description: Content page rendered through the Markdown filter.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Markdown
+        rows: 14

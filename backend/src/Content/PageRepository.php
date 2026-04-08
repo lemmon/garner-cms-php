@@ -103,8 +103,8 @@ final class PageRepository
             throw new RuntimeException('Page "slug" must be a string or null');
         }
 
-        $blueprint = $page['blueprint'] ?? 'default';
-        $template = $page['template'] ?? $blueprint;
+        $blueprint = $page['blueprint'] ?? 'page';
+        $template = $page['template'] ?? $this->defaultTemplate;
         $now = gmdate(DATE_ATOM);
         $normalizedSlug = is_string($slug) ? trim($slug, '/') : null;
         $status = $this->normalizeStatus($page, $blueprint, $template);
@@ -118,7 +118,7 @@ final class PageRepository
             'kind' => is_string($page['kind'] ?? null) ? $page['kind'] : 'page',
             'parent_id' => is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null,
             'slug' => $normalizedSlug,
-            'blueprint' => is_string($blueprint) ? $blueprint : 'default',
+            'blueprint' => is_string($blueprint) ? $blueprint : 'page',
             'template' => is_string($template) ? $template : $this->defaultTemplate,
             'status' => $status,
             'sort' => $this->normalizeSort($page['sort'] ?? null, $status),

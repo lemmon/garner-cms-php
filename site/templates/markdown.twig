@@ -6,8 +6,13 @@
   </head>
   <body>
     <main>
-      <h1>{{ page.title }}</h1>
-      <p>{{ controller_message }}</p>
+      <article>
+        <h1>{{ page.title }}</h1>
+        {% set text = page.value('text') %}
+        {% if text %}
+          {{ text|markdown }}
+        {% endif %}
+      </article>
     </main>
   </body>
 </html>

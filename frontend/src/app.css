@@ -54,3 +54,11 @@
     }
   }
 }
+
+@utility -d {
+  outline: 1px dashed orange;
+  outline-offset: -1px;
+  & .-d {
+    outline-color: purple;
+  }
+}

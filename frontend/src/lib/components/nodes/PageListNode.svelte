@@ -6,6 +6,7 @@
   import FileTextIcon from '@lucide/svelte/icons/file-text';
   import HouseIcon from '@lucide/svelte/icons/house';
 
+  import { resolve } from '$app/paths';
   import { api } from '$lib/api';
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
@@ -30,20 +31,22 @@
     {#if data.items.length > 0}
       <div class="border-t border-neutral-100">
         {#each data.items as item (item.id)}
-          <article
-            class="py-border-4 flex flex-row gap-3 border-b border-neutral-100 px-4"
-          >
-            <div class="flex flex-1 flex-row items-center gap-3 text-lg/6">
+          {@const detailHref = resolve(`/site/pages/${item.id}`)}
+          <article class="flex flex-row border-b border-neutral-100 text-lg/6">
+            <div class="py-border-4 flex px-4">
               {#if item.is_home}
                 <HouseIcon class="text-blue" />
               {:else}
                 <FileTextIcon class="text-blue" />
               {/if}
-              <h2 class="flex-1 underline">{item.title}</h2>
-              {#if item.status}
-                <div class="text-neutral-500">{item.status}</div>
-              {/if}
             </div>
+            <h2 class="flex flex-1">
+              <a class="py-border-4 underline" href={detailHref}>{item.title}</a
+              >
+            </h2>
+            {#if item.status}
+              <div class="py-border-4 px-4 text-neutral-500">{item.status}</div>
+            {/if}
           </article>
         {/each}
       </div>

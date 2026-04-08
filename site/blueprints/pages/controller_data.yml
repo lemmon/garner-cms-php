@@ -1,0 +1,11 @@
+title: Controller Data
+description: Content page with controller-enriched template context.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Text
+        rows: 10

@@ -29,7 +29,7 @@ Future fix options:
 
 Current state:
 
-- blueprint files are parsed from `site/blueprints/*.yml`
+- blueprint files are parsed from `site/blueprints/**/*.yml`
 - the backend validates only the currently supported blueprint subset
 - unknown keys are preserved in the returned blueprint payload
 - full schema validation and blueprint-to-content validation are not implemented yet

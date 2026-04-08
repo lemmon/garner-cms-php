@@ -42,7 +42,7 @@
         "platform-check": "composer check-platform-reqs",
         "start": [
             "Composer\\Config::disableProcessTimeout",
-            "@php -S localhost:8000 -t backend backend/server.php"
+            "@php -S localhost:8030 -t backend backend/server.php"
         ],
         "studio:build": "npm run studio:build",
         "studio:dev": [

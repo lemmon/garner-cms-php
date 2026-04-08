@@ -213,7 +213,7 @@ From repo root:
 - `composer studio:dev`: run Studio in dev mode
 - `composer test`: run PHPUnit
 - `composer studio:build`: build Studio
-- `http://localhost:8000/studio`: built Studio served by the PHP backend
+- `http://localhost:8030/studio`: built Studio served by the PHP backend
 - `composer platform-check`: verify platform requirements
 - `npm run lint`: lint frontend and repo JS/Svelte files
 - `npm run format`: format repo files

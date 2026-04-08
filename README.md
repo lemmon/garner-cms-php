@@ -23,6 +23,12 @@ Backend:
 composer start
 ```
 
+Default backend URL:
+
+```sh
+http://localhost:8030
+```
+
 Studio:
 
 ```sh
@@ -39,13 +45,13 @@ Built Studio via the PHP backend:
 
 ```sh
 composer studio:build
-http://localhost:8000/studio
+http://localhost:8030/studio
 ```
 
 Health check:
 
 ```sh
-http://localhost:8000/api/meta/health
+http://localhost:8030/api/meta/health
 ```
 
 ## Other Commands

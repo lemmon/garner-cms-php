@@ -2,11 +2,11 @@
 
 ## Why Build It
 
-This is technically worth building if Garner stays focused on a small number of structural improvements instead of trying to replace all of Kirby at once.
+This is technically worth building if Garner stays focused on a small number of structural improvements instead of trying to replace every existing CMS pattern at once.
 
 The strongest reasons to build it are:
 
-- Kirby's content file format is optimized for hand editing more than modern editor-driven editing
+- legacy flat-file content formats are optimized for hand editing more than modern editor-driven editing
 - path-as-filesystem-tree makes renames and large-site traversal more expensive than they need to be
 - package and plugin installation can be cleaner
 - the CLI should be a first-class core surface, not a separate companion
@@ -25,7 +25,7 @@ Garner should be a file-native, template-first CMS for small and medium PHP site
 - installation stays Composer-friendly and shared-host-friendly
 - runtime performance does not depend on recursively walking the content tree on every request
 
-## What Garner Should Keep From Kirby
+## What Garner Should Keep
 
 - server-side rendering with Twig as a first-class model
 - blueprints as an authoring schema for editing UI and write-time validation
@@ -101,7 +101,7 @@ File ownership and file accessibility should be separate concepts:
 
 ### 4. Distribution and Package Hygiene
 
-Installed projects should not contain both `vendor/` and a separate runtime directory like `kirby/`.
+Installed projects should not contain both `vendor/` and a separate bundled runtime directory.
 
 Target behavior:
 
@@ -127,6 +127,8 @@ Target behavior:
 - core maintenance commands come from the main Garner package
 - installed projects do not need a separate CLI package for fundamental operations
 - project and plugin code can extend one core CLI surface
+- the CLI should be usable by LLM-driven workflows as the preferred automation surface
+- installed projects should ship a root `llms.txt` that explains Garner usage to external LLMs building the site, not Garner core internals
 
 ### 5. Blueprint Model
 
@@ -173,7 +175,7 @@ That means:
 - explicit helper/factory conversions apply semantics where the site code asks for them
 - wrong conversions should fail early instead of silently coercing
 
-This is a better fit for typed PHP than Kirby-style universal field coercion.
+This is a better fit for typed PHP than universal field coercion.
 
 ### 7. PHP Ecosystem Strategy
 
@@ -186,7 +188,7 @@ Preferred approach:
 - use `lemmon/validator` for validation concerns
 - reserve Garner classes for CMS-specific concepts, not for cloning `Str`, `Arr`, or generic collection APIs
 
-In practice this means it is reasonable to depend on libraries such as Laravel's standalone collection utilities and established string helpers instead of maintaining a homegrown Kirby-style utility surface.
+In practice this means it is reasonable to depend on libraries such as Laravel's standalone collection utilities and established string helpers instead of maintaining a homegrown CMS-specific utility surface.
 
 The line should be:
 
@@ -197,7 +199,7 @@ The line should be:
 
 ## Opinionated V1 Boundaries
 
-Garner v1 should be narrower than Kirby.
+Garner v1 should stay intentionally narrow.
 
 Include:
 
@@ -221,7 +223,7 @@ Defer:
 - multilingual content
 - collaborative editing
 - database backends beyond SQLite
-- full Kirby compatibility promises
+- broad compatibility promises with other CMS content models
 - broad plugin ecosystem compatibility
 
 ## Technical Position
@@ -238,7 +240,7 @@ The main technical risk is over-scoping the first version.
 
 If you start by chasing:
 
-- complete Kirby feature parity
+- complete feature parity with existing CMSes
 - a complex Studio before the content model is stable
 - a large plugin API before core behaviors are settled
 

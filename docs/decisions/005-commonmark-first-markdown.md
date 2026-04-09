@@ -6,7 +6,7 @@ Rules:
 
 - Markdown fields stay plain strings in JSON
 - Twig renders Markdown through a Garner-owned service and filter
-- Garner should not introduce a KirbyTags-style proprietary inline language in v1
+- Garner should not introduce a proprietary inline tag language in v1
 - simple links and images should prefer normal Markdown plus attributes
 - richer CMS objects should use structured fields or purpose-built extensions later
 

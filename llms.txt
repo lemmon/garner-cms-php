@@ -1,34 +1,89 @@
 # Garner CMS LLM Guide
 
+This file is for external LLMs working inside a Garner-powered project.
+
+It describes how to work with a site built on Garner CMS.
+It is not a maintainer guide for developing Garner core itself.
+
+If project-specific documentation conflicts with this file, follow the project.
+
 ## What Garner Is
 
-Garner CMS is a custom PHP CMS with:
+Garner is a file-native, template-first PHP CMS with:
 
-- a PHP backend in `backend/`
-- a SvelteKit Studio app in `frontend/`
-- Tailwind-based Studio components in `frontend/src/lib/components/`
-- canonical content stored as JSON in `content/`
-- a derived SQLite index in `runtime/index.sqlite`
-- Twig as the public page templating engine
+- canonical content stored as JSON files
+- a derived SQLite index for fast lookup and traversal
+- Twig as the default public templating engine
+- a Studio SPA for editorial work
+- a first-class CLI intended for automation and non-UI workflows
 
-Garner is file-native, not filesystem-shaped. The directory tree is not the public sitemap. URLs are derived from page metadata and indexed in SQLite.
+Garner is not filesystem-shaped. Public URLs are derived from page metadata and
+the SQLite index, not from nested content directories.
 
-## Directory Responsibilities
+## Preferred Automation Surface
 
-- `content/`: canonical content and page-owned files
+Prefer Garner's CLI for automation when the needed command exists.
+
+Reasoning:
+
+- the CLI is intended to be a first-class surface of Garner core
+- the CLI should stay mostly in parity with CMS capabilities
+- LLMs should be able to inspect, generate, and manipulate content without
+  driving the browser UI
+- CLI, Studio, and HTTP APIs should call the same underlying core services
+
+Use Studio when the task is inherently interactive.
+Use direct file edits only when no CLI or API surface exists yet.
+
+## Installed Project Layout
+
+Typical Garner project layout:
+
+```text
+bin/
+  garner
+content/
+  +site.json
+  pages/
+    {id}/
+      +page.json
+      files/
+site/
+  blueprints/
+  config/
+  controllers/
+  plugins/
+  routes.php
+  snippets/
+  templates/
+storage/
+runtime/
+vendor/
+llms.txt
+```
+
+Directory responsibilities:
+
+- `content/`: canonical site content and page-owned files
 - `site/`: developer-authored source only
 - `storage/`: persistent app state
-- `runtime/`: disposable derived state
+- `runtime/`: disposable derived state such as indexes and caches
 - `vendor/`: Composer dependencies
 
-Never treat `site/` as a cache or runtime directory.
+Never treat `site/` as a cache or generated directory.
 
 ## Content Model
 
-Each page lives at:
+Canonical page files live at:
 
 ```text
 content/pages/{id}/+page.json
+```
+
+Canonical site metadata lives at:
+
+```text
+content/+site.json
 ```
 
 Important page fields:
@@ -36,83 +91,64 @@ Important page fields:
 - `id`: stable generated identifier
 - `parent_id`: nullable parent reference
 - `slug`: nullable path segment
+- `blueprint`: authoring schema name
 - `template`: runtime template/controller name
-- `status`: `draft`, `unlisted`, or `listed` for normal public pages; omitted for system pages like `home` and `error`
-- `sort`: meaningful only for listed pages
-- `fields`: plain JSON object with persisted content
+- `status`: `draft`, `unlisted`, or `listed` for normal public pages
+- `sort`: used only for listed pages
+- `fields`: plain JSON object with persisted field values
 
 Important site fields:
 
 - `id`: always `site`
 - `title`: site title
-- `home_page_id`: configured home page pointer
-- `error_page_id`: configured not-found page pointer
+- `home_page_id`: pointer to the required home page
+- `error_page_id`: optional pointer to the dedicated error page
 
-Path rules:
+Conventions:
+
+- persisted shapes use `snake_case`
+- content is pretty-printed JSON
+- one entry equals one JSON file
+- IDs come from a configurable generator; `uuid_v7` is the default direction
+
+## System Pages
+
+Garner treats some pages as special system pages.
+
+Current conventions:
+
+- the home page is a real content page referenced by `home_page_id`
+- the error page may be a real content page referenced by `error_page_id`
+- home and error pages do not persist a normal page `status`
+- the home page resolves to `/`
+- the error page is outside the normal public tree
+
+When unresolved public requests occur, Garner should prefer the configured error
+page and fall back safely if it is missing.
+
+## URL and Tree Semantics
+
+Path derivation:
 
 - the configured home page resolves to `/`
 - otherwise use `slug` when present
 - otherwise use `id` as the path segment
 
-ID generation is intentionally configurable. `uuid_v7` is the default architectural choice, but the system should support alternate generators such as shorter IDs or `cuid2`.
-
-## Rendering Model
-
-Garner uses Twig for public page rendering.
-Markdown content is parsed with `league/commonmark` through a Garner service and exposed to Twig with a `markdown` filter.
-
-Public request order:
-
-1. `/favicon.ico` serves `site/favicon.ico` when present, otherwise a built-in Garner fallback
-2. `/api/*` dispatches backend actions
-3. `/studio/*` serves the built Garner Studio SPA
-4. `site/routes.php` can return a direct response before page resolution
-5. page lookup resolves through SQLite
-6. `site/controllers/{template}.php` runs before Twig
-7. if the controller returns an array, merge it into the Twig context
-8. if the controller returns `RenderedResponse`, skip Twig and return that response directly
-9. otherwise render `site/templates/{template}.twig`, with fallback to `default.twig`
-
-This means Garner supports both:
-
-- route-style responses from `site/routes.php`
-- page-controller-style responses tied to content pages
-
-System pages:
-
-- the home page is a real content page referenced by `content/+site.json`
-- the error page may be a real content page referenced by `content/+site.json`
-- home and error pages do not persist a normal page `status`
-- unresolved public requests try the configured error page first
-- if no error page exists, runtime falls back safely to normal 404 template rendering
-
-## Site Extension Points
-
-Use these first:
-
-- `site/routes.php`: direct text, JSON, or HTML responses
-- `site/controllers/{template}.php`: controller logic for resolved pages
-- `site/templates/{template}.twig`: Twig page templates
-- `site/snippets/*.twig`: shared partials
-- `site/favicon.ico`: project favicon override
-
-## Runtime Data Rules
-
-- runtime code should work on plain decoded data first
-- blueprints are authoring-time schema, not runtime semantic truth
-- use explicit helpers/factories or DTOs when semantics are needed
-- do not recreate generic helpers that already exist in the PHP ecosystem
-
-Current traversal semantics:
+Traversal semantics:
 
 - `Page.children(drafts: true)` returns direct children only
-- `Page.index(drafts: true)` returns all descendants on all levels, excluding self
+- `Page.index(drafts: true)` returns all descendants, excluding self
 - `Site.children(drafts: true)` returns home plus home's direct children
 - `Site.index(drafts: true)` returns home plus all of its descendants
 - `Site.systemPages()` returns system pages outside the public tree
-- sibling ordering is listed by `sort`, then unlisted by `slug` with `id` fallback
-- when drafts are included, drafts come last and are ordered by `slug` with `id` fallback
-- unlisted pages do not persist `sort`
+
+Sibling ordering:
+
+- listed pages first, sorted by `sort`
+- unlisted pages next, sorted by `slug` with `id` fallback
+- drafts last when requested, sorted by `slug` with `id` fallback
+- unlisted pages should not persist a meaningful `sort`
+- `Site.children()` and `Site.index()` still force home to the first position
 
 ## Files and Media
 
@@ -122,116 +158,141 @@ Files are page-owned by default:
 content/pages/{id}/files/
 ```
 
-But ownership and accessibility are separate:
+Rules:
 
 - one page owns the file physically
 - any page may reference that file logically
+- ownership and accessibility are separate
 
-## Current Libraries
+Do not assume a file is only usable by its owning page.
 
-- `twig/twig`: page rendering
-- `illuminate/support`: collections and string helpers
-- `carthage-software/mago`: PHP formatting and linting
-- `phpstan/phpstan`: static analysis
-- `tailwindcss`: Studio styling and component foundation
-- `symfony/yaml`: blueprint parsing
-- `lemmon/validator`: blueprint validation engine behind a Garner adapter boundary
+## Rendering Model
 
-Use Garner code for CMS-specific behavior and ecosystem libraries for generic behavior.
+Garner uses Twig for public rendering by default.
 
-## Request Notes
+Main extension points:
 
-- `backend/src/Core/Request.php` handles HTTPS detection, request path lookup, raw input, and JSON payload decoding
-- raw input falls back to `php://stdin` under CLI so request-body tests can exercise the same code path
-- Studio/API actions can read JSON bodies through `Request::getPayload()`
+- `site/routes.php`: explicit custom routes returning direct responses
+- `site/controllers/{template}.php`: page-level pre-render logic
+- `site/templates/{template}.twig`: page templates
+- `site/snippets/*.twig`: shared partials
 
-## Error Handling Notes
+Request order:
 
-- backend runtime error handling is centralized in `backend/src/Core/ErrorHandler.php`
-- `Application::run()` registers the global handler; constructing `Application` alone should stay side-effect light
-- API payload/input exceptions should not be handled ad hoc in every route
-- only route/action boundary validation should return `invalid: true`
-- `Lemmon\\Validator\\ValidationException` maps to `400` invalid API responses with flattened field errors
-- `JsonException` and `InvalidArgumentException` map to `400` API error responses with `error: true`
-- service/runtime failures from `backend/src/` must not be reported as invalid form state
+1. `/favicon.ico`
+2. `/api/*`
+3. `/studio/*`
+4. `site/routes.php`
+5. page lookup through SQLite
+6. page controller
+7. Twig rendering
 
-## Studio Frontend Notes
+Controller contract:
 
-- the PHP backend serves the built Studio app from `frontend/build/`
-- the Studio base path is currently fixed at `/studio` and must match the backend prefix
-- `/studio` redirects to `/studio/site`
-- `frontend/src/routes/+layout.js` loads `/api/studio/site` for shell-level site metadata
-- the current site overview screen lives at `frontend/src/routes/site/+page.svelte`
-- page detail lives at `frontend/src/routes/site/pages/[id]/+page.svelte`
-- root `eslint.config.mjs` owns JS and Svelte linting
-- shared Studio UI primitives live in `frontend/src/lib/components/`
-- form primitives live in `frontend/src/lib/components/forms/`
-- do not use rounded corners in Studio UI
-- prefer those primitives over ad-hoc repeated markup when Studio starts growing
+- return an array to enrich Twig context
+- return a direct response object to bypass Twig
 
-## Blueprint Notes
+Garner also supports Markdown rendering through `league/commonmark`, typically
+exposed to Twig through a `markdown` filter.
 
-- blueprints live under `site/blueprints/`
-- the first example blueprint is `site/blueprints/site.yml`
-- page blueprints live under `site/blueprints/pages/`
-- reusable fragments such as shared tabs live under paths like `site/blueprints/tabs/`
-- blueprint mappings may use `extends: some/path` to reuse and override another blueprint fragment
-- `/api/studio/site` returns minimal site metadata for Studio UI
-- `/api/studio/blueprints/site` returns the parsed site blueprint as JSON
-- `/api/studio/nodes/query` resolves list-node payloads for Studio
-- `/api/studio/pages/show` returns page detail plus the loaded blueprint when available
-- Studio keeps page metadata loaded but does not display it yet
-- page title is implicit for every page and is not declared in blueprints
-- title and slug editing should use a separate page-level affordance, not blueprint field nodes
-- top-level blueprint `description` is optional and may be used for Studio screen intro copy
-- `tabs` is an ordered array of named tab objects, not an associative mapping
-- the backend validates the currently supported blueprint subset at load time
-- blueprint validation is intentionally incomplete for now and should not be treated as the final schema contract
-- input/picker nodes and listing/manipulation nodes are distinct node kinds in one schema tree
-- use `pages` and `files` for picker-style nodes
-- use `page_list` and `file_list` for editorial listing/manipulation nodes
-- supported field nodes currently include `text` and `textarea`
-- `page_list.source` identifies the semantic source object for a page listing
-- `file_list.source` identifies the semantic source object for a file listing
-- the default page-list query is `source.children(drafts: true)`
-- current supported page-list sources include `site`, `site.home`, and `site.page("...")`
-- current supported page-list queries include `source.children(drafts: true)`, `source.index(drafts: true)`, and `source.system_pages`
-- action payload shape for node queries is validated with `lemmon/validator` before the Studio service runs
-- Studio page detail tolerates missing page blueprints by returning `blueprint: null` plus a `blueprint_issue`
-- Studio page detail currently renders blueprint fields but does not save them yet
-- system blueprints currently exist for `home` and `error`
+## Blueprints
 
-## Current Commands
+Blueprints are authoring-time schema, not runtime semantic truth.
 
-From repo root:
+They live under:
 
-- `composer start`: run the backend
-- `composer check`: run the PHP check suite
-- `composer lint`: lint PHP code
-- `composer analyze`: run PHPStan
-- `composer format`: format PHP code
-- `composer studio:dev`: run Studio in dev mode
-- `composer test`: run PHPUnit
-- `composer studio:build`: build Studio
-- `http://localhost:8030/studio`: built Studio served by the PHP backend
-- `composer platform-check`: verify platform requirements
-- `npm run lint`: lint frontend and repo JS/Svelte files
-- `npm run format`: format repo files
+```text
+site/blueprints/
+```
 
-## Important Constraints
+Typical locations:
 
-- do not write generated state into `site/`
-- do not assume blueprints are required at runtime
-- do not assume page directories express URL structure
+- `site/blueprints/site.yml`
+- `site/blueprints/pages/*.yml`
+- `site/blueprints/tabs/*.yml`
+
+Blueprints drive:
+
+- Studio editing UI
+- defaults
+- write-time validation
+- authoring structure
+
+Important rules:
+
+- page title is implicit and should not be declared as a normal blueprint field
+- tabs are ordered arrays, not associative mappings
+- blueprint fragments may use `extends: some/path`
+- blueprints may define both picker-style nodes and editorial listing nodes
+
+Examples of node kinds:
+
+- `text`, `textarea`, `pages`, `files`
+- `page_list`, `file_list`
+- tabs and future layout/container nodes
+
+## Studio and APIs
+
+Garner Studio lives under `/studio`.
+Public APIs live under `/api`.
+
+Studio APIs should primarily support editorial work:
+
+- site metadata
+- blueprint fetch
+- page tree/list queries
+- page detail
+- editing flows
+- file/media operations
+
+Current and future authoring APIs should validate route payloads and distinguish:
+
+- `invalid: true` for action-boundary validation failures
+- `error: true` for service/runtime failures
+
+## CLI Expectations
+
+Garner should expose a core CLI at:
+
+```text
+bin/garner
+```
+
+The CLI is expected to be the main automation surface for LLMs and scripts.
+
+Target capability areas:
+
+- inspect site metadata and page trees
+- create, update, move, and delete pages
+- change status and sorting
+- manage files and references
+- rebuild indexes and caches
+- run repair and maintenance actions
+- expose the same content model rules used by Studio and HTTP flows
+
+When a project has custom plugins, expect them to extend the same CLI surface
+rather than inventing a separate tool.
+
+## Safe Working Rules
+
+- prefer CLI commands over browser automation when available
+- if direct file edits are required, preserve stable JSON formatting and
+  `snake_case`
+- do not write generated runtime state into `site/`
+- do not assume blueprints are required at public request time
+- do not assume content directory structure expresses the public sitemap
 - do not assume every public response goes through Twig
-- prefer `snake_case` for persisted and external data
-- prefer a curated Studio icon registry over arbitrary dynamic icon imports
+- treat `runtime/` as rebuildable derived state
 
-## Docs To Read Next
+## Plugin and Customization Expectations
 
-- `docs/vision.md`
-- `docs/architecture.md`
-- `docs/plan.md`
-- `docs/known-issues.md`
-- `docs/open-questions.md`
-- `docs/decisions/README.md`
+Garner should support project and plugin extension through:
+
+- blueprints
+- templates and snippets
+- controllers and routes
+- site plugins
+- CLI extensions
+
+Studio customization may eventually include custom UI components, but LLMs
+should prefer stable schema- and CLI-driven extension points first.

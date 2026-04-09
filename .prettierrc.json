@@ -4,6 +4,14 @@
     "prettier-plugin-packagejson",
     "prettier-plugin-tailwindcss"
   ],
+  "overrides": [
+    {
+      "files": "llms.txt",
+      "options": {
+        "parser": "markdown"
+      }
+    }
+  ],
   "singleQuote": true,
   "trailingComma": "es5"
 }

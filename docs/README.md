@@ -1,5 +1,12 @@
 # Garner CMS Docs
 
+Note:
+
+- the root [`llms.txt`](../llms.txt) is a product-facing guide for external LLMs
+  working on Garner-powered sites
+- it is not intended to be another maintainer-instructions file for this
+  repository
+
 Use this directory in this order:
 
 - [vision.md](./vision.md): product direction and guiding principles

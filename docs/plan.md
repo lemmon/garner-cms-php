@@ -2,7 +2,7 @@
 
 ## Scope Discipline
 
-The project should not begin as "Kirby replacement."
+The project should not begin as a feature-parity replacement for another CMS.
 
 It should begin as:
 
@@ -33,6 +33,8 @@ Freeze these before writing much code:
 - `storage/` is persistent and `runtime/` is disposable
 - Composer plugins are discovered from `vendor/` without mirrored directories
 - the CLI ships as part of Garner core, not as a separate companion package
+- installed projects should ship a root `llms.txt` for external LLMs working on Garner sites
+- the CLI should be treated as the primary LLM-friendly automation surface
 
 If those decisions remain fluid for too long, the Studio and template APIs will be built on unstable assumptions.
 
@@ -42,6 +44,7 @@ Deliver:
 
 - `backend/` bootstrap and router
 - initial core CLI entrypoint shape
+- initial project-facing `llms.txt` shape
 - `frontend/` SvelteKit shell
 - installed-site directory conventions for `content/`, `site/`, `storage/`, and `runtime/`
 - dependency policy for native PHP versus adopted utility packages
@@ -200,7 +203,7 @@ Defer these until the core model is proven:
 - multisite
 - revision browser
 - block editor complexity
-- broad Kirby import compatibility
+- broad import compatibility with other CMSes
 - alternate database backends
 - extensive Studio customization API
 

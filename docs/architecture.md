@@ -334,7 +334,7 @@ Current example:
 - reusable fragments such as shared tabs may live under paths like `site/blueprints/tabs/*.yml`
 - blueprint mappings may use `extends: some/path` to reuse and override another blueprint fragment
 
-This preserves the important distinction between a relation picker and an editorial listing without bringing back Kirby's separate fields-versus-sections model.
+This preserves the important distinction between a relation picker and an editorial listing without bringing back a separate fields-versus-sections model.
 
 Current API surface:
 
@@ -401,9 +401,24 @@ The CLI is part of Garner core.
 Target surface:
 
 - `bin/garner`
-- core commands such as `reindex`, cache maintenance, and runtime cleanup
+- core commands such as `reindex`, cache maintenance, runtime cleanup, and content operations
 
 CLI commands should call the same core services used by HTTP and Studio flows.
+The CLI should be the preferred automation surface for LLMs when available and
+should stay mostly in parity with CMS capabilities.
+
+## LLM Guide
+
+Installed Garner projects should ship a root `llms.txt`.
+
+Purpose:
+
+- explain Garner's installed-project model to external LLMs
+- describe safe assumptions about content, templates, blueprints, Studio, and CLI
+- help LLMs build and operate Garner-powered sites
+
+This file is not meant to be another maintainer-instructions file for Garner
+core development.
 
 ## Dependency Policy
 

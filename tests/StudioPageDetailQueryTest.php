@@ -92,10 +92,30 @@ final class StudioPageDetailQueryTest extends TestCase
         self::assertSame('page', $payload['page']['blueprint']);
         self::assertSame('/about', $payload['page']['path']);
         self::assertSame(0, $payload['page']['children_count']);
-        self::assertSame([
-            'title' => 'About',
-            'text' => 'About Garner',
-        ], $payload['page']['fields']);
+        self::assertSame(
+            [
+                'title' => 'About',
+                'text' => 'About Garner',
+            ],
+            $payload['page']['fields'],
+        );
+        self::assertSame(
+            [
+                [
+                    'label' => 'Site',
+                    'href' => '/site',
+                ],
+                [
+                    'label' => 'Home',
+                    'href' => '/site/pages/home-page',
+                ],
+                [
+                    'label' => 'About',
+                    'href' => null,
+                ],
+            ],
+            $payload['breadcrumbs'],
+        );
         self::assertFalse($payload['page']['is_system']);
         self::assertSame('Page', $payload['blueprint']['title']);
         self::assertNull($payload['blueprint_issue']);

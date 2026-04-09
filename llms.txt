@@ -225,6 +225,7 @@ From repo root:
 - do not assume page directories express URL structure
 - do not assume every public response goes through Twig
 - prefer `snake_case` for persisted and external data
+- prefer a curated Studio icon registry over arbitrary dynamic icon imports
 
 ## Docs To Read Next
 
@@ -232,4 +233,5 @@ From repo root:
 - `docs/architecture.md`
 - `docs/plan.md`
 - `docs/known-issues.md`
+- `docs/open-questions.md`
 - `docs/decisions/README.md`

@@ -9,3 +9,25 @@ tabs:
         name: text
         label: Intro
         rows: 8
+
+  - name: pages
+    label: Pages
+    nodes:
+      - type: page_list
+        name: pages
+        label: Pages
+        source: site.home
+        create:
+          enabled: true
+        empty: No pages yet.
+
+  - name: files
+    label: Files
+    nodes:
+      - type: file_list
+        name: files
+        label: Files
+        source: site.home
+        upload:
+          enabled: true
+        empty: Upload the first file.

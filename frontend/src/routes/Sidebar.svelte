@@ -1,28 +1,7 @@
 <script>
-  import GlobeIcon from '@lucide/svelte/icons/globe';
-  import SlidersVerticalIcon from '@lucide/svelte/icons/sliders-vertical';
-  import UsersIcon from '@lucide/svelte/icons/users';
-
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-
-  const items = [
-    {
-      href: '/site',
-      label: 'Pages',
-      icon: GlobeIcon,
-    },
-    {
-      href: '/users',
-      label: 'Users',
-      icon: UsersIcon,
-    },
-    {
-      href: '/system',
-      label: 'System',
-      icon: SlidersVerticalIcon,
-    },
-  ];
+  import { studioNavigationItems as items } from '$lib/studio/navigation.js';
 </script>
 
 <aside
@@ -32,6 +11,7 @@
     <ul class="space-y-0.5 p-3">
       {#each items as item (item.href)}
         {@const resolvedHref = resolve(item.href)}
+        {@const Icon = item.icon}
         {@const active =
           page.url.pathname === resolvedHref ||
           page.url.pathname.startsWith(resolvedHref + '/')}
@@ -48,7 +28,7 @@
             aria-label={item.label}
             title={item.label}
           >
-            <svelte:component this={item.icon} />
+            <Icon />
             <span class="sr-only">{item.label}</span>
           </a>
         </li>

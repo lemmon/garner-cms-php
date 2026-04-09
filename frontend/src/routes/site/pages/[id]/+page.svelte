@@ -11,6 +11,7 @@
 <BlueprintView
   title={data.page.title}
   description={data.blueprint?.description}
+  breadcrumbs={data.breadcrumbs}
   blueprint={data.blueprint}
   blueprintIssue={data.blueprintIssue}
   fields={data.page.fields}

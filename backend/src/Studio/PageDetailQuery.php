@@ -50,6 +50,7 @@ final class PageDetailQuery
 
         return [
             'ok' => true,
+            'breadcrumbs' => $this->buildBreadcrumbs($page, $pages),
             'page' => [
                 'id' => $page->id(),
                 'kind' => is_string($data['kind'] ?? null) ? $data['kind'] : 'page',
@@ -72,6 +73,48 @@ final class PageDetailQuery
             'blueprint' => $blueprint,
             'blueprint_issue' => $blueprintIssue,
         ];
+    }
+
+    /**
+     * @return list<array{label: string, href: string|null}>
+     */
+    private function buildBreadcrumbs(\Garner\Site\Page $page, Pages $pages): array
+    {
+        $ancestors = [];
+        $parentId = $page->parentId();
+
+        while ($parentId !== null) {
+            $parent = $pages->find($parentId);
+
+            if ($parent === null) {
+                break;
+            }
+
+            $ancestors[] = $parent;
+            $parentId = $parent->parentId();
+        }
+
+        $ancestors = array_reverse($ancestors);
+        $breadcrumbs = [
+            [
+                'label' => 'Site',
+                'href' => '/site',
+            ],
+        ];
+
+        foreach ($ancestors as $ancestor) {
+            $breadcrumbs[] = [
+                'label' => $ancestor->title(),
+                'href' => '/site/pages/' . $ancestor->id(),
+            ];
+        }
+
+        $breadcrumbs[] = [
+            'label' => $page->title(),
+            'href' => null,
+        ];
+
+        return $breadcrumbs;
     }
 
     /**

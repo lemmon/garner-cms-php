@@ -1,5 +1,6 @@
 <script>
   import { page } from '$app/state';
+  import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
   import Tabs from '$lib/components/Tabs.svelte';
@@ -8,6 +9,7 @@
   let {
     title,
     description = '',
+    breadcrumbs = [],
     blueprint = undefined,
     blueprintIssue = '',
     fields = undefined,
@@ -33,7 +35,9 @@
 
 <div class="space-y-12 p-12">
   <header class="space-y-3">
-    <h1 class="text-4xl font-medium tracking-tight text-balance">
+    <Breadcrumbs items={breadcrumbs} />
+
+    <h1 class="text-5xl font-medium tracking-tight text-balance">
       {title}
     </h1>
 

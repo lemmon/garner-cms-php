@@ -11,5 +11,6 @@
 <BlueprintView
   title={data.site.title}
   description={data.blueprint.description}
+  breadcrumbs={[{ label: 'Site' }]}
   blueprint={data.blueprint}
 />

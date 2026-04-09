@@ -8,6 +8,7 @@ export async function load({ params }) {
   return {
     blueprint: detail.blueprint,
     blueprintIssue: detail.blueprint_issue,
+    breadcrumbs: detail.breadcrumbs,
     page: detail.page,
   };
 }

@@ -6,4 +6,5 @@ Use this directory in this order:
 - [architecture.md](./architecture.md): canonical technical model
 - [plan.md](./plan.md): phased implementation roadmap
 - [known-issues.md](./known-issues.md): accepted issues that should stay visible
+- [open-questions.md](./open-questions.md): unresolved design questions worth tracking
 - [decisions/README.md](./decisions/README.md): ADR-style notes for key architectural choices

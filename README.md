@@ -29,6 +29,8 @@ Default backend URL:
 http://localhost:8030
 ```
 
+Debug mode defaults to `true` on `localhost` and can be overridden with `APP_DEBUG`.
+
 Studio:
 
 ```sh

@@ -20,6 +20,15 @@ Garner is a file-native, template-first PHP CMS with:
 Garner is not filesystem-shaped. Public URLs are derived from page metadata and
 the SQLite index, not from nested content directories.
 
+In normal browser-driven production usage, Garner should detect the current
+public host automatically. Explicit canonical URL configuration may still exist
+as an override for special cases such as proxies, feeds, emails, CLI tasks, or
+multiple-domain setups. Current limitation: root installation is assumed when
+composing public links.
+
+In normal local development, debug mode defaults to `true` on `localhost`
+unless `APP_DEBUG` overrides it.
+
 ## Preferred Automation Surface
 
 Prefer Garner's CLI for automation when the needed command exists.
@@ -40,8 +49,9 @@ Use direct file edits only when no CLI or API surface exists yet.
 Typical Garner project layout:
 
 ```text
-bin/
-  garner
+index.php
+public/
+  index.php
 content/
   +site.json
   pages/
@@ -61,6 +71,12 @@ runtime/
 vendor/
 llms.txt
 ```
+
+Installed-project notes:
+
+- Garner may be booted either from `index.php` at project root or from `public/index.php`
+- both entrypoints load Garner from `vendor/garner/cms/boot/web.php`
+- Studio static assets are served from the installed package, not from a project-local `frontend/` directory
 
 Directory responsibilities:
 
@@ -194,6 +210,12 @@ Controller contract:
 
 Garner also supports Markdown rendering through `league/commonmark`, typically
 exposed to Twig through a `markdown` filter.
+
+Twig-specific behavior:
+
+- Twig debug mode inherits Garner's main debug setting by default
+- Twig cache is disabled in debug and otherwise defaults to `runtime/cache/twig`
+- installed projects may override Twig behavior through `config/app.php` under `app.twig`
 
 ## Blueprints
 

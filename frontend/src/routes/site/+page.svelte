@@ -13,4 +13,6 @@
   description={data.blueprint.description}
   breadcrumbs={[{ label: 'Site' }]}
   blueprint={data.blueprint}
+  openHref={data.site.url}
+  openLabel="Open site"
 />

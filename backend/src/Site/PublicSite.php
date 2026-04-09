@@ -39,10 +39,15 @@ final class PublicSite
                 return $errorResponse;
             }
 
-            return RenderedResponse::html(
-                $this->renderer->renderNotFound($site, $pages, $path),
+            return RenderedResponse::html($this->renderer->renderError(
+                $site,
+                $pages,
                 404,
-            );
+                'not_found',
+                [
+                    'path' => $path,
+                ],
+            ), 404);
         }
 
         $page = new Page($resolvedPage, $pages);
@@ -129,6 +134,12 @@ final class PublicSite
 
         return RenderedResponse::html($this->renderer->renderPage($errorPage, $site, $pages, [
             ...$controllerResult,
+            'error' => [
+                'kind' => 'not_found',
+                'path' => $path,
+                'status' => 404,
+                'title' => 'Not Found',
+            ],
             'path' => $path,
         ]), 404);
     }

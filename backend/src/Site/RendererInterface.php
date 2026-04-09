@@ -11,5 +11,16 @@ interface RendererInterface
     /**
      * @param array<string, mixed> $data
      */
+    public function renderError(
+        Site $site,
+        Pages $pages,
+        int $status,
+        string $kind,
+        array $data = [],
+    ): string;
+
+    /**
+     * @param array<string, mixed> $data
+     */
     public function renderPage(Page $page, Site $site, Pages $pages, array $data = []): string;
 }

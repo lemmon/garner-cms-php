@@ -25,4 +25,23 @@ final class ConfigLoader
 
         return $config;
     }
+
+    /**
+     * @param iterable<string> $configPaths
+     * @return array<string, mixed>
+     */
+    public static function loadMany(iterable $configPaths): array
+    {
+        $config = [];
+
+        foreach ($configPaths as $configPath) {
+            if ($configPath === '') {
+                continue;
+            }
+
+            $config = array_replace_recursive($config, self::load($configPath));
+        }
+
+        return $config;
+    }
 }

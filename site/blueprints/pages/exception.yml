@@ -1,0 +1,11 @@
+title: Exception
+description: Debug page that throws a deliberate exception from its controller.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Text
+        rows: 8

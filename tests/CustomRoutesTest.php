@@ -46,8 +46,8 @@ final class CustomRoutesTest extends TestCase
 
         $routes = new CustomRoutes($this->projectRoot . '/site/routes.php');
         $app = new Application(
-            backendPath: $this->projectRoot . '/backend',
-            rootPath: $this->projectRoot,
+            corePath: dirname(__DIR__),
+            projectRootPath: $this->projectRoot,
             config: [
                 'app' => [
                     'name' => 'Test Garner',

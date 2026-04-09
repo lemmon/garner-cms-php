@@ -1,6 +1,9 @@
 <script>
+  import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+
   import { page } from '$app/state';
   import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
+  import Button from '$lib/components/Button.svelte';
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
   import Tabs from '$lib/components/Tabs.svelte';
@@ -13,6 +16,8 @@
     blueprint = undefined,
     blueprintIssue = '',
     fields = undefined,
+    openHref = '',
+    openLabel = 'Open page',
   } = $props();
 
   let tabs = $derived(blueprint?.tabs ?? []);
@@ -49,7 +54,22 @@
   </header>
 
   {#if blueprint}
-    <Tabs items={tabs} value={activeTab} />
+    <Tabs items={tabs} value={activeTab}>
+      {#snippet actions()}
+        {#if openHref}
+          <Button
+            class="p-2"
+            kind="secondary"
+            href={openHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={openLabel}
+          >
+            <ExternalLinkIcon size={20} aria-hidden="true" />
+          </Button>
+        {/if}
+      {/snippet}
+    </Tabs>
 
     {#if invalidTabMessage}
       <NodeErrorState>{invalidTabMessage}</NodeErrorState>

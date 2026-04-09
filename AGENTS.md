@@ -14,6 +14,8 @@
 - Do not use cheerleading, hype, or reassuring filler.
 - Challenge weak assumptions when necessary, but do it in a technical and constructive way.
 - Keep the focus on architectural coherence, implementation quality, and next concrete steps.
+- Assume this repository is intended to become public. Keep commit-ready code, docs, comments, and examples appropriate for an eventual open-source audience.
+- Avoid repo-facing notes that only make sense as private scratch context when the same information can be expressed in a durable, public-safe way.
 
 ## Project Structure & Module Organization
 

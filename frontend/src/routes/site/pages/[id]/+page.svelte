@@ -15,4 +15,6 @@
   blueprint={data.blueprint}
   blueprintIssue={data.blueprintIssue}
   fields={data.page.fields}
+  openHref={data.site.url + data.page.path}
+  openLabel={'Open ' + data.page.title}
 />

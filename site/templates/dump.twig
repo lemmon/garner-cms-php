@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ page.title }} | {{ site.title }}</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p><a href="/">{{ site.title }}</a></p>
+      </header>
+
+      <article>
+        <h1>{{ page.title }}</h1>
+        {{ dump(page.data(), site.data()) }}
+        {% set text = page.value('text') %}
+        {% if text %}
+          {{ text|markdown }}
+        {% endif %}
+        <p>If debug is enabled, this page now renders both controller-level and Twig-level dumps.</p>
+      </article>
+    </main>
+  </body>
+</html>

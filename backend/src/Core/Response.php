@@ -8,8 +8,7 @@ final class Response
 {
     public static function content(string $body, string $contentType, int $status = 200): never
     {
-        http_response_code($status);
-        header('Content-Type: ' . $contentType);
+        self::applyHeaders($contentType, $status);
 
         echo $body;
         exit();
@@ -20,8 +19,7 @@ final class Response
      */
     public static function json(array $payload, int $status = 200): never
     {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=utf-8');
+        self::applyHeaders('application/json; charset=utf-8', $status);
 
         echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit();
@@ -29,10 +27,19 @@ final class Response
 
     public static function html(string $html, int $status = 200): never
     {
-        http_response_code($status);
-        header('Content-Type: text/html; charset=utf-8');
+        self::applyHeaders('text/html; charset=utf-8', $status);
 
         echo $html;
         exit();
+    }
+
+    private static function applyHeaders(string $contentType, int $status): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        http_response_code($status);
+        header('Content-Type: ' . $contentType);
     }
 }

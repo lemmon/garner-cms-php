@@ -211,8 +211,8 @@ final class PublicSiteTest extends TestCase
         RendererInterface $renderer,
     ): PublicSite {
         $app = new Application(
-            backendPath: $this->projectRoot . '/backend',
-            rootPath: $this->projectRoot,
+            corePath: dirname(__DIR__),
+            projectRootPath: $this->projectRoot,
             config: [
                 'app' => [
                     'name' => 'Test Site',
@@ -276,17 +276,22 @@ final class PublicSiteTest extends TestCase
             </html>
             TWIG);
 
-        file_put_contents($this->projectRoot . '/site/templates/404.twig', <<<'TWIG'
+        file_put_contents($this->projectRoot . '/site/templates/error.twig', <<<'TWIG'
             <!doctype html>
             <html lang="en">
               <head>
                 <meta charset="utf-8">
-                <title>Not Found | {{ site.title }}</title>
+                {% set error_title = page is defined ? page.title : (error.title ?? 'Application Error') %}
+                <title>{{ error_title }} | {{ site.title }}</title>
               </head>
               <body>
                 <main>
-                  <h1>Not Found</h1>
-                  <p>No page matched <code>{{ path }}</code>.</p>
+                  <h1>{{ error_title }}</h1>
+                  {% if error.kind == 'not_found' %}
+                    <p>No page matched <code>{{ error.path }}</code>.</p>
+                  {% else %}
+                    <p>The request could not be completed.</p>
+                  {% endif %}
                 </main>
               </body>
             </html>

@@ -1,0 +1,11 @@
+title: Dump
+description: Debug page that triggers Symfony VarDumper from its controller.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: textarea
+        name: text
+        label: Text
+        rows: 10

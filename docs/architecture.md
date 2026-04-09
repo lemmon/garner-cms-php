@@ -51,9 +51,9 @@ docs/
 Target installed-site shape:
 
 ```text
-bin/
-  garner
 index.php
+public/
+  index.php
 content/
   +site.json
   pages/
@@ -74,6 +74,13 @@ runtime/
   index.sqlite
 vendor/
 ```
+
+Installed-site notes:
+
+- Garner should support either `index.php` at project root or `public/index.php` as the webroot entrypoint
+- both entrypoints bootstrap Garner from `vendor/garner/cms/boot/web.php`
+- the built Studio SPA is served from the installed package under `vendor/garner/cms/frontend/build`
+- installed projects should not need their own `backend/` or `frontend/` directory
 
 Directory responsibilities:
 
@@ -230,6 +237,40 @@ Key property:
 
 - public routing does not depend on recursive filesystem traversal
 
+## Bootstrapping
+
+Garner core is installable as a Composer package.
+
+Current model:
+
+- core defaults live in the package under `backend/config`
+- installed projects may override config with project-local `config/*.php`
+- the application is bootstrapped with a distinct `corePath` and `projectRootPath`
+- backend actions and built Studio assets resolve from the core package
+- content, templates, blueprints, routes, runtime, and storage resolve from the installed project
+
+This split is what allows a real installed project to have no local `backend/` or `frontend/` directory.
+
+## Public URL Strategy
+
+Garner should detect public origin and host automatically from the current
+request in normal browser-driven production usage.
+
+Target behavior:
+
+- Studio and the public site usually live on the same host
+- ordinary "open page" and similar in-app links should work without requiring
+  explicit host configuration
+- explicit URL configuration should remain available as an override and for
+  features that require a canonical absolute URL outside the current request
+  context
+
+Current limitation:
+
+- Garner still assumes root installation when composing public links
+
+This should evolve into explicit application base-path support.
+
 ## Request Utilities
 
 `backend/src/Core/Request.php` is the minimal backend request helper.
@@ -254,8 +295,36 @@ Current behavior:
 - `JsonException` and `InvalidArgumentException` become `400` API error responses with `error: true`
 - service/runtime failures from `backend/src/` must not return `invalid: true`
 - other uncaught API exceptions become generic `500` JSON responses
-- non-API uncaught exceptions render a generic HTML `500` page
+- non-API uncaught exceptions render a generic HTML `500` page in production
+- when debug mode is enabled, HTML error pages use Symfony's error renderer when available and otherwise fall back to a verbose internal debug page
 - exceptions are logged through `error_log()`
+
+Debug behavior:
+
+- `app.debug` is the primary debug switch
+- if `APP_DEBUG` is not set, debug defaults to `true` on `localhost`, `127.0.0.1`, and `::1`
+- if `APP_ENV` is not set, environment defaults to `development` when debug is on and `production` otherwise
+
+## Twig Runtime
+
+Garner uses Twig for public rendering and exposes a small Twig-specific config surface under `app.twig`.
+
+Current defaults:
+
+- `debug`: inherits `app.debug`
+- `auto_reload`: inherits Twig debug mode
+- `cache`: disabled in debug, otherwise defaults to `runtime/cache/twig`
+- `strict_variables`: `false`
+
+Supported Twig options today:
+
+- `cache`
+- `debug`
+- `auto_reload`
+- `strict_variables`
+- `charset`
+
+Relative Twig cache paths resolve from the installed project root, not from the core package path.
 
 ## Rendering Surfaces
 
@@ -381,6 +450,7 @@ Current validation boundary:
 
 Garner Studio is a SvelteKit SPA under `/studio`.
 In the source repository, the PHP backend serves the built app from `frontend/build/`.
+In an installed project, the PHP runtime serves the built app from `vendor/garner/cms/frontend/build/`.
 The Studio base path is currently fixed at build time and must match the backend `studio_prefix`.
 
 Backend APIs are plain PHP actions under `backend/actions/`.

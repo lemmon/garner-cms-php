@@ -1,0 +1,16 @@
+{
+    "id": "018f3b89-2a10-7bf6-a244-5df234ac9002",
+    "kind": "page",
+    "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
+    "slug": "exception",
+    "blueprint": "exception",
+    "template": "exception",
+    "status": "listed",
+    "sort": 50,
+    "fields": {
+        "title": "Exception",
+        "text": "This page throws a deliberate exception from its controller so the public error flow can be verified."
+    },
+    "created_at": "2026-04-09T12:05:00+00:00",
+    "updated_at": "2026-04-09T12:05:00+00:00"
+}

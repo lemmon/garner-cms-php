@@ -22,6 +22,8 @@ final class StudioSiteActionTest extends TestCase
 
     protected function tearDown(): void
     {
+        unset($_SERVER['HTTP_HOST'], $_SERVER['REQUEST_SCHEME']);
+
         $this->deleteDirectory($this->projectRoot);
     }
 
@@ -35,12 +37,16 @@ final class StudioSiteActionTest extends TestCase
             'home_page_id' => 'home-page',
         ]);
 
+        $_SERVER['HTTP_HOST'] = 'test.garner.local';
+        $_SERVER['REQUEST_SCHEME'] = 'https';
+
         $handler = require $this->repoRoot . '/backend/actions/studio/site.php';
         $payload = $handler($this->makeApplication());
 
         self::assertTrue($payload['ok']);
         self::assertSame('site', $payload['site']['id']);
         self::assertSame('Test Garner', $payload['site']['title']);
+        self::assertSame('https://test.garner.local', $payload['site']['url']);
         self::assertSame('error-page', $payload['site']['error_page_id']);
         self::assertSame('home-page', $payload['site']['home_page_id']);
     }
@@ -48,8 +54,8 @@ final class StudioSiteActionTest extends TestCase
     private function makeApplication(): Application
     {
         return new Application(
-            backendPath: $this->repoRoot . '/backend',
-            rootPath: $this->projectRoot,
+            corePath: $this->repoRoot,
+            projectRootPath: $this->projectRoot,
             config: [
                 'app' => [
                     'name' => 'Test Garner',

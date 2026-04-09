@@ -106,6 +106,24 @@ final class StudioApp
 
     private function contentType(string $path): string
     {
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mapped = match ($extension) {
+            'css' => 'text/css; charset=utf-8',
+            'html' => 'text/html; charset=utf-8',
+            'ico' => 'image/x-icon',
+            'js', 'mjs' => 'application/javascript; charset=utf-8',
+            'json', 'map' => 'application/json; charset=utf-8',
+            'svg' => 'image/svg+xml; charset=utf-8',
+            'txt' => 'text/plain; charset=utf-8',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            default => null,
+        };
+
+        if ($mapped !== null) {
+            return $mapped;
+        }
+
         $detected = mime_content_type($path);
         $contentType = is_string($detected) && $detected !== ''
             ? $detected

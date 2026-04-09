@@ -25,6 +25,31 @@ Future fix options:
 - make the Studio prefix non-configurable and treat `/studio` as a hard contract
 - or generate the frontend base path from the same source as the backend prefix during the Studio build
 
+## Non-Root Installation Is Not Supported Yet
+
+Current state:
+
+- Garner now detects the current public base URL automatically from the request by default
+- `app.url` remains available as an explicit override when needed
+- Studio currently builds public page links by concatenating `site_url + page.path`
+
+Why this matters:
+
+- the current implementation still assumes Garner is installed at the web root
+- installing Garner under a subdirectory such as `/cms` or `/project/public` would produce incorrect public links
+
+Current decision:
+
+- automatic request-based URL detection should be the default production behavior
+- explicit URL configuration should remain available as an override and for features that truly need a canonical absolute URL outside the current request context
+- accept the current root-location-only support as temporary
+
+Future fix options:
+
+- derive public URLs from a normalized request-aware `{origin, base_path}` contract rather than simple string concatenation
+- support non-root installs explicitly by modeling application base path
+- keep canonical URL configuration as an override for proxies, multiple domains, CLI flows, feeds, emails, and other non-request contexts
+
 ## Blueprint Validation Is Intentionally Incomplete
 
 Current state:

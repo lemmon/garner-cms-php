@@ -15,6 +15,10 @@ final class TemplateResolver
 
     public function resolveErrorTemplate(): ?string
     {
+        if ($this->templateExists('error')) {
+            return 'error.twig';
+        }
+
         return $this->templateExists('404') ? '404.twig' : null;
     }
 

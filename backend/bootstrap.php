@@ -11,8 +11,6 @@ if (!is_file($vendorAutoload)) {
 
 require $vendorAutoload;
 
-return new Garner\Core\Application(
-    backendPath: __DIR__,
-    rootPath: $rootPath,
-    config: Garner\Support\ConfigLoader::load(__DIR__ . '/config'),
-);
+$appFactory = require $rootPath . '/boot/app.php';
+
+return $appFactory($rootPath, $rootPath);

@@ -73,6 +73,7 @@ final class RouterIntegrationTest extends TestCase
 
         self::assertSame('200', $studioSite['status']);
         self::assertStringContainsString('"title": "Test Garner"', $studioSite['body']);
+        self::assertStringContainsString('"url": "https://test.garner.local"', $studioSite['body']);
         self::assertStringContainsString('"home_page_id": "home-page"', $studioSite['body']);
 
         self::assertSame('200', $siteBlueprint['status']);
@@ -94,6 +95,14 @@ final class RouterIntegrationTest extends TestCase
         self::assertSame('200', $response['status']);
         self::assertStringContainsString('Custom example route', $response['body']);
         self::assertStringNotContainsString('<h1>Example Page</h1>', $response['body']);
+    }
+
+    public function testRouterCanStillRenderWhenOutputStartedBeforeResponse(): void
+    {
+        $response = $this->dispatch('/headers-sent');
+
+        self::assertStringContainsString('debug-prefix', $response['body']);
+        self::assertStringContainsString('<h1>Headers Sent</h1>', $response['body']);
     }
 
     public function testRouterReturnsJsonErrorsForInvalidAndMissingActions(): void
@@ -223,7 +232,7 @@ final class RouterIntegrationTest extends TestCase
         string $body,
     ): string {
         $autoload = var_export($this->repoRoot . '/vendor/autoload.php', true);
-        $backendPath = var_export($this->repoRoot . '/backend', true);
+        $corePath = var_export($this->repoRoot, true);
         $projectRoot = var_export($this->projectRoot, true);
         $requestPath = var_export($path, true);
         $statusPath = var_export($statusFile, true);
@@ -243,6 +252,9 @@ final class RouterIntegrationTest extends TestCase
                 'routes' => [
                     'api_prefix' => '/api',
                     'studio_prefix' => '/studio',
+                ],
+                'studio' => [
+                    'build_path' => $this->projectRoot . '/frontend/build',
                 ],
                 'rendering' => [
                     'default_template' => 'default',
@@ -266,14 +278,16 @@ final class RouterIntegrationTest extends TestCase
             \$_SERVER['REQUEST_METHOD'] = {$requestMethod};
             \$_SERVER['CONTENT_TYPE'] = {$requestContentType};
             \$_SERVER['CONTENT_LENGTH'] = {$requestContentLength};
+            \$_SERVER['HTTP_HOST'] = 'test.garner.local';
+            \$_SERVER['REQUEST_SCHEME'] = 'https';
 
             register_shutdown_function(static function (): void {
                 file_put_contents({$statusPath}, (string) http_response_code());
             });
 
             \$app = new \Garner\Core\Application(
-                backendPath: {$backendPath},
-                rootPath: {$projectRoot},
+                corePath: {$corePath},
+                projectRootPath: {$projectRoot},
                 config: {$config},
             );
 
@@ -417,6 +431,11 @@ final class RouterIntegrationTest extends TestCase
             return [
                 '/api/meta/health' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom api route'),
                 '/example.txt' => static fn(Application $app): RenderedResponse => RenderedResponse::text('Custom example route'),
+                '/headers-sent' => static function (Application $app): RenderedResponse {
+                    echo 'debug-prefix';
+
+                    return RenderedResponse::html('<h1>Headers Sent</h1>');
+                },
                 '/studio' => static fn(Application $app): RenderedResponse => RenderedResponse::text('custom studio route'),
             ];
             PHP);

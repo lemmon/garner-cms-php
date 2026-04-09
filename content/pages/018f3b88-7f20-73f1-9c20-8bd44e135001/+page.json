@@ -1,0 +1,16 @@
+{
+    "id": "018f3b88-7f20-73f1-9c20-8bd44e135001",
+    "kind": "page",
+    "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
+    "slug": "dump",
+    "blueprint": "dump",
+    "template": "dump",
+    "status": "listed",
+    "sort": 40,
+    "fields": {
+        "title": "Dump",
+        "text": "This page triggers Symfony VarDumper from the page controller. Use it to inspect the current page, site, and page listing context while debug mode is enabled."
+    },
+    "created_at": "2026-04-09T12:00:00+00:00",
+    "updated_at": "2026-04-09T12:00:00+00:00"
+}

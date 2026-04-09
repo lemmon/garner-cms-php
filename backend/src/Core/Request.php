@@ -33,6 +33,25 @@ final class Request
         return is_string($path) && $path !== '' ? $path : '/';
     }
 
+    public static function publicBaseUrl(?string $override = null): ?string
+    {
+        if (is_string($override)) {
+            $trimmed = trim($override);
+
+            if ($trimmed !== '') {
+                return rtrim($trimmed, '/');
+            }
+        }
+
+        $host = self::publicHost();
+
+        if ($host === null) {
+            return null;
+        }
+
+        return (self::isHttps() ? 'https' : 'http') . '://' . $host;
+    }
+
     public static function getInput(): string
     {
         $input = file_get_contents('php://input');
@@ -44,6 +63,47 @@ final class Request
         }
 
         return $input !== false ? $input : '';
+    }
+
+    private static function publicHost(): ?string
+    {
+        $forwardedHost = self::firstForwardedValue($_SERVER['HTTP_X_FORWARDED_HOST'] ?? null);
+
+        if ($forwardedHost !== null) {
+            return $forwardedHost;
+        }
+
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+
+        if ($host !== '') {
+            return $host;
+        }
+
+        $serverName = trim((string) ($_SERVER['SERVER_NAME'] ?? ''));
+
+        if ($serverName === '') {
+            return null;
+        }
+
+        $port = (string) ($_SERVER['SERVER_PORT'] ?? '');
+        $defaultPort = self::isHttps() ? '443' : '80';
+
+        if ($port === '' || $port === $defaultPort) {
+            return $serverName;
+        }
+
+        return $serverName . ':' . $port;
+    }
+
+    private static function firstForwardedValue(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $first = trim(explode(',', $value)[0]);
+
+        return $first !== '' ? $first : null;
     }
 
     /**

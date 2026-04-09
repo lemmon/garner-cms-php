@@ -3,8 +3,8 @@
     "kind": "page",
     "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
     "slug": "controller-data",
-    "blueprint": "controller_data",
-    "template": "controller_data",
+    "blueprint": "controller-data",
+    "template": "controller-data",
     "status": "listed",
     "sort": 20,
     "fields": {

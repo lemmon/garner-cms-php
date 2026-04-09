@@ -28,7 +28,7 @@ final class PageListItemSerializer
             'slug' => $page->slug(),
             'status' => $page->status(),
             'sort' => is_int($data['sort'] ?? null) ? $data['sort'] : null,
-            'blueprint' => is_string($data['blueprint'] ?? null) ? $data['blueprint'] : 'page',
+            'blueprint' => $page->blueprint(),
             'template' => $page->template(),
             'title' => $page->title(),
             'path' => $path,

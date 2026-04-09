@@ -34,6 +34,7 @@
 - Prefer trailing commas in multiline PHP arrays, argument lists, and object literals.
 - Use named arguments when they improve clarity.
 - Persisted and external data should use `snake_case`. Keep JSON output stable and pretty-printed.
+- Content-facing identifiers and filenames should use `kebab-case` for blueprints, templates, and page controllers.
 - Action-boundary validation should use `lemmon/validator`. Validate route payloads in actions, not deep inside services.
 - Validation phases are distinct:
   - action-boundary validation errors return `{invalid: true, fields}`

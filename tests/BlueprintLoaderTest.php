@@ -93,6 +93,27 @@ final class BlueprintLoaderTest extends TestCase
         self::assertSame(10, $blueprint['tabs'][0]['nodes'][1]['rows']);
     }
 
+    public function testLoaderNormalizesBlueprintReferencesAndNodeTypes(): void
+    {
+        $this->writeFile('site/blueprints/pages/controller-data.yml', <<<'YAML'
+            title: Controller Data
+
+            tabs:
+                - name: content
+                  label: Content
+                  nodes:
+                      - type: page-list
+                        name: pages
+                        label: Pages
+                        source: site
+            YAML);
+
+        $blueprint = $this->makeLoader()->loadPage('controller_data');
+
+        self::assertSame('Controller Data', $blueprint['title']);
+        self::assertSame('page_list', $blueprint['tabs'][0]['nodes'][0]['type']);
+    }
+
     public function testLoaderRejectsInvalidBlueprintStructure(): void
     {
         $this->writeFile('site/blueprints/site.yml', <<<'YAML'

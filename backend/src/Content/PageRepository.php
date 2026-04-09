@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Content;
 
+use Garner\Support\Identifier;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -83,6 +84,14 @@ final class PageRepository
             throw new RuntimeException(sprintf('Invalid page JSON in "%s"', $file));
         }
 
+        if (is_string($decoded['blueprint'] ?? null)) {
+            $decoded['blueprint'] = Identifier::kebab($decoded['blueprint']);
+        }
+
+        if (is_string($decoded['template'] ?? null)) {
+            $decoded['template'] = Identifier::kebab($decoded['template']);
+        }
+
         return $decoded;
     }
 
@@ -107,7 +116,11 @@ final class PageRepository
         $template = $page['template'] ?? $this->defaultTemplate;
         $now = gmdate(DATE_ATOM);
         $normalizedSlug = is_string($slug) ? trim($slug, '/') : null;
-        $status = $this->normalizeStatus($page, $blueprint, $template);
+        $normalizedBlueprint = is_string($blueprint) ? Identifier::kebab($blueprint) : 'page';
+        $normalizedTemplate = is_string($template)
+            ? Identifier::kebab($template)
+            : $this->defaultTemplate;
+        $status = $this->normalizeStatus($page, $normalizedBlueprint, $normalizedTemplate);
 
         if ($normalizedSlug === '') {
             $normalizedSlug = null;
@@ -118,8 +131,8 @@ final class PageRepository
             'kind' => is_string($page['kind'] ?? null) ? $page['kind'] : 'page',
             'parent_id' => is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null,
             'slug' => $normalizedSlug,
-            'blueprint' => is_string($blueprint) ? $blueprint : 'page',
-            'template' => is_string($template) ? $template : $this->defaultTemplate,
+            'blueprint' => $normalizedBlueprint !== '' ? $normalizedBlueprint : 'page',
+            'template' => $normalizedTemplate !== '' ? $normalizedTemplate : $this->defaultTemplate,
             'status' => $status,
             'sort' => $this->normalizeSort($page['sort'] ?? null, $status),
             'fields' => is_array($page['fields'] ?? null) ? $page['fields'] : [],

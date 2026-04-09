@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Site;
 
+use Garner\Support\Identifier;
 use Illuminate\Support\Collection;
 
 final class Page
@@ -63,7 +64,26 @@ final class Page
     {
         $template = $this->data['template'] ?? 'default';
 
-        return is_string($template) && $template !== '' ? $template : 'default';
+        if (!is_string($template) || $template === '') {
+            return 'default';
+        }
+
+        $normalized = Identifier::kebab($template);
+
+        return $normalized !== '' ? $normalized : 'default';
+    }
+
+    public function blueprint(): string
+    {
+        $blueprint = $this->data['blueprint'] ?? 'page';
+
+        if (!is_string($blueprint) || $blueprint === '') {
+            return 'page';
+        }
+
+        $normalized = Identifier::kebab($blueprint);
+
+        return $normalized !== '' ? $normalized : 'page';
     }
 
     public function title(): string

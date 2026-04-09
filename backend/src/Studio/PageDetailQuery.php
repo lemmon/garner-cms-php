@@ -43,7 +43,7 @@ final class PageDetailQuery
         }
 
         $data = $page->data();
-        $blueprintName = is_string($data['blueprint'] ?? null) ? $data['blueprint'] : 'page';
+        $blueprintName = $page->blueprint();
         [$blueprint, $blueprintIssue] = $this->loadBlueprint($blueprintName);
         $isHome = $site->homePageId() === $page->id();
         $isError = $site->errorPageId() === $page->id();

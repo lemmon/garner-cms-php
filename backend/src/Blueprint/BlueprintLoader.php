@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Blueprint;
 
+use Garner\Support\Identifier;
 use Lemmon\Validator\FieldValidator;
 use Lemmon\Validator\ValidationException;
 use Lemmon\Validator\Validator;
@@ -21,6 +22,7 @@ final class BlueprintLoader
      */
     public function load(string $name): array
     {
+        $name = $this->normalizeBlueprintReference($name);
         $this->assertBlueprintReference($name);
 
         $blueprint = $this->resolveValue($this->parseBlueprintFile($name), [$name]);
@@ -50,9 +52,7 @@ final class BlueprintLoader
      */
     public function loadPage(string $name): array
     {
-        $this->assertBlueprintReference($name);
-
-        return $this->load('pages/' . $name);
+        return $this->load('pages/' . Identifier::kebab($name));
     }
 
     private function assertBlueprintReference(string $name): void
@@ -108,10 +108,14 @@ final class BlueprintLoader
         $extends = $resolved['extends'] ?? null;
 
         if (!is_string($extends) || trim($extends) === '') {
+            if (is_string($resolved['type'] ?? null)) {
+                $resolved['type'] = Identifier::snake($resolved['type']);
+            }
+
             return $resolved;
         }
 
-        $reference = trim($extends);
+        $reference = $this->normalizeBlueprintReference(trim($extends));
         $this->assertBlueprintReference($reference);
 
         if (in_array($reference, $stack, true)) {
@@ -133,7 +137,18 @@ final class BlueprintLoader
 
         unset($resolved['extends']);
 
-        return $this->mergeMappings($base, $resolved);
+        $resolved = $this->mergeMappings($base, $resolved);
+
+        if (is_string($resolved['type'] ?? null)) {
+            $resolved['type'] = Identifier::snake($resolved['type']);
+        }
+
+        return $resolved;
+    }
+
+    private function normalizeBlueprintReference(string $name): string
+    {
+        return Identifier::kebabPath($name);
     }
 
     /**

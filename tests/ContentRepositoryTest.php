@@ -80,6 +80,29 @@ final class ContentRepositoryTest extends TestCase
         self::assertNull($stored['sort']);
     }
 
+    public function testPageRepositoryCanonicalizesBlueprintAndTemplateIdentifiers(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+
+        $pages->save([
+            'id' => 'controller-page',
+            'blueprint' => 'controller_response',
+            'template' => 'controller_response',
+            'fields' => [
+                'title' => 'Controller Response',
+            ],
+        ]);
+
+        $stored = $pages->find('controller-page');
+
+        if (!is_array($stored)) {
+            self::fail('Stored page JSON must decode to an array.');
+        }
+
+        self::assertSame('controller-response', $stored['blueprint']);
+        self::assertSame('controller-response', $stored['template']);
+    }
+
     public function testIndexerBuildsPublicPathsAndResolverSkipsDrafts(): void
     {
         $pages = new PageRepository($this->projectRoot . '/content');

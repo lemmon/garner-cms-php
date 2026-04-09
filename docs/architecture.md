@@ -131,6 +131,7 @@ Important page fields:
 Conventions:
 
 - persisted shapes use `snake_case`
+- content-facing identifiers such as blueprint names, template names, controller names, and their filenames use `kebab-case`
 - content is stored as pretty-printed JSON
 - one entry equals one JSON file
 - IDs come from a configurable generator, with `uuid_v7` as the default

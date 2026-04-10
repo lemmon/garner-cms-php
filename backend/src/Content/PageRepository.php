@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Garner\Content;
 
+use Garner\Core\NotFoundException;
 use Garner\Support\Identifier;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
 final class PageRepository
 {
+    use SortsPages;
+
     public function __construct(
         private readonly string $contentPath,
         private readonly string $defaultTemplate = 'default',
@@ -31,15 +34,46 @@ final class PageRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function find(string $id): ?array
+    public function find(mixed $id): ?array
     {
-        $file = $this->pageFilePath($id);
+        $normalizedId = $this->normalizeLookupId($id);
+
+        if ($normalizedId === null) {
+            return null;
+        }
+
+        $file = $this->pageFilePath($normalizedId);
 
         if (!is_file($file)) {
             return null;
         }
 
         return $this->decodeFile($file);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function findOrFail(mixed $id): array
+    {
+        $page = $this->find($id);
+
+        if (!is_array($page)) {
+            throw new NotFoundException('Page not found');
+        }
+
+        return $page;
+    }
+
+    private function normalizeLookupId(mixed $id): ?string
+    {
+        if (!is_string($id)) {
+            return null;
+        }
+
+        $normalizedId = trim($id);
+
+        return $normalizedId !== '' ? $normalizedId : null;
     }
 
     /**
@@ -120,7 +154,7 @@ final class PageRepository
         $normalizedTemplate = is_string($template)
             ? Identifier::kebab($template)
             : $this->defaultTemplate;
-        $status = $this->normalizeStatus($page, $normalizedBlueprint, $normalizedTemplate);
+        $status = $this->normalizeStatus($page);
 
         if ($normalizedSlug === '') {
             $normalizedSlug = null;
@@ -144,21 +178,14 @@ final class PageRepository
     /**
      * @param array<string, mixed> $page
      */
-    private function normalizeStatus(array $page, mixed $blueprint, mixed $template): ?string
+    private function normalizeStatus(array $page): ?string
     {
+        if (array_key_exists('status', $page) && $page['status'] === null) {
+            return null;
+        }
+
         if (is_string($page['status'] ?? null)) {
             return $page['status'];
-        }
-
-        $blueprintName = is_string($blueprint) ? $blueprint : '';
-        $templateName = is_string($template) ? $template : '';
-
-        if (in_array($blueprintName, ['home', 'error'], true)) {
-            return null;
-        }
-
-        if (in_array($templateName, ['home', 'error'], true)) {
-            return null;
         }
 
         return 'draft';
@@ -171,82 +198,5 @@ final class PageRepository
         }
 
         return $sort !== null ? (int) $sort : null;
-    }
-
-    /**
-     * @param array<string, mixed> $page
-     */
-    private static function systemRank(array $page): int
-    {
-        $blueprint = is_string($page['blueprint'] ?? null) ? $page['blueprint'] : '';
-        $template = is_string($page['template'] ?? null) ? $page['template'] : '';
-
-        if ($blueprint === 'home' || $template === 'home') {
-            return 0;
-        }
-
-        if ($blueprint === 'error' || $template === 'error') {
-            return 2;
-        }
-
-        return 1;
-    }
-
-    /**
-     * @param array<string, mixed> $page
-     */
-    private static function statusRank(array $page): int
-    {
-        return match ($page['status'] ?? null) {
-            'listed' => 0,
-            'unlisted' => 1,
-            'draft' => 2,
-            default => 3,
-        };
-    }
-
-    /**
-     * @param array<string, mixed> $page
-     */
-    private static function listedSortKey(array $page): int
-    {
-        if (($page['status'] ?? null) !== 'listed') {
-            return PHP_INT_MAX;
-        }
-
-        return is_int($page['sort'] ?? null) ? $page['sort'] : PHP_INT_MAX;
-    }
-
-    /**
-     * @param array<string, mixed> $page
-     */
-    private static function slugOrId(array $page): string
-    {
-        $slug = is_string($page['slug'] ?? null) ? $page['slug'] : '';
-
-        if ($slug !== '') {
-            return $slug;
-        }
-
-        return is_string($page['id'] ?? null) ? $page['id'] : '';
-    }
-
-    /**
-     * @param array<string, mixed> $left
-     * @param array<string, mixed> $right
-     */
-    private static function comparePages(array $left, array $right): int
-    {
-        return (
-            (string) ($left['parent_id'] ?? '') <=> (string) ($right['parent_id'] ?? '')
-            // @mago-expect lint:no-shorthand-ternary
-            ?: self::systemRank($left) <=> self::systemRank($right)
-            // @mago-expect lint:no-shorthand-ternary
-            ?: self::statusRank($left) <=> self::statusRank($right)
-            // @mago-expect lint:no-shorthand-ternary
-            ?: self::listedSortKey($left) <=> self::listedSortKey($right)
-            // @mago-expect lint:no-shorthand-ternary
-            ?: self::slugOrId($left) <=> self::slugOrId($right)
-        );
     }
 }

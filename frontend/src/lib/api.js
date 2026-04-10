@@ -1,3 +1,5 @@
+import { error } from '@sveltejs/kit';
+
 import { resolve } from '$app/paths';
 
 const API_BASE = '/api/';
@@ -21,40 +23,28 @@ export async function api(action, data = {}) {
     body: JSON.stringify(data),
   });
 
-  const contentType = response.headers.get('content-type') ?? '';
-  const body = await response.text();
-  const expectsJson = contentType.includes('application/json');
-  let json = {};
-
   if (response.status === 401) {
     window.location.href = resolve('/login');
     return new Promise(() => {});
   }
 
-  if (body !== '') {
-    if (!expectsJson) {
-      const message = response.ok
-        ? `Expected JSON response from ${API_BASE + action}`
-        : `Request to ${API_BASE + action} failed with ${response.status}`;
+  let json;
 
-      throw new Error(message);
-    }
-
-    try {
-      json = JSON.parse(body);
-    } catch {
-      throw new Error(`Invalid JSON response from ${API_BASE + action}`);
-    }
+  try {
+    json = await response.json();
+  } catch {
+    if (!response.ok) throw error(response.status, response.statusText);
+    throw new Error(`Invalid JSON response from ${API_BASE + action}`);
   }
 
-  // Validation responses are expected, not errors - return them normally
+  // Validation responses are expected control flow, not errors — return them
+  // normally so callers can render field-level feedback without try/catch.
   if (json.invalid) {
     return json;
   }
 
   if (!response.ok) {
-    const message = json.message || response.statusText;
-    throw new Error(message);
+    throw error(response.status, json.message || response.statusText);
   }
 
   return json;

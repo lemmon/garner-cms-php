@@ -42,8 +42,8 @@ final class SiteModelTest extends TestCase
             'id' => 'home-page',
             'blueprint' => 'home',
             'template' => 'home',
+            'status' => null,
             'slug' => 'home',
-            'sort' => 1,
             'fields' => [
                 'title' => 'Home',
             ],
@@ -136,6 +136,7 @@ final class SiteModelTest extends TestCase
             'id' => 'error-page',
             'blueprint' => 'error',
             'template' => 'error',
+            'status' => null,
             'fields' => [
                 'title' => 'Not Found',
             ],
@@ -243,6 +244,31 @@ final class SiteModelTest extends TestCase
         self::assertNotNull($zed);
         self::assertNull($privacy->data()['sort'] ?? null);
         self::assertNull($zed->data()['sort'] ?? null);
+    }
+
+    public function testSiteIdentifiesSystemPagesByConfiguredPointers(): void
+    {
+        $site = new Site([
+            'title' => 'Test',
+            'home_page_id' => 'home-page',
+            'error_page_id' => 'error-page',
+        ]);
+
+        self::assertTrue($site->isSystemPage('home-page'));
+        self::assertTrue($site->isSystemPage('error-page'));
+        self::assertFalse($site->isSystemPage('about-page'));
+        self::assertFalse($site->isSystemPage(''));
+    }
+
+    public function testSiteIdentifiesSystemPagesWithoutErrorPage(): void
+    {
+        $site = new Site([
+            'title' => 'Test',
+            'home_page_id' => 'home-page',
+        ]);
+
+        self::assertTrue($site->isSystemPage('home-page'));
+        self::assertFalse($site->isSystemPage('error-page'));
     }
 
     private function deleteDirectory(string $path): void

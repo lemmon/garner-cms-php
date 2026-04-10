@@ -4,6 +4,7 @@
   import { page } from '$app/state';
   import Breadcrumbs from '$lib/components/Breadcrumbs.svelte';
   import Button from '$lib/components/Button.svelte';
+  import EditableTitle from '$lib/components/EditableTitle.svelte';
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
   import Tabs from '$lib/components/Tabs.svelte';
@@ -11,6 +12,7 @@
 
   let {
     title,
+    slug = '',
     description = '',
     breadcrumbs = [],
     blueprint = undefined,
@@ -18,6 +20,11 @@
     fields = undefined,
     openHref = '',
     openLabel = 'Open page',
+    editAction = '',
+    editId = '',
+    invalidateKeys = [],
+    slugEditable = false,
+    editTitleLabel = 'Edit title and slug',
   } = $props();
 
   let tabs = $derived(blueprint?.tabs ?? []);
@@ -42,9 +49,21 @@
   <header class="space-y-3">
     <Breadcrumbs items={breadcrumbs} />
 
-    <h1 class="text-5xl font-medium tracking-tight text-balance">
-      {title}
-    </h1>
+    {#if editAction}
+      <EditableTitle
+        {title}
+        {slug}
+        action={editAction}
+        id={editId}
+        {invalidateKeys}
+        {slugEditable}
+        editLabel={editTitleLabel}
+      />
+    {:else}
+      <h1 class="text-5xl font-medium tracking-tight text-balance">
+        {title}
+      </h1>
+    {/if}
 
     {#if description}
       <p class="max-w-2xl text-lg/6 text-current/60">

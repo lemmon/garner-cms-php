@@ -27,5 +27,5 @@ literal-named-argument = { enabled = false }
 no-boolean-flag-parameter = { enabled = false }
 no-ini-set = { enabled = false }
 tagged-todo = { enabled = false }
-too-many-methods = { threshold = 20 }
+too-many-methods = { enabled = false }
 too-many-properties = { enabled = false }

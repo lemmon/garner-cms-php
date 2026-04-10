@@ -13,6 +13,9 @@
   description={data.blueprint.description}
   breadcrumbs={[{ label: 'Site' }]}
   blueprint={data.blueprint}
+  editAction="studio/site/update"
+  invalidateKeys={['studio:site']}
+  editTitleLabel="Edit site title"
   openHref={data.site.url}
   openLabel="Open site"
 />

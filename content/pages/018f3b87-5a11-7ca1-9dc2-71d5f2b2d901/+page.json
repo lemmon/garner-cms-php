@@ -5,6 +5,7 @@
     "slug": null,
     "blueprint": "error",
     "template": "error",
+    "status": null,
     "sort": null,
     "fields": {
         "title": "Not Found",

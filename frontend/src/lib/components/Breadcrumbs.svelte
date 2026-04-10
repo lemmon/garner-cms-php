@@ -24,7 +24,7 @@
         {@const Icon = activeNavigationItem?.icon}
         <li class="flex items-center gap-2 text-neutral-400">
           {#if index === 0 && Icon}
-            <Icon size={20} />
+            <Icon size={20} aria-hidden="true" />
           {/if}
 
           {#if item.href}

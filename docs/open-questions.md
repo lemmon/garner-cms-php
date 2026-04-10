@@ -49,6 +49,36 @@ Open follow-up:
   registry, or whether Garner should later support a custom project icon
   registry outside core
 
+## Blueprint-Controlled Slug Editability
+
+Current state:
+
+- system pages (home, error) have non-editable slugs, determined by whether
+  the page's id matches the site's `home_page_id` or `error_page_id`
+- all other pages have freely editable slugs
+- runtime "system page" identity is defined only by site config pointers
+- the `home` and `error` blueprint/template names remain conventions for the
+  configured system pages, but they do not themselves make a page system-like
+
+Future direction:
+
+- blueprints should be able to declare that a page's slug is equivalent to its
+  id — meaning the slug is stored as `null` in the content file but is still
+  used for routing (resolved to the page id at path-resolution time)
+- when a blueprint declares this, the slug becomes non-editable regardless of
+  system page status
+- this makes slug editability a function of two inputs: system page status
+  (site pointers) and blueprint schema configuration
+
+Implication:
+
+- `slug_editable` in the Studio API response already exists as a dedicated
+  field, so the frontend does not need to derive this from `is_system`
+- the backend can extend `slugEditableForPage` to also consult the blueprint
+  definition when that schema property is introduced
+- pages with `slug: null` and blueprint-locked slugs would resolve their
+  public path segment from the page id, not from a stored slug string
+
 ## Multilingual Model Must Not Fork The Product
 
 Current concern:

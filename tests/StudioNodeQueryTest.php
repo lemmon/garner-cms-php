@@ -94,8 +94,8 @@ final class StudioNodeQueryTest extends TestCase
             'id' => 'home-page',
             'blueprint' => 'home',
             'template' => 'home',
+            'status' => null,
             'slug' => 'home',
-            'sort' => 1,
             'fields' => [
                 'title' => 'Home',
             ],
@@ -165,6 +165,7 @@ final class StudioNodeQueryTest extends TestCase
             'id' => 'error-page',
             'blueprint' => 'error',
             'template' => 'error',
+            'status' => null,
             'fields' => [
                 'title' => 'Not Found',
             ],

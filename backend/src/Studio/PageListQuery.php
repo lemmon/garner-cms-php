@@ -7,6 +7,7 @@ namespace Garner\Studio;
 use Garner\Content\PageRepository;
 use Garner\Content\PathResolver;
 use Garner\Content\SiteRepository;
+use Garner\Core\NotFoundException;
 use Garner\Site\Page;
 use Garner\Site\Pages;
 use Garner\Site\Site;
@@ -82,15 +83,15 @@ final class PageListQuery
         }
 
         if ($source === 'site.home') {
-            return $site->home();
+            return $site->home() ?? throw new NotFoundException('Page not found');
         }
 
         if ($source === 'site.error_page') {
-            return $site->errorPage();
+            return $site->errorPage() ?? throw new NotFoundException('Page not found');
         }
 
         if (preg_match('/^site\.page\((["\'])([^"\']+)\1\)$/', $source, $matches) === 1) {
-            return $site->page($matches[2]);
+            return $site->page($matches[2]) ?? throw new NotFoundException('Page not found');
         }
 
         return null;

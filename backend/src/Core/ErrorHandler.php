@@ -84,6 +84,13 @@ final class ErrorHandler
             ], 400);
         }
 
+        if ($throwable instanceof NotFoundException) {
+            Response::json([
+                'error' => true,
+                'message' => $throwable->getMessage(),
+            ], 404);
+        }
+
         if (
             $throwable instanceof \JsonException
             || $throwable instanceof InvalidArgumentException

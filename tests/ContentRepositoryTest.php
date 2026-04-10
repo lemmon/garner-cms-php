@@ -103,6 +103,82 @@ final class ContentRepositoryTest extends TestCase
         self::assertSame('controller-response', $stored['template']);
     }
 
+    public function testDetachedHomeBlueprintDoesNotInferSystemPageState(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+        $site = new SiteRepository($this->projectRoot . '/content');
+
+        $site->save([
+            'home_page_id' => 'real-home',
+            'title' => 'Test Site',
+        ]);
+
+        $pages->save([
+            'id' => 'real-home',
+            'slug' => 'real-home',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Real Home',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'detached-home',
+            'blueprint' => 'home',
+            'template' => 'home',
+            'slug' => 'detached-home',
+            'fields' => [
+                'title' => 'Detached Home',
+            ],
+        ]);
+
+        $stored = $pages->find('detached-home');
+
+        if (!is_array($stored)) {
+            self::fail('Stored page JSON must decode to an array.');
+        }
+
+        self::assertSame('draft', $stored['status']);
+
+        $indexer = new PathIndexer(
+            siteRepository: $site,
+            pageRepository: $pages,
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+        );
+        $resolver = new PathResolver(
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            pageRepository: $pages,
+        );
+
+        $indexer->rebuild();
+        self::assertNull($resolver->resolve('/detached-home'));
+
+        $pages->save([
+            'id' => 'detached-home',
+            'blueprint' => 'home',
+            'template' => 'home',
+            'slug' => 'detached-home',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Detached Home',
+            ],
+        ]);
+
+        $indexer->rebuild();
+
+        $resolver = new PathResolver(
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            pageRepository: $pages,
+        );
+        $resolved = $resolver->resolve('/detached-home');
+
+        if (!is_array($resolved)) {
+            self::fail('Listed detached home page must resolve to a page.');
+        }
+
+        self::assertSame('detached-home', $resolved['id']);
+    }
+
     public function testIndexerBuildsPublicPathsAndResolverSkipsDrafts(): void
     {
         $pages = new PageRepository($this->projectRoot . '/content');

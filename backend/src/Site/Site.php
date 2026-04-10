@@ -119,6 +119,14 @@ final class Site
         return $pages->values();
     }
 
+    public function isSystemPage(string $pageId): bool
+    {
+        return (
+            $pageId !== ''
+            && ($pageId === $this->homePageId() || $pageId === $this->errorPageId())
+        );
+    }
+
     public function value(string $key, mixed $default = null): mixed
     {
         return array_key_exists($key, $this->data) ? $this->data[$key] : $default;

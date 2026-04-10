@@ -50,6 +50,18 @@ final class RouterIntegrationTest extends TestCase
             '{"id":"about-page"}',
             'application/json',
         );
+        $pageUpdate = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","title":"  Company  Name  ","slug":"Company Name!!"}',
+            'application/json',
+        );
+        $siteUpdate = $this->dispatch(
+            '/api/studio/site/update',
+            'POST',
+            '{"title":"Renamed Garner"}',
+            'application/json',
+        );
 
         self::assertSame('200', $studio['status']);
         self::assertStringContainsString('<title>Test Garner Studio</title>', $studio['body']);
@@ -68,7 +80,7 @@ final class RouterIntegrationTest extends TestCase
         self::assertStringNotContainsString('custom api route', $health['body']);
 
         self::assertSame('200', $contentStatus['status']);
-        self::assertStringContainsString('"page_count": 3', $contentStatus['body']);
+        self::assertStringContainsString('"page_count": 4', $contentStatus['body']);
         self::assertStringContainsString('"/about"', $contentStatus['body']);
 
         self::assertSame('200', $studioSite['status']);
@@ -86,6 +98,105 @@ final class RouterIntegrationTest extends TestCase
         self::assertStringContainsString('"blueprint": "page"', $pageShow['body']);
         self::assertStringContainsString('"path": "/about"', $pageShow['body']);
         self::assertStringContainsString('"title": "Page"', $pageShow['body']);
+
+        self::assertSame('200', $pageUpdate['status']);
+        self::assertStringContainsString('"title": "Company Name"', $pageUpdate['body']);
+        self::assertStringContainsString('"slug": "company-name"', $pageUpdate['body']);
+        self::assertStringContainsString('"path": "/company-name"', $pageUpdate['body']);
+
+        self::assertSame('200', $siteUpdate['status']);
+        self::assertStringContainsString('"title": "Renamed Garner"', $siteUpdate['body']);
+    }
+
+    public function testRouterUsesValidationForSlugRulesOnPageUpdates(): void
+    {
+        $missingSlug = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","title":"Company","slug":"   "}',
+            'application/json',
+        );
+        $duplicateSlug = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","title":"Company","slug":"Contact"}',
+            'application/json',
+        );
+
+        self::assertSame('400', $missingSlug['status']);
+        self::assertStringContainsString('"invalid": true', $missingSlug['body']);
+        self::assertStringContainsString('"path": "slug"', $missingSlug['body']);
+        self::assertStringContainsString('"message": "Value is required"', $missingSlug['body']);
+
+        self::assertSame('400', $duplicateSlug['status']);
+        self::assertStringContainsString('"invalid": true', $duplicateSlug['body']);
+        self::assertStringContainsString('"path": "slug"', $duplicateSlug['body']);
+        self::assertStringContainsString(
+            '"message": "Slug must be unique among sibling pages"',
+            $duplicateSlug['body'],
+        );
+    }
+
+    public function testRouterReturnsNotFoundForMissingOrUnknownPageUpdateIds(): void
+    {
+        $missingId = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"title":"Company"}',
+            'application/json',
+        );
+        $unknownId = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"missing-page","title":"Company"}',
+            'application/json',
+        );
+
+        self::assertSame('404', $missingId['status']);
+        self::assertStringContainsString('"error": true', $missingId['body']);
+        self::assertStringContainsString('"message": "Page not found"', $missingId['body']);
+        self::assertStringNotContainsString('"invalid": true', $missingId['body']);
+
+        self::assertSame('404', $unknownId['status']);
+        self::assertStringContainsString('"error": true', $unknownId['body']);
+        self::assertStringContainsString('"message": "Page not found"', $unknownId['body']);
+        self::assertStringNotContainsString('"invalid": true', $unknownId['body']);
+    }
+
+    public function testRouterReturnsNotFoundForMissingOrUnknownPageShowIds(): void
+    {
+        $missingId = $this->dispatch('/api/studio/pages/show', 'POST', '{}', 'application/json');
+        $unknownId = $this->dispatch(
+            '/api/studio/pages/show',
+            'POST',
+            '{"id":"missing-page"}',
+            'application/json',
+        );
+
+        self::assertSame('404', $missingId['status']);
+        self::assertStringContainsString('"error": true', $missingId['body']);
+        self::assertStringContainsString('"message": "Page not found"', $missingId['body']);
+        self::assertStringNotContainsString('"invalid": true', $missingId['body']);
+
+        self::assertSame('404', $unknownId['status']);
+        self::assertStringContainsString('"error": true', $unknownId['body']);
+        self::assertStringContainsString('"message": "Page not found"', $unknownId['body']);
+        self::assertStringNotContainsString('"invalid": true', $unknownId['body']);
+    }
+
+    public function testRouterReturnsNotFoundForMissingPageNodeSources(): void
+    {
+        $response = $this->dispatch(
+            '/api/studio/nodes/query',
+            'POST',
+            '{"type":"page_list","source":"site.page(\"missing-page\")"}',
+            'application/json',
+        );
+
+        self::assertSame('404', $response['status']);
+        self::assertStringContainsString('"error": true', $response['body']);
+        self::assertStringContainsString('"message": "Page not found"', $response['body']);
+        self::assertStringNotContainsString('"invalid": true', $response['body']);
     }
 
     public function testRouterLetsCustomRoutesWinOverPublicPages(): void
@@ -337,6 +448,18 @@ final class RouterIntegrationTest extends TestCase
             'template' => 'default',
             'fields' => [
                 'title' => 'Example Page',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'contact-page',
+            'parent_id' => 'home-page',
+            'slug' => 'contact',
+            'status' => 'listed',
+            'sort' => 30,
+            'template' => 'default',
+            'fields' => [
+                'title' => 'Contact',
             ],
         ]);
     }

@@ -48,6 +48,7 @@ final class StudioPageDetailQueryTest extends TestCase
             'id' => 'home-page',
             'blueprint' => 'home',
             'template' => 'home',
+            'status' => null,
             'slug' => 'home',
             'fields' => [
                 'title' => 'Home',
@@ -117,8 +118,54 @@ final class StudioPageDetailQueryTest extends TestCase
             $payload['breadcrumbs'],
         );
         self::assertFalse($payload['page']['is_system']);
+        self::assertTrue($payload['page']['slug_editable']);
         self::assertSame('Page', $payload['blueprint']['title']);
         self::assertNull($payload['blueprint_issue']);
+    }
+
+    public function testPageDetailMarksSystemPageSlugAsNotEditable(): void
+    {
+        $siteRepository = new SiteRepository($this->projectRoot . '/content');
+        $pageRepository = new PageRepository($this->projectRoot . '/content');
+
+        $siteRepository->save([
+            'title' => 'Test Garner',
+            'home_page_id' => 'home-page',
+        ]);
+
+        $pageRepository->save([
+            'id' => 'home-page',
+            'blueprint' => 'home',
+            'template' => 'home',
+            'status' => null,
+            'slug' => 'home',
+            'fields' => [
+                'title' => 'Home',
+            ],
+        ]);
+
+        (new PathIndexer(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+        ))->rebuild();
+
+        $query = new PageDetailQuery(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathResolver: new PathResolver(
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+                pageRepository: $pageRepository,
+            ),
+            blueprintLoader: new BlueprintLoader($this->projectRoot . '/site/blueprints'),
+        );
+
+        $payload = $query->query([
+            'id' => 'home-page',
+        ]);
+
+        self::assertTrue($payload['page']['is_system']);
+        self::assertFalse($payload['page']['slug_editable']);
     }
 
     private function deleteDirectory(string $path): void

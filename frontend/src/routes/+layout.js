@@ -2,7 +2,9 @@ import { api } from '$lib/api';
 
 export const ssr = false;
 
-export async function load() {
+export async function load({ depends }) {
+  depends('studio:site');
+
   const data = await api('studio/site');
 
   return {

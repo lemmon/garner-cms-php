@@ -1,6 +1,8 @@
 import { api } from '$lib/api';
 
-export async function load({ params }) {
+export async function load({ depends, params }) {
+  depends(`studio:page:${params.id}`);
+
   const detail = await api('studio/pages/show', {
     id: params.id,
   });

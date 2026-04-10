@@ -26,11 +26,16 @@ final class Pages
             ->values();
     }
 
-    public function find(string $id): ?Page
+    public function find(mixed $id): ?Page
     {
         $page = $this->pageRepository->find($id);
 
         return is_array($page) ? $this->makePage($page) : null;
+    }
+
+    public function findOrFail(mixed $id): Page
+    {
+        return $this->makePage($this->pageRepository->findOrFail($id));
     }
 
     /**
@@ -95,7 +100,7 @@ final class Pages
     private function makePage(array $page): Page
     {
         if (!array_key_exists('resolved_path', $page)) {
-            $page['resolved_path'] = $this->pathResolver->pathForId((string) ($page['id'] ?? ''));
+            $page['resolved_path'] = $this->pathResolver->pathForId((string) $page['id']);
         }
 
         return new Page($page, $this);

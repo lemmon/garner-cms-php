@@ -19,7 +19,7 @@
     [
       'relative',
       'text-current',
-      'flex items-center justify-center p-5 text-xl/6',
+      'flex items-center justify-center p-4 text-xl/6',
       'focus:outline-2 focus:-outline-offset-2 focus:outline-blue focus:shadow-[inset_0_0_0_3px_#fff]',
       'disabled:not-aria-busy:cursor-not-allowed disabled:not-aria-busy:bg-neutral-300 disabled:not-aria-busy:text-neutral-500/50',
       'cursor-pointer aria-busy:cursor-progress',

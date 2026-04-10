@@ -135,7 +135,7 @@ Important page fields:
 - `slug`: nullable path segment
 - `blueprint`: authoring schema name
 - `template`: runtime template/controller name
-- `status`: `draft`, `unlisted`, or `listed` for normal public pages; omitted for system pages such as `home` and `error`
+- `status`: `draft`, `unlisted`, or `listed` for normal public pages; `null` for configured system pages
 - `sort`: nullable integer used only for listed pages
 - `fields`: plain JSON object
 - `created_at`
@@ -157,14 +157,16 @@ Current model:
 
 - `home_page_id` points to the required home page
 - `error_page_id` may point to a dedicated not-found page
+- those site pointers are the runtime authority for which pages are system pages
 
 Current conventions:
 
 - the home page uses the `home` blueprint and `home` template
 - the error page uses the `error` blueprint and `error` template
-- home and error pages do not persist a normal page `status`
+- configured home and error pages persist `status: null`
 - the home page resolves to `/`
 - the error page is not part of the normal public tree
+- blueprint/template names like `home` and `error` are conventions, not standalone runtime authority
 
 Runtime behavior:
 
@@ -306,6 +308,9 @@ Current behavior:
 - uncaught API exceptions render JSON responses
 - only uncaught `ValidationException` instances become `400` invalid responses with flattened field errors
 - action-level payload validation is the only phase that should produce `invalid: true`
+- resource-scoped Studio actions may resolve their target before full payload validation
+- if that target cannot be resolved, the action intentionally returns a `404` API error response even when the incoming identifier is missing, blank, or malformed
+- `NotFoundException` becomes a `404` API error response with `error: true`
 - `JsonException` and `InvalidArgumentException` become `400` API error responses with `error: true`
 - service/runtime failures from `backend/src/` must not return `invalid: true`
 - other uncaught API exceptions become generic `500` JSON responses
@@ -422,9 +427,11 @@ This preserves the important distinction between a relation picker and an editor
 Current API surface:
 
 - `/api/studio/site`: returns minimal site metadata for Studio shell use
+- `/api/studio/site/update`: updates the site title
 - `/api/studio/blueprints/site`: returns the parsed site blueprint as JSON for Studio consumption
 - `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
 - `/api/studio/pages/show`: returns page detail plus the resolved blueprint payload when available
+- `/api/studio/pages/update`: updates page title and, when allowed, slug
 
 Current `nodes/query` payload contract:
 
@@ -448,13 +455,24 @@ Current Studio page-detail behavior:
 - title and slug editing should use a separate page-level affordance, not blueprint field nodes
 - the current detail screen renders supported field nodes from the loaded blueprint
 - supported field nodes currently include `text` and `textarea`
-- save/update behavior is not implemented yet
+- the current update flow is intentionally narrow:
+  - site screen can update the site title
+  - page detail can update page title
+  - non-system pages can also update slug
+  - title values are squished before save
+  - editable page slugs are slugified before save and must be unique among sibling pages
+  - blueprint field editing is not saved yet
 - missing page blueprints do not fail the entire detail view; they return `blueprint: null` with a `blueprint_issue`
+- Studio frontend error handling currently aims for two distinct behaviors:
+  - route-load failures from backend `4xx`/`5xx` responses should propagate into the SvelteKit error route
+  - form submissions that fail at the backend should stay on the current screen and render the backend message in an inline red error banner
 
 Current validation boundary:
 
 - validate blueprint files at load time
 - validate Studio node-query payload shape at the action boundary with `lemmon/validator`
+- for resource-scoped Studio actions, resolve the addressed resource first when that lookup is the authoritative gate
+- a missing addressed resource is a `404 error: true` condition, not an `invalid: true` validation response
 - resolve source/query semantics in the Studio service layer
 - keep validation intentionally narrow to the node kinds currently supported by Studio
 - preserve unknown blueprint keys in the returned payload instead of normalizing them away

@@ -11,7 +11,6 @@ use Garner\Content\PathResolver;
 use Garner\Content\SiteRepository;
 use Garner\Site\Pages;
 use Garner\Site\Site;
-use InvalidArgumentException;
 
 final class PageDetailQuery
 {
@@ -28,25 +27,16 @@ final class PageDetailQuery
      */
     public function query(array $payload): array
     {
-        $id = is_string($payload['id'] ?? null) ? trim($payload['id']) : '';
-
-        if ($id === '') {
-            throw new InvalidArgumentException('Page id is required');
-        }
-
         $pages = new Pages($this->pageRepository, $this->pathResolver);
         $site = new Site($this->siteRepository->read(), $pages);
-        $page = $pages->find($id);
-
-        if ($page === null) {
-            throw new InvalidArgumentException(sprintf('Page "%s" was not found', $id));
-        }
+        $page = $pages->findOrFail($payload['id'] ?? null);
 
         $data = $page->data();
         $blueprintName = $page->blueprint();
         [$blueprint, $blueprintIssue] = $this->loadBlueprint($blueprintName);
         $isHome = $site->homePageId() === $page->id();
         $isError = $site->errorPageId() === $page->id();
+        $isSystem = $site->isSystemPage($page->id());
 
         return [
             'ok' => true,
@@ -66,7 +56,8 @@ final class PageDetailQuery
                 'updated_at' => is_string($data['updated_at'] ?? null) ? $data['updated_at'] : null,
                 'is_home' => $isHome,
                 'is_error' => $isError,
-                'is_system' => $isHome || $isError,
+                'is_system' => $isSystem,
+                'slug_editable' => !$isSystem,
                 'children_count' => $page->children(true)->count(),
                 'fields' => $page->fields(),
             ],

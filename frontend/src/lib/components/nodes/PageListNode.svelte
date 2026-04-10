@@ -54,6 +54,6 @@
       <NodeEmptyState>{node.empty || 'No pages yet.'}</NodeEmptyState>
     {/if}
   {:catch error}
-    <NodeErrorState>{error.message}</NodeErrorState>
+    <NodeErrorState {error} />
   {/await}
 </NodeSection>

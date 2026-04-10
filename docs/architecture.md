@@ -81,6 +81,7 @@ Installed-site notes:
 - both entrypoints bootstrap Garner from `vendor/garner/cms/boot/web.php`
 - the built Studio SPA is served from the installed package under `vendor/garner/cms/frontend/build`
 - installed projects should not need their own `backend/` or `frontend/` directory
+- the current model assumes one project root, but future path configuration should be able to separate `site/`, `content/`, `runtime/`, `storage/`, and `config/` roots without changing Garner's single-site mental model
 
 Directory responsibilities:
 
@@ -91,6 +92,18 @@ Directory responsibilities:
 - `vendor/`: Composer-installed code
 
 Generated state must not be written into `site/`.
+
+Future direction:
+
+- Garner should remain single-site in its own mental model
+- but bootstrapping should eventually be able to mount separate configured paths such as:
+  - `site_path`
+  - `content_path`
+  - `runtime_path`
+  - `storage_path`
+  - `config_path`
+- that would allow a higher-level host to share code, templates, blueprints, and plugins while isolating tenant content and runtime state
+- Garner itself should not need to know whether those mounted paths belong to one installed site or one tenant inside a larger host
 
 ## Content Model
 

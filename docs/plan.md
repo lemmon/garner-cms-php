@@ -26,11 +26,14 @@ Freeze these before writing much code:
 - SvelteKit is Studio-only
 - blueprints use YAML with a unified schema tree
 - blueprints are authoring-time schema, not runtime truth
+- single-language and multilingual installs should share one language model;
+  single-language is a one-language configuration, not a separate architecture
 - runtime transformations use explicit typed helpers/factories
 - generic collection/string behavior comes from ecosystem libraries, not Garner clones
 - `lemmon/validator` is the validation engine behind a thin Garner adapter
 - `site/` remains source-only
 - `storage/` is persistent and `runtime/` is disposable
+- current installed-site layout may later grow into explicitly configurable path roots while preserving Garner's single-site mental model
 - Composer plugins are discovered from `vendor/` without mirrored directories
 - the CLI ships as part of Garner core, not as a separate companion package
 - installed projects should ship a root `llms.txt` for external LLMs working on Garner sites
@@ -199,13 +202,16 @@ If that slice feels clean, the rest of the system has a solid foundation.
 
 Defer these until the core model is proven:
 
-- multilingual content
+- multilingual content UI and full implementation
 - multisite
 - revision browser
 - block editor complexity
 - broad import compatibility with other CMSes
 - alternate database backends
 - extensive Studio customization API
+
+But do not defer the language model itself so long that it becomes a breaking
+architectural retrofit.
 
 ## My Strongest Technical Recommendation
 

@@ -1,5 +1,7 @@
 <script>
   import PencilLineIcon from '@lucide/svelte/icons/pencil-line';
+  import WandSparklesIcon from '@lucide/svelte/icons/wand-sparkles';
+  import slugify from 'slugify';
 
   import { invalidate } from '$app/navigation';
   import Button from '$lib/components/Button.svelte';
@@ -21,11 +23,46 @@
   let dialogLoading = $state(false);
   let draftTitle = $state('');
   let draftSlug = $state('');
+  let slugAuto = $state(true);
   let normalizedSlug = $derived(typeof slug === 'string' ? slug : '');
 
   let accessibleEditLabel = $derived(
     title ? `${editLabel} for ${title}` : editLabel
   );
+
+  function generateSlug(value) {
+    return slugify(value, {
+      lower: true,
+      strict: true,
+      trim: true,
+    });
+  }
+
+  function openDialog() {
+    let generatedSlug = generateSlug(title);
+
+    draftTitle = title;
+    draftSlug = normalizedSlug || generatedSlug;
+    slugAuto = normalizedSlug === '';
+    dialogOpen = true;
+  }
+
+  function handleTitleInput(event) {
+    if (!slugEditable) return;
+
+    if (slugAuto) {
+      draftSlug = generateSlug(event.currentTarget.value);
+    }
+  }
+
+  function handleSlugInput(event) {
+    slugAuto = event.currentTarget.value.trim() === '';
+  }
+
+  function handleSlugGenerate() {
+    draftSlug = generateSlug(draftTitle);
+    slugAuto = true;
+  }
 </script>
 
 <h1 class="text-5xl font-medium tracking-tight text-balance">
@@ -35,11 +72,7 @@
     aria-label={accessibleEditLabel}
     aria-haspopup="dialog"
     title={editLabel}
-    onclick={() => {
-      draftTitle = title;
-      draftSlug = normalizedSlug;
-      dialogOpen = true;
-    }}
+    onclick={openDialog}
   >
     {title}
     <span
@@ -79,6 +112,7 @@
             error={errors.title}
             required
             autofocus
+            oninput={handleTitleInput}
           />
           {#if slugEditable}
             <TextInput
@@ -87,7 +121,20 @@
               bind:value={draftSlug}
               error={errors.slug}
               required
-            />
+              oninput={handleSlugInput}
+            >
+              {#snippet actions()}
+                <Button
+                  class="-my-0.5 px-1.5 py-0.5 text-lg/6"
+                  type="button"
+                  kind="secondary"
+                  onclick={handleSlugGenerate}
+                >
+                  <WandSparklesIcon size={16} aria-hidden="true" />
+                  Generate
+                </Button>
+              {/snippet}
+            </TextInput>
           {/if}
           <div class="mt-8 flex flex-row flex-wrap gap-2">
             <Button class="min-w-40" type="submit" {loading}>Update</Button>

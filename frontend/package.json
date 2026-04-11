@@ -14,6 +14,7 @@
     "@sveltejs/vite-plugin-svelte": "~7.0",
     "@tailwindcss/vite": "~4.2",
     "class-variance-authority": "~0.7",
+    "slugify": "~1",
     "svelte": "~5.55",
     "tailwind-merge": "~3.5",
     "tailwindcss": "~4.2",

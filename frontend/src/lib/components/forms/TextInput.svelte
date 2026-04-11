@@ -13,6 +13,7 @@
     name,
     value = $bindable(''),
     placeholder,
+    actions,
     ...props
   } = $props();
 
@@ -23,7 +24,7 @@
 
 <div class={twMerge('space-y-2', classname)}>
   {#if label}
-    <Label for={inputId} {disabled} {optional}>{label}</Label>
+    <Label for={inputId} {disabled} {optional} {actions}>{label}</Label>
   {/if}
   <input
     type="text"

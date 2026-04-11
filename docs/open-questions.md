@@ -161,3 +161,88 @@ Open follow-up:
 - decide whether path configuration should be all-or-nothing or individually
   overrideable
 - decide when the current single-root API should be generalized in code
+
+## Advanced Studio Editing UX
+
+Current state:
+
+- Studio page editing uses explicit manual save
+- the save action lives in the page chrome, next to the public-page preview
+- field controls remain interactive during save; only the save action shows
+  loading state
+- title/slug editing is already treated as a separate page-level affordance
+
+Why this is a question:
+
+- richer editing UX often grows into autosave, dirty-state indicators, revert,
+  and page version history
+- these features can improve comfort, but they also add a lot of behavioral
+  complexity and can distort the content model if introduced too early
+
+Current desired direction:
+
+- keep explicit manual save as the default editing model
+- avoid autosave until field coverage and persistence rules are broader
+- avoid revert/version UI until revisions have a real backend model rather than
+  client-side tricks
+- if versions arrive later, build them on persisted content snapshots or
+  revision records, not only on frontend state
+
+Open follow-up:
+
+- decide whether a lightweight dirty-state indicator is worth adding before
+  full revision support
+- decide what the canonical backend model for page revisions should be
+- decide whether autosave, if ever added, should remain optional rather than
+  replacing explicit save
+
+## Blueprint Reserved Node Names
+
+Current state:
+
+- the page update endpoint treats `title` and `slug` as reserved payload keys
+  with special validation and persistence behavior
+- blueprint field nodes are validated separately from these reserved keys
+- reserved page-level validators are applied after blueprint field validators so
+  `title` and `slug` keep their dedicated validation behavior even if a
+  blueprint uses those names
+- nothing currently prevents a blueprint author from declaring a node named
+  `title` or `slug`
+
+Why this is a question:
+
+- a blueprint node named `slug` would collide with the reserved slug key in the
+  update payload, so the value would still be handled as a page-level slug
+  change instead of a field update
+- `title` is implicit and should never appear as a blueprint field node
+
+Current desired direction:
+
+- add validation in blueprint loading or in `BlueprintFieldNodes` that rejects
+  nodes whose names collide with reserved keys
+- the reserved set is currently `title` and `slug`; this may grow
+
+## IntersectionObserver Lazy Loading for List Nodes
+
+Current state:
+
+- blueprint tab panels are rendered persistently (hidden when inactive) so
+  saveable form inputs are always in the DOM
+- non-saveable list nodes (file_list, page_list) are also rendered when their
+  tab panel mounts, even if the tab is not visible
+- list nodes currently fetch their query data on mount
+
+Why this is a question:
+
+- rendering all tab panels means every list node fetches on initial page load,
+  even if the user never visits that tab
+- for long single-tab pages with many list nodes, all queries fire at once
+
+Current desired direction:
+
+- use IntersectionObserver inside list node components to defer data fetching
+  until the node enters the viewport
+- this is orthogonal to the tab persistence model and works for both multi-tab
+  and single-tab layouts
+- individual node components own their own lazy loading; the parent layout does
+  not need to track visited tabs

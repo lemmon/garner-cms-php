@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Garner\Blueprint\BlueprintFieldNodes;
 use Garner\Core\Application;
 use Garner\Core\Request;
 use Garner\Studio\PageUpdate;
@@ -11,6 +12,7 @@ use Lemmon\Validator\Validator;
 return static function (Application $app): array {
     $payload = Request::getPayload();
     $page = $app->pageRepository()->findOrFail($payload['id'] ?? null);
+    $blueprint = $app->blueprintLoader()->loadPage((string) ($page['blueprint'] ?? 'page'));
 
     $updater = new PageUpdate(
         siteRepository: $app->siteRepository(),
@@ -19,17 +21,26 @@ return static function (Application $app): array {
         pathResolver: $app->pathResolver(),
     );
 
-    $schema = [
-        'title' => Validator::isString()
-            ->pipe(Str::squish(...))
-            ->required()
-            ->notEmpty(),
-    ];
+    $schema = [];
 
-    if ($updater->slugEditableForPage($page)) {
+    foreach (BlueprintFieldNodes::validationSchema($blueprint) as $name => $fieldValidator) {
+        if (!array_key_exists($name, $payload)) {
+            continue;
+        }
+
+        $schema[$name] = $fieldValidator;
+    }
+
+    // Reserved page-level keys must win over colliding blueprint node names.
+    if (array_key_exists('title', $payload)) {
+        $schema['title'] = Validator::isString()
+            ->pipe(Str::squish(...))
+            ->notEmpty();
+    }
+
+    if (array_key_exists('slug', $payload) && $updater->slugEditableForPage($page)) {
         $schema['slug'] = Validator::isString()
             ->pipe(Str::slug(...))
-            ->required()
             ->notEmpty('Value is required')
             ->satisfies(
                 fn(string $value): bool => !$updater->slugExistsAmongSiblingsForPage($page, $value),
@@ -37,12 +48,8 @@ return static function (Application $app): array {
             );
     }
 
-    /** @var array{title: string, slug?: string} $validated */
+    /** @var array<string, string> $validated */
     $validated = Validator::isAssociative($schema)->validate($payload);
 
-    return $updater->update(
-        page: $page,
-        title: $validated['title'],
-        slug: $validated['slug'] ?? null,
-    );
+    return $updater->update(page: $page, validated: $validated);
 };

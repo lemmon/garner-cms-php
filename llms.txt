@@ -244,6 +244,8 @@ Blueprints drive:
 Important rules:
 
 - page title is implicit and should not be declared as a normal blueprint field
+- page slug is a reserved page-level property and should not be declared as a
+  normal blueprint field
 - tabs are ordered arrays, not associative mappings
 - blueprint fragments may use `extends: some/path`
 - blueprints may define both picker-style nodes and editorial listing nodes

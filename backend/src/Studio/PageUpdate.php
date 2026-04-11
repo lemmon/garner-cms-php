@@ -22,38 +22,43 @@ final class PageUpdate
 
     /**
      * @param array<string, mixed> $page Pre-loaded page array from the repository.
+     * @param array<string, string> $validated Already-validated payload (title, slug, and/or blueprint fields).
      * @return array<string, mixed>
      */
-    public function update(array $page, string $title, ?string $slug): array
+    public function update(array $page, array $validated): array
     {
-        $id = is_string($page['id'] ?? null) ? $page['id'] : '';
-        $site = $this->buildSite();
-        $canEditSlug = !$site->isSystemPage($id);
+        $id = (string) $page['id'];
+        $fields = is_array($page['fields'] ?? null) ? $page['fields'] : [];
+        $slugChanged = false;
 
-        if ($canEditSlug) {
-            $normalizedSlug = $slug !== null ? Str::slug($slug) : '';
-
-            if ($normalizedSlug === '') {
-                throw new \InvalidArgumentException('Slug is required for editable pages');
-            }
-
-            $page['slug'] = $normalizedSlug;
+        if (array_key_exists('slug', $validated)) {
+            $page['slug'] = $validated['slug'];
+            $slugChanged = true;
         }
 
-        $fields = is_array($page['fields'] ?? null) ? $page['fields'] : [];
-        $fields['title'] = Str::squish($title);
+        foreach ($validated as $name => $value) {
+            if ($name === 'slug') {
+                continue;
+            }
+            $fields[$name] = $value;
+        }
+
         $page['fields'] = $fields;
         $page['updated_at'] = gmdate(DATE_ATOM);
 
         $this->pageRepository->save($page);
-        $this->pathIndexer->rebuild();
+
+        if ($slugChanged) {
+            $this->pathIndexer->rebuild();
+        }
 
         return [
             'ok' => true,
             'page' => [
                 'id' => $id,
                 'slug' => is_string($page['slug'] ?? null) ? $page['slug'] : null,
-                'title' => $fields['title'],
+                'title' => $fields['title'] ?? null,
+                'fields' => $fields,
                 'path' => $this->pathResolver->pathForId($id),
             ],
         ];
@@ -64,7 +69,7 @@ final class PageUpdate
      */
     public function slugEditableForPage(array $page): bool
     {
-        $id = is_string($page['id'] ?? null) ? $page['id'] : '';
+        $id = (string) $page['id'];
 
         return !$this->buildSite()->isSystemPage($id);
     }
@@ -74,7 +79,7 @@ final class PageUpdate
      */
     public function slugExistsAmongSiblingsForPage(array $page, string $slug): bool
     {
-        $id = is_string($page['id'] ?? null) ? $page['id'] : '';
+        $id = (string) $page['id'];
         $normalizedSlug = Str::slug($slug);
 
         if ($normalizedSlug === '') {

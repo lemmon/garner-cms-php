@@ -431,7 +431,7 @@ Current API surface:
 - `/api/studio/blueprints/site`: returns the parsed site blueprint as JSON for Studio consumption
 - `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
 - `/api/studio/pages/show`: returns page detail plus the resolved blueprint payload when available
-- `/api/studio/pages/update`: updates page title and, when allowed, slug
+- `/api/studio/pages/update`: unified page update accepting any combination of title, slug, and blueprint field nodes; validates only present keys
 
 Current `nodes/query` payload contract:
 
@@ -455,13 +455,15 @@ Current Studio page-detail behavior:
 - title and slug editing should use a separate page-level affordance, not blueprint field nodes
 - the current detail screen renders supported field nodes from the loaded blueprint
 - supported field nodes currently include `text` and `textarea`
-- the current update flow is intentionally narrow:
-  - site screen can update the site title
-  - page detail can update page title
-  - non-system pages can also update slug
+- the current update flow uses a single unified endpoint:
+  - accepts any combination of title, slug, and blueprint fields in one payload
+  - validates only present keys
+  - blueprint field validators are collected first, then reserved page-level `title` and `slug` validators are applied last so reserved keys win over colliding blueprint node names
   - title values are squished before save
   - editable page slugs are slugified before save and must be unique among sibling pages
-  - blueprint field editing is not saved yet
+  - slug is silently excluded from validation for system pages
+  - path index rebuilds only when slug changes
+  - Studio tab panels render all tabs persistently (hidden when inactive) so saveable inputs across all tabs are always in the DOM for form submission
 - missing page blueprints do not fail the entire detail view; they return `blueprint: null` with a `blueprint_issue`
 - Studio frontend error handling currently aims for two distinct behaviors:
   - route-load failures from backend `4xx`/`5xx` responses should propagate into the SvelteKit error route

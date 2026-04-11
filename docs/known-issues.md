@@ -121,3 +121,18 @@ Future fix options:
 
 - implement `file_list` source resolution for `site` and page-owned files
 - add shared node-query validation so unsupported node types fail more explicitly
+
+## Node help text and validation errors can show simultaneously
+
+`TextNode` and `TextareaNode` render blueprint `node.help` as a trailing paragraph
+below the input, while `TextInput` and `TextArea` render validation errors in their
+own trailing paragraph. When both are present, the field shows two messages stacked
+beneath it — one red error and one grey help — which is redundant and noisy.
+
+Future fix:
+
+- move help text rendering into `TextInput` and `TextArea` so they own the full
+  below-input slot
+- show error _instead of_ help when a validation error is active, not both
+- this also collapses `TextNode`/`TextareaNode` into thin wrappers that only map
+  blueprint node shape to form component props

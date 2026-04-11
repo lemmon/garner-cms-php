@@ -41,7 +41,7 @@ final class StudioPageUpdateTest extends TestCase
                 sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
             ),
             pathResolver: $pathResolver,
-        ))->update(page: $page, title: "  Company \n Name  ", slug: 'Company Name!!!');
+        ))->update(page: $page, validated: ['title' => 'Company Name', 'slug' => 'company-name']);
 
         $stored = $pageRepository->find('about-page');
 
@@ -55,7 +55,7 @@ final class StudioPageUpdateTest extends TestCase
         self::assertSame('/company-name', $result['page']['path']);
     }
 
-    public function testPageUpdateDoesNotChangeSlugForSystemPages(): void
+    public function testPageUpdateDoesNotChangeSlugWhenOmitted(): void
     {
         [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
 
@@ -70,7 +70,7 @@ final class StudioPageUpdateTest extends TestCase
                 sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
             ),
             pathResolver: $pathResolver,
-        ))->update(page: $page, title: 'Welcome', slug: 'start');
+        ))->update(page: $page, validated: ['title' => 'Welcome']);
 
         $stored = $pageRepository->find('home-page');
 
@@ -81,6 +81,72 @@ final class StudioPageUpdateTest extends TestCase
         self::assertSame('Welcome', $stored['fields']['title']);
         self::assertSame('home', $stored['slug']);
         self::assertNull($stored['status']);
+    }
+
+    public function testPageUpdateCanPersistSupportedFieldValues(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $page = $pageRepository->findOrFail('about-page');
+
+        $result = (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $page, validated: ['text' => "Updated\nbody"]);
+
+        $stored = $pageRepository->find('about-page');
+
+        if (!is_array($stored)) {
+            self::fail('Updated page must exist.');
+        }
+
+        self::assertTrue($result['ok']);
+        self::assertSame('About', $stored['fields']['title']);
+        self::assertSame("Updated\nbody", $stored['fields']['text']);
+        self::assertSame("Updated\nbody", $result['page']['fields']['text']);
+        self::assertSame('/about', $result['page']['path']);
+    }
+
+    public function testPageUpdateCanApplyMixedPayload(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $page = $pageRepository->findOrFail('about-page');
+
+        $result = (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $page, validated: [
+            'title' => 'New Title',
+            'slug' => 'new-slug',
+            'text' => 'New body',
+        ]);
+
+        $stored = $pageRepository->find('about-page');
+
+        if (!is_array($stored)) {
+            self::fail('Updated page must exist.');
+        }
+
+        self::assertTrue($result['ok']);
+        self::assertSame('New Title', $stored['fields']['title']);
+        self::assertSame('New body', $stored['fields']['text']);
+        self::assertSame('new-slug', $stored['slug']);
+        self::assertSame('/new-slug', $result['page']['path']);
+        self::assertSame('New Title', $result['page']['title']);
+        self::assertSame('New body', $result['page']['fields']['text']);
     }
 
     public function testPageUpdateCanReportSiblingSlugConflicts(): void
@@ -134,6 +200,7 @@ final class StudioPageUpdateTest extends TestCase
             'sort' => 10,
             'fields' => [
                 'title' => 'About',
+                'text' => 'About body',
             ],
         ]);
 

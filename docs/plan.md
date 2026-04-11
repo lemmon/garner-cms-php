@@ -160,6 +160,7 @@ Deliver:
 - cross-page file references by file UUID
 - reference-aware file deletion or reassignment flow
 - optimistic locking or conflict detection
+- explicit manual-save page editing as the default Studio behavior
 
 Exit criteria:
 
@@ -205,6 +206,9 @@ Defer these until the core model is proven:
 - multilingual content UI and full implementation
 - multisite
 - revision browser
+- autosave
+- revert/discard editing UI
+- page version history UI
 - block editor complexity
 - broad import compatibility with other CMSes
 - alternate database backends

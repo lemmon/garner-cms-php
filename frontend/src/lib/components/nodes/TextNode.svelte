@@ -1,7 +1,7 @@
 <script>
   import TextInput from '$lib/components/forms/TextInput.svelte';
 
-  let { node, value = '' } = $props();
+  let { node, value = '', ...props } = $props();
 </script>
 
 <div class="space-y-2">
@@ -10,6 +10,7 @@
     name={node.name}
     placeholder={node.placeholder ?? ''}
     {value}
+    {...props}
   />
 
   {#if node.help}

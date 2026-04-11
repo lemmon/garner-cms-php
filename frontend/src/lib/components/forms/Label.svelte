@@ -17,7 +17,7 @@
       'block text-lg/6 font-medium data-disabled:text-current/20',
       classname
     )}
-    data-disabled={disabled}
+    data-disabled={disabled || undefined}
     {...props}
   >
     {@render children()}

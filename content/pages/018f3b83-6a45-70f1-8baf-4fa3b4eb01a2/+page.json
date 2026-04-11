@@ -9,8 +9,10 @@
     "sort": 10,
     "fields": {
         "title": "About",
+        "eyebrow": "About Garner",
+        "lead": "Garner is a file-native CMS focused on calm editorial workflows and transparent project structure.",
         "text": "Garner is a file-native CMS with a Twig site layer and a Studio UI."
     },
     "created_at": "2026-04-04T08:05:00+00:00",
-    "updated_at": "2026-04-10T08:30:03+00:00"
+    "updated_at": "2026-04-11T14:31:11+00:00"
 }

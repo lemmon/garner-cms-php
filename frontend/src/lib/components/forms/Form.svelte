@@ -1,4 +1,6 @@
 <script>
+  import { twMerge } from 'tailwind-merge';
+
   import { api } from '$lib/api';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
 
@@ -7,12 +9,11 @@
     action = '',
     children,
     loading = $bindable(false),
+    errors = $bindable({}),
+    error = $bindable(null),
     onsuccess,
     ...props
   } = $props();
-
-  let errors = $state({});
-  let error = $state(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -45,7 +46,7 @@
 </script>
 
 <form
-  class={['space-y-4', classname]}
+  class={twMerge('space-y-4', classname)}
   method="post"
   novalidate
   onsubmit={handleSubmit}

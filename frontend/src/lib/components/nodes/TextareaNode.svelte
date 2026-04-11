@@ -1,7 +1,7 @@
 <script>
   import TextArea from '$lib/components/forms/TextArea.svelte';
 
-  let { node, value = '' } = $props();
+  let { node, value = '', ...props } = $props();
 </script>
 
 <div class="space-y-2">
@@ -11,6 +11,7 @@
     placeholder={node.placeholder ?? ''}
     rows={node.rows ?? 8}
     {value}
+    {...props}
   />
 
   {#if node.help}

@@ -12,5 +12,5 @@
         "text": "This page renders **Markdown** by default.\n\n- JSON stores plain strings\n- Twig applies the markdown filter\n- Garner keeps the parser behind its own service\n\n[About](/about){class=\"inline-link\"}"
     },
     "created_at": "2026-04-04T11:40:00+00:00",
-    "updated_at": "2026-04-04T11:40:00+00:00"
+    "updated_at": "2026-04-11T20:24:13+00:00"
 }

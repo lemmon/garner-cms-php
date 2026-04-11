@@ -56,6 +56,12 @@ final class RouterIntegrationTest extends TestCase
             '{"id":"about-page","title":"  Company  Name  ","slug":"Company Name!!"}',
             'application/json',
         );
+        $pageFieldUpdate = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","text":"Updated about body"}',
+            'application/json',
+        );
         $siteUpdate = $this->dispatch(
             '/api/studio/site/update',
             'POST',
@@ -104,6 +110,11 @@ final class RouterIntegrationTest extends TestCase
         self::assertStringContainsString('"slug": "company-name"', $pageUpdate['body']);
         self::assertStringContainsString('"path": "/company-name"', $pageUpdate['body']);
 
+        self::assertSame('200', $pageFieldUpdate['status']);
+        self::assertStringContainsString('"id": "about-page"', $pageFieldUpdate['body']);
+        self::assertStringContainsString('"text": "Updated about body"', $pageFieldUpdate['body']);
+        self::assertStringContainsString('"path": "/company-name"', $pageFieldUpdate['body']);
+
         self::assertSame('200', $siteUpdate['status']);
         self::assertStringContainsString('"title": "Renamed Garner"', $siteUpdate['body']);
     }
@@ -135,6 +146,32 @@ final class RouterIntegrationTest extends TestCase
             '"message": "Slug must be unique among sibling pages"',
             $duplicateSlug['body'],
         );
+    }
+
+    public function testRouterKeepsReservedSlugValidationAheadOfCollidingBlueprintNodes(): void
+    {
+        $this->writePageBlueprint(<<<'YAML'
+            title: Page
+            tabs:
+                - name: content
+                  label: Content
+                  nodes:
+                      - type: text
+                        name: slug
+                        label: Slug
+            YAML);
+
+        $response = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","slug":"   "}',
+            'application/json',
+        );
+
+        self::assertSame('400', $response['status']);
+        self::assertStringContainsString('"invalid": true', $response['body']);
+        self::assertStringContainsString('"path": "slug"', $response['body']);
+        self::assertStringContainsString('"message": "Value is required"', $response['body']);
     }
 
     public function testRouterReturnsNotFoundForMissingOrUnknownPageUpdateIds(): void
@@ -436,6 +473,7 @@ final class RouterIntegrationTest extends TestCase
             'template' => 'default',
             'fields' => [
                 'title' => 'About',
+                'text' => 'About body',
             ],
         ]);
 
@@ -513,10 +551,21 @@ final class RouterIntegrationTest extends TestCase
                       enabled: true
             YAML);
 
-        file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', <<<'YAML'
+        $this->writePageBlueprint(<<<'YAML'
             title: Page
-            tabs: []
+            tabs:
+                - name: content
+                  label: Content
+                  nodes:
+                      - type: textarea
+                        name: text
+                        label: Text
             YAML);
+    }
+
+    private function writePageBlueprint(string $yaml): void
+    {
+        file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', $yaml);
     }
 
     private function writeStudioBuild(): void

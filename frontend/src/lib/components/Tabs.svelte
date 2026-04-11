@@ -37,7 +37,9 @@
       {/each}
     </ul>
     {#if actions}
-      {@render actions()}
+      <div class="flex flex-row gap-2">
+        {@render actions()}
+      </div>
     {/if}
   </nav>
 {/if}

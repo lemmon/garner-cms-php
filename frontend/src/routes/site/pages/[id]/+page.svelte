@@ -17,6 +17,7 @@
   blueprintIssue={data.blueprintIssue}
   fields={data.page.fields}
   editAction="studio/pages/update"
+  contentAction="studio/pages/update"
   editId={data.page.id}
   invalidateKeys={['studio:site', `studio:page:${data.page.id}`]}
   slugEditable={data.page.slug_editable}

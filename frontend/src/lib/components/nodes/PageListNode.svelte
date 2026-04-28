@@ -24,7 +24,7 @@
   }
 </script>
 
-<NodeSection label={node.label} help={node.help}>
+<NodeSection class="not-last:mb-12" label={node.label} help={node.help}>
   {#await loadData(node)}
     <Shimmer class="h-14 w-full" />
   {:then data}

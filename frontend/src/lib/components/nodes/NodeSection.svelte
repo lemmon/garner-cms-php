@@ -1,8 +1,16 @@
 <script>
-  let { label = null, meta = null, help = null, children } = $props();
+  import { twMerge } from 'tailwind-merge';
+
+  let {
+    class: classname = '',
+    label = null,
+    meta = null,
+    help = null,
+    children,
+  } = $props();
 </script>
 
-<section class="space-y-2">
+<section class={twMerge('space-y-2', classname)}>
   {#if label || meta}
     <header class="flex items-end justify-between gap-6">
       {#if label}

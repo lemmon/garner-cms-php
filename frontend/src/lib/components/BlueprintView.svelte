@@ -136,37 +136,39 @@
     {#if invalidTabMessage}
       <NodeErrorState>{invalidTabMessage}</NodeErrorState>
     {:else}
-      {#each tabs as tab (tab.name)}
-        {@const tabNodes = tab.nodes ?? []}
-        {@const isActive = tab.name === activeTab}
-        {#if tabNodes.length > 0}
-          <div class="space-y-6" hidden={!isActive}>
-            {#each tabNodes as node (node.name)}
-              {@const definition = nodeDefinitions[node.type]}
-              {@const NodeComponent = definition?.component}
-              {#if NodeComponent}
-                <NodeComponent
-                  {node}
-                  value={fields?.[node.name] ?? ''}
-                  error={definition?.saveable
-                    ? contentErrors[node.name]
-                    : undefined}
-                  disabled={definition?.saveable ? contentLoading : undefined}
-                  form={definition?.saveable ? contentFormId : undefined}
-                />
-              {:else}
-                <NodeErrorState>
-                  Unsupported node type "{node.type}" in this blueprint.
-                </NodeErrorState>
-              {/if}
-            {/each}
-          </div>
-        {:else if isActive}
-          <NodeEmptyState>
-            This tab does not define any editable fields yet.
-          </NodeEmptyState>
-        {/if}
-      {/each}
+      <div>
+        {#each tabs as tab (tab.name)}
+          {@const tabNodes = tab.nodes ?? []}
+          {@const isActive = tab.name === activeTab}
+          {#if tabNodes.length > 0}
+            <div class="space-y-6" hidden={!isActive}>
+              {#each tabNodes as node (node.name)}
+                {@const definition = nodeDefinitions[node.type]}
+                {@const NodeComponent = definition?.component}
+                {#if NodeComponent}
+                  <NodeComponent
+                    {node}
+                    value={fields?.[node.name] ?? ''}
+                    error={definition?.saveable
+                      ? contentErrors[node.name]
+                      : undefined}
+                    disabled={definition?.saveable ? contentLoading : undefined}
+                    form={definition?.saveable ? contentFormId : undefined}
+                  />
+                {:else}
+                  <NodeErrorState>
+                    Unsupported node type "{node.type}" in this blueprint.
+                  </NodeErrorState>
+                {/if}
+              {/each}
+            </div>
+          {:else if isActive}
+            <NodeEmptyState>
+              This tab does not define any editable fields yet.
+            </NodeEmptyState>
+          {/if}
+        {/each}
+      </div>
     {/if}
   {:else}
     <NodeErrorState>

@@ -7,9 +7,15 @@ namespace Garner\Content;
 use Illuminate\Support\Collection;
 use PDO;
 use RuntimeException;
+use Throwable;
 
 final class PathIndexer
 {
+    private const LIVE_ENTRIES_TABLE = 'entries';
+    private const LIVE_PATHS_TABLE = 'entry_paths';
+    private const NEXT_ENTRIES_TABLE = 'entries_next';
+    private const NEXT_PATHS_TABLE = 'entry_paths_next';
+
     public function __construct(
         private readonly SiteRepository $siteRepository,
         private readonly PageRepository $pageRepository,
@@ -45,8 +51,7 @@ final class PathIndexer
         }
 
         $pdo = $this->connect();
-        $this->createSchema($pdo);
-        $this->writeIndex($pdo, $pages, $paths);
+        $this->writeReplacementIndex($pdo, $pages, $paths);
 
         return [
             'entry_count' => $pages->count(),
@@ -73,13 +78,39 @@ final class PathIndexer
         return $pdo;
     }
 
-    private function createSchema(PDO $pdo): void
+    /**
+     * @param Collection<string, array<string, mixed>> $pages
+     * @param array<string, string> $paths
+     */
+    private function writeReplacementIndex(PDO $pdo, Collection $pages, array $paths): void
     {
-        $pdo->exec('DROP TABLE IF EXISTS entry_paths');
-        $pdo->exec('DROP TABLE IF EXISTS entries');
+        $this->dropTables($pdo, self::NEXT_PATHS_TABLE, self::NEXT_ENTRIES_TABLE);
+        $this->createSchema($pdo, self::NEXT_ENTRIES_TABLE, self::NEXT_PATHS_TABLE);
 
-        $pdo->exec(<<<'SQL'
-            CREATE TABLE entries (
+        try {
+            $this->writeIndex(
+                $pdo,
+                $pages,
+                $paths,
+                self::NEXT_ENTRIES_TABLE,
+                self::NEXT_PATHS_TABLE,
+            );
+            $this->swapReplacementTables($pdo);
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            $this->dropTables($pdo, self::NEXT_PATHS_TABLE, self::NEXT_ENTRIES_TABLE);
+
+            throw $exception;
+        }
+    }
+
+    private function createSchema(PDO $pdo, string $entriesTable, string $pathsTable): void
+    {
+        $pdo->exec(sprintf(<<<'SQL'
+            CREATE TABLE %s (
                 id TEXT PRIMARY KEY,
                 kind TEXT NOT NULL,
                 parent_id TEXT NULL,
@@ -91,29 +122,32 @@ final class PathIndexer
                 updated_at TEXT NOT NULL,
                 content_hash TEXT NOT NULL
             );
-            SQL);
+            SQL, $entriesTable));
 
-        $pdo->exec(<<<'SQL'
-            CREATE TABLE entry_paths (
+        $pdo->exec(sprintf(<<<'SQL'
+            CREATE TABLE %s (
                 entry_id TEXT PRIMARY KEY,
                 path TEXT NOT NULL UNIQUE,
                 depth INTEGER NOT NULL
             );
-            SQL);
+            SQL, $pathsTable));
     }
 
     /**
      * @param Collection<string, array<string, mixed>> $pages
      * @param array<string, string> $paths
      */
-    private function writeIndex(PDO $pdo, Collection $pages, array $paths): void
-    {
+    private function writeIndex(
+        PDO $pdo,
+        Collection $pages,
+        array $paths,
+        string $entriesTable,
+        string $pathsTable,
+    ): void {
         $pdo->beginTransaction();
-        $pdo->exec('DELETE FROM entry_paths');
-        $pdo->exec('DELETE FROM entries');
 
-        $entryStatement = $pdo->prepare(<<<'SQL'
-            INSERT INTO entries (
+        $entryStatement = $pdo->prepare(sprintf(<<<'SQL'
+            INSERT INTO %s (
                 id,
                 kind,
                 parent_id,
@@ -136,10 +170,10 @@ final class PathIndexer
                 :updated_at,
                 :content_hash
             )
-            SQL);
+            SQL, $entriesTable));
 
-        $pathStatement = $pdo->prepare(<<<'SQL'
-            INSERT INTO entry_paths (
+        $pathStatement = $pdo->prepare(sprintf(<<<'SQL'
+            INSERT INTO %s (
                 entry_id,
                 path,
                 depth
@@ -148,7 +182,7 @@ final class PathIndexer
                 :path,
                 :depth
             )
-            SQL);
+            SQL, $pathsTable));
 
         foreach ($pages as $page) {
             $pageJson = json_encode($page, JSON_UNESCAPED_SLASHES);
@@ -162,7 +196,7 @@ final class PathIndexer
                 ':kind' => (string) ($page['kind'] ?? 'page'),
                 ':parent_id' => is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null,
                 ':slug' => $this->normalizedSlug($page),
-                ':blueprint' => (string) ($page['blueprint'] ?? 'page'),
+                ':blueprint' => (string) ($page['blueprint'] ?? 'default'),
                 ':template' => (string) ($page['template'] ?? 'default'),
                 ':status' => is_string($page['status'] ?? null) ? $page['status'] : null,
                 ':sort' => is_int($page['sort'] ?? null) ? $page['sort'] : null,
@@ -186,6 +220,30 @@ final class PathIndexer
         }
 
         $pdo->commit();
+    }
+
+    private function swapReplacementTables(PDO $pdo): void
+    {
+        $pdo->beginTransaction();
+        $this->dropTables($pdo, self::LIVE_PATHS_TABLE, self::LIVE_ENTRIES_TABLE);
+        $pdo->exec(sprintf(
+            'ALTER TABLE %s RENAME TO %s',
+            self::NEXT_ENTRIES_TABLE,
+            self::LIVE_ENTRIES_TABLE,
+        ));
+        $pdo->exec(sprintf(
+            'ALTER TABLE %s RENAME TO %s',
+            self::NEXT_PATHS_TABLE,
+            self::LIVE_PATHS_TABLE,
+        ));
+        $pdo->commit();
+    }
+
+    private function dropTables(PDO $pdo, string ...$tables): void
+    {
+        foreach ($tables as $table) {
+            $pdo->exec(sprintf('DROP TABLE IF EXISTS %s', $table));
+        }
     }
 
     /**

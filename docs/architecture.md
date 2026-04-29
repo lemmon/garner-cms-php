@@ -147,7 +147,8 @@ Conventions:
 - content-facing identifiers such as blueprint names, template names, controller names, and their filenames use `kebab-case`
 - content is stored as pretty-printed JSON
 - one entry equals one JSON file
-- IDs come from a configurable generator, with `uuid_v7` as the default
+- IDs come from the configured ID generator, default to UUID v4, and are independent from page slugs
+- normal pages default to matching blueprint/template names; the core default is `default`
 
 ## System Pages
 
@@ -214,7 +215,7 @@ The SQLite index is responsible for:
 - ordered listings
 - future search projection
 
-The index can be rebuilt from files. It is derived state, not business data.
+The index can be rebuilt from files. It is derived state, not business data. Rebuilds populate replacement tables first and only swap them over the live tables after the replacement index has been written successfully, so a failed rebuild leaves the current routing index intact.
 
 ## File and Media Model
 
@@ -264,6 +265,7 @@ Current model:
 - the application is bootstrapped with a distinct `corePath` and `projectRootPath`
 - backend actions and built Studio assets resolve from the core package
 - content, templates, blueprints, routes, runtime, and storage resolve from the installed project
+- `app.ids.generator` configures entry ID generation; `uuid_v4` is the core default, and projects may provide an `IdGenerator` instance, class, or callback
 
 This split is what allows a real installed project to have no local `backend/` or `frontend/` directory.
 
@@ -431,6 +433,7 @@ Current API surface:
 - `/api/studio/blueprints/site`: returns the parsed site blueprint as JSON for Studio consumption
 - `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
 - `/api/studio/pages/show`: returns page detail plus the resolved blueprint payload when available
+- `/api/studio/pages/create`: creates a draft default page from a page-list source
 - `/api/studio/pages/update`: unified page update accepting any combination of title, slug, and blueprint field nodes; validates only present keys
 
 Current `nodes/query` payload contract:
@@ -455,12 +458,15 @@ Current Studio page-detail behavior:
 - title and slug editing should use a separate page-level affordance, not blueprint field nodes
 - the current detail screen renders supported field nodes from the loaded blueprint
 - supported field nodes currently include `text` and `textarea`
+- page-list nodes with `create.enabled: true` render a create action that opens a title/slug dialog
+- the current page create flow creates draft pages with the default blueprint and default template
+- page create uses the page-list `source` as the parent context: `site` and `site.home` create under the configured home page, and `site.page("id")` creates under that page
 - the current update flow uses a single unified endpoint:
   - accepts any combination of title, slug, and blueprint fields in one payload
   - validates only present keys
   - blueprint field validators are collected first, then reserved page-level `title` and `slug` validators are applied last so reserved keys win over colliding blueprint node names
   - title values are squished before save
-  - editable page slugs are slugified before save and must be unique among sibling pages
+  - editable page slugs are normalized to ASCII, non-alphanumeric runs become `-`, and values must be unique among sibling pages, checked against canonical JSON content
   - slug is silently excluded from validation for system pages
   - path index rebuilds only when slug changes
   - Studio tab panels render all tabs persistently (hidden when inactive) so saveable inputs across all tabs are always in the DOM for form submission

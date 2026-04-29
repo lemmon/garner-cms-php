@@ -22,8 +22,8 @@ final class StudioPageDetailQueryTest extends TestCase
         mkdir($this->projectRoot . '/content/pages', 0o777, true);
         mkdir($this->projectRoot . '/site/blueprints/pages', 0o777, true);
 
-        file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', <<<'YAML'
-            title: Page
+        file_put_contents($this->projectRoot . '/site/blueprints/pages/default.yml', <<<'YAML'
+            title: Default
             tabs: []
             YAML);
     }
@@ -90,7 +90,7 @@ final class StudioPageDetailQueryTest extends TestCase
         self::assertTrue($payload['ok']);
         self::assertSame('about-page', $payload['page']['id']);
         self::assertSame('About', $payload['page']['title']);
-        self::assertSame('page', $payload['page']['blueprint']);
+        self::assertSame('default', $payload['page']['blueprint']);
         self::assertSame('/about', $payload['page']['path']);
         self::assertSame(0, $payload['page']['children_count']);
         self::assertSame(
@@ -119,7 +119,7 @@ final class StudioPageDetailQueryTest extends TestCase
         );
         self::assertFalse($payload['page']['is_system']);
         self::assertTrue($payload['page']['slug_editable']);
-        self::assertSame('Page', $payload['blueprint']['title']);
+        self::assertSame('Default', $payload['blueprint']['title']);
         self::assertNull($payload['blueprint_issue']);
     }
 

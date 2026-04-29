@@ -6,13 +6,14 @@ use Garner\Blueprint\BlueprintFieldNodes;
 use Garner\Core\Application;
 use Garner\Core\Request;
 use Garner\Studio\PageUpdate;
+use Garner\Support\Slug;
 use Illuminate\Support\Str;
 use Lemmon\Validator\Validator;
 
 return static function (Application $app): array {
     $payload = Request::getPayload();
     $page = $app->pageRepository()->findOrFail($payload['id'] ?? null);
-    $blueprint = $app->blueprintLoader()->loadPage((string) ($page['blueprint'] ?? 'page'));
+    $blueprint = $app->blueprintLoader()->loadPage((string) ($page['blueprint'] ?? 'default'));
 
     $updater = new PageUpdate(
         siteRepository: $app->siteRepository(),
@@ -40,7 +41,7 @@ return static function (Application $app): array {
 
     if (array_key_exists('slug', $payload) && $updater->slugEditableForPage($page)) {
         $schema['slug'] = Validator::isString()
-            ->pipe(Str::slug(...))
+            ->pipe(Slug::normalize(...))
             ->notEmpty('Value is required')
             ->satisfies(
                 fn(string $value): bool => !$updater->slugExistsAmongSiblingsForPage($page, $value),

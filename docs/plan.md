@@ -19,7 +19,7 @@ That is enough to validate the architecture.
 Freeze these before writing much code:
 
 - canonical content format is JSON
-- entry identity uses a configurable generator, with `uuid_v7` as the default
+- entry identity uses the configured ID generator, not slugs
 - URL paths are derived from parent relationships and indexed in SQLite
 - Twig is the default public-site renderer
 - Garner Studio lives at `/studio`
@@ -67,8 +67,8 @@ Exit criteria:
 Deliver:
 
 - JSON entry model
-- ID generator abstraction plus `uuid_v7` default implementation
-- filesystem store using `content/pages/{uuid}/+page.json`
+- configurable ID generation with UUID v4 as the core default
+- filesystem store using `content/pages/{id}/+page.json`
 - site metadata in `content/+site.json`, including home and error system page pointers
 - SQLite index builder writing to `runtime/index.sqlite`
 - repository/query interfaces
@@ -157,7 +157,7 @@ Deliver:
 - move page
 - slug updates with path reindex
 - page-owned file uploads
-- cross-page file references by file UUID
+- cross-page file references by file ID
 - reference-aware file deletion or reassignment flow
 - optimistic locking or conflict detection
 - explicit manual-save page editing as the default Studio behavior

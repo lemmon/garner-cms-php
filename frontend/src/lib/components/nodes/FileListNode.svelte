@@ -5,11 +5,6 @@
   let { node } = $props();
 </script>
 
-<NodeSection
-  class="not-last:mb-12"
-  label={node.label}
-  meta={node.type}
-  help={node.help}
->
+<NodeSection class="not-last:mb-12" label={node.label} help={node.help}>
   <NodeEmptyState text={node.empty || 'No files yet.'} />
 </NodeSection>

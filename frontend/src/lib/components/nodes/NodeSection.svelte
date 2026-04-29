@@ -4,22 +4,26 @@
   let {
     class: classname = '',
     label = null,
-    meta = null,
     help = null,
+    actions,
     children,
   } = $props();
 </script>
 
 <section class={twMerge('space-y-2', classname)}>
-  {#if label || meta}
-    <header class="flex items-end justify-between gap-6">
-      {#if label}
-        <h2 class="text-lg/6 font-medium">{label}</h2>
-      {/if}
+  {#if label || actions}
+    <header class="flex flex-row justify-between gap-2">
+      <div>
+        {#if label}
+          <h2 class="text-lg/6 font-medium">{label}</h2>
+        {/if}
+      </div>
 
-      {#if meta}
-        <p class="my-0.5 text-base/5 text-current/60">{meta}</p>
-      {/if}
+      <div class="flex gap-2">
+        {#if actions}
+          {@render actions()}
+        {/if}
+      </div>
     </header>
   {/if}
 

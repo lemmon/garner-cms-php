@@ -17,6 +17,9 @@ use Garner\Site\PublicSite;
 use Garner\Site\RendererInterface;
 use Garner\Site\TwigRenderer;
 use Garner\Studio\StudioApp;
+use Garner\Support\CallbackIdGenerator;
+use Garner\Support\IdGenerator;
+use Garner\Support\UuidV4IdGenerator;
 
 final class Application
 {
@@ -24,6 +27,7 @@ final class Application
     private ?CustomRoutes $customRoutes = null;
     private ErrorHandler $errorHandler;
     private ?Favicon $favicon = null;
+    private ?IdGenerator $idGenerator = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?PageControllers $pageControllers = null;
     private ?PageRepository $pageRepository = null;
@@ -111,6 +115,14 @@ final class Application
     public function favicon(): Favicon
     {
         return $this->favicon ??= new Favicon(sitePath: $this->projectPath('site'));
+    }
+
+    public function idGenerator(): IdGenerator
+    {
+        return $this->idGenerator ??= $this->makeIdGenerator($this->config(
+            'app.ids.generator',
+            'uuid_v4',
+        ));
     }
 
     public function customRoutes(): CustomRoutes
@@ -225,6 +237,32 @@ final class Application
         }
 
         return $options;
+    }
+
+    private function makeIdGenerator(mixed $configured): IdGenerator
+    {
+        if ($configured instanceof IdGenerator) {
+            return $configured;
+        }
+
+        if ($configured === null || $configured === 'uuid_v4') {
+            return new UuidV4IdGenerator();
+        }
+
+        if (is_callable($configured)) {
+            return new CallbackIdGenerator($configured);
+        }
+
+        if (
+            is_string($configured)
+            && class_exists($configured)
+            && is_subclass_of($configured, IdGenerator::class)
+        ) {
+            /** @var class-string<IdGenerator> $configured */
+            return new $configured();
+        }
+
+        throw new \RuntimeException('Invalid ID generator configuration');
     }
 
     private function resolveTwigCache(mixed $cache, bool $debug): string|false

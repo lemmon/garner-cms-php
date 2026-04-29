@@ -65,6 +65,40 @@ final class PageRepository
         return $page;
     }
 
+    public function slugExistsAmongSiblings(
+        ?string $parentId,
+        string $slug,
+        ?string $exceptId = null,
+    ): bool {
+        $normalizedSlug = $this->normalizeSlugForLookup($slug);
+
+        if ($normalizedSlug === null) {
+            return false;
+        }
+
+        foreach ($this->all() as $candidate) {
+            $candidateId = is_string($candidate['id'] ?? null) ? $candidate['id'] : '';
+
+            if ($candidateId === '' || $exceptId !== null && $candidateId === $exceptId) {
+                continue;
+            }
+
+            $candidateParentId = is_string($candidate['parent_id'] ?? null)
+                ? $candidate['parent_id']
+                : null;
+
+            if ($candidateParentId !== $parentId) {
+                continue;
+            }
+
+            if ($this->normalizeSlugForLookup($candidate['slug'] ?? null) === $normalizedSlug) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function normalizeLookupId(mixed $id): ?string
     {
         if (!is_string($id)) {
@@ -74,6 +108,17 @@ final class PageRepository
         $normalizedId = trim($id);
 
         return $normalizedId !== '' ? $normalizedId : null;
+    }
+
+    private function normalizeSlugForLookup(mixed $slug): ?string
+    {
+        if (!is_string($slug)) {
+            return null;
+        }
+
+        $normalizedSlug = trim($slug, '/');
+
+        return $normalizedSlug !== '' ? $normalizedSlug : null;
     }
 
     /**
@@ -146,11 +191,15 @@ final class PageRepository
             throw new RuntimeException('Page "slug" must be a string or null');
         }
 
-        $blueprint = $page['blueprint'] ?? 'page';
         $template = $page['template'] ?? $this->defaultTemplate;
+        $defaultBlueprint = Identifier::kebab($this->defaultTemplate);
+        $defaultBlueprint = $defaultBlueprint !== '' ? $defaultBlueprint : 'default';
+        $blueprint = $page['blueprint'] ?? $defaultBlueprint;
         $now = gmdate(DATE_ATOM);
         $normalizedSlug = is_string($slug) ? trim($slug, '/') : null;
-        $normalizedBlueprint = is_string($blueprint) ? Identifier::kebab($blueprint) : 'page';
+        $normalizedBlueprint = is_string($blueprint)
+            ? Identifier::kebab($blueprint)
+            : $defaultBlueprint;
         $normalizedTemplate = is_string($template)
             ? Identifier::kebab($template)
             : $this->defaultTemplate;
@@ -165,7 +214,7 @@ final class PageRepository
             'kind' => is_string($page['kind'] ?? null) ? $page['kind'] : 'page',
             'parent_id' => is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null,
             'slug' => $normalizedSlug,
-            'blueprint' => $normalizedBlueprint !== '' ? $normalizedBlueprint : 'page',
+            'blueprint' => $normalizedBlueprint !== '' ? $normalizedBlueprint : $defaultBlueprint,
             'template' => $normalizedTemplate !== '' ? $normalizedTemplate : $this->defaultTemplate,
             'status' => $status,
             'sort' => $this->normalizeSort($page['sort'] ?? null, $status),

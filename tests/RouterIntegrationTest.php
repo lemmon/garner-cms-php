@@ -53,7 +53,7 @@ final class RouterIntegrationTest extends TestCase
         $pageUpdate = $this->dispatch(
             '/api/studio/pages/update',
             'POST',
-            '{"id":"about-page","title":"  Company  Name  ","slug":"Company Name!!"}',
+            '{"id":"about-page","title":"  Company  Name  ","slug":"Company=Name!!"}',
             'application/json',
         );
         $pageFieldUpdate = $this->dispatch(
@@ -66,6 +66,22 @@ final class RouterIntegrationTest extends TestCase
             '/api/studio/site/update',
             'POST',
             '{"title":"Renamed Garner"}',
+            'application/json',
+        );
+        $pageCreate = $this->dispatch(
+            '/api/studio/pages/create',
+            'POST',
+            '{"source":"site","title":"New Draft","slug":"New!Draft"}',
+            'application/json',
+        );
+        $pageCreatePayload = json_decode($pageCreate['body'], true, 512, JSON_THROW_ON_ERROR);
+        $createdPageId = is_string($pageCreatePayload['page']['id'] ?? null)
+            ? $pageCreatePayload['page']['id']
+            : '';
+        $createdPageShow = $this->dispatch(
+            '/api/studio/pages/show',
+            'POST',
+            json_encode(['id' => $createdPageId], JSON_THROW_ON_ERROR),
             'application/json',
         );
 
@@ -101,9 +117,9 @@ final class RouterIntegrationTest extends TestCase
 
         self::assertSame('200', $pageShow['status']);
         self::assertStringContainsString('"id": "about-page"', $pageShow['body']);
-        self::assertStringContainsString('"blueprint": "page"', $pageShow['body']);
+        self::assertStringContainsString('"blueprint": "default"', $pageShow['body']);
         self::assertStringContainsString('"path": "/about"', $pageShow['body']);
-        self::assertStringContainsString('"title": "Page"', $pageShow['body']);
+        self::assertStringContainsString('"title": "Default"', $pageShow['body']);
 
         self::assertSame('200', $pageUpdate['status']);
         self::assertStringContainsString('"title": "Company Name"', $pageUpdate['body']);
@@ -117,6 +133,25 @@ final class RouterIntegrationTest extends TestCase
 
         self::assertSame('200', $siteUpdate['status']);
         self::assertStringContainsString('"title": "Renamed Garner"', $siteUpdate['body']);
+
+        self::assertSame('200', $pageCreate['status']);
+        self::assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            $createdPageId,
+        );
+        self::assertStringNotContainsString('"id": "new-draft-page"', $pageCreate['body']);
+        self::assertStringContainsString('"parent_id": "home-page"', $pageCreate['body']);
+        self::assertStringContainsString('"slug": "new-draft"', $pageCreate['body']);
+        self::assertStringContainsString('"blueprint": "default"', $pageCreate['body']);
+        self::assertStringContainsString('"status": "draft"', $pageCreate['body']);
+
+        self::assertSame('200', $createdPageShow['status']);
+        self::assertStringContainsString(
+            '"id": "' . $createdPageId . '"',
+            $createdPageShow['body'],
+        );
+        self::assertStringContainsString('"blueprint": "default"', $createdPageShow['body']);
+        self::assertStringContainsString('"title": "Default"', $createdPageShow['body']);
     }
 
     public function testRouterUsesValidationForSlugRulesOnPageUpdates(): void
@@ -133,6 +168,12 @@ final class RouterIntegrationTest extends TestCase
             '{"id":"about-page","title":"Company","slug":"Contact"}',
             'application/json',
         );
+        $duplicateCreateSlug = $this->dispatch(
+            '/api/studio/pages/create',
+            'POST',
+            '{"source":"site","title":"Contact Duplicate","slug":"Contact"}',
+            'application/json',
+        );
 
         self::assertSame('400', $missingSlug['status']);
         self::assertStringContainsString('"invalid": true', $missingSlug['body']);
@@ -146,12 +187,20 @@ final class RouterIntegrationTest extends TestCase
             '"message": "Slug must be unique among sibling pages"',
             $duplicateSlug['body'],
         );
+
+        self::assertSame('400', $duplicateCreateSlug['status']);
+        self::assertStringContainsString('"invalid": true', $duplicateCreateSlug['body']);
+        self::assertStringContainsString('"path": "slug"', $duplicateCreateSlug['body']);
+        self::assertStringContainsString(
+            '"message": "Slug must be unique among sibling pages"',
+            $duplicateCreateSlug['body'],
+        );
     }
 
     public function testRouterKeepsReservedSlugValidationAheadOfCollidingBlueprintNodes(): void
     {
         $this->writePageBlueprint(<<<'YAML'
-            title: Page
+            title: Default
             tabs:
                 - name: content
                   label: Content
@@ -552,7 +601,7 @@ final class RouterIntegrationTest extends TestCase
             YAML);
 
         $this->writePageBlueprint(<<<'YAML'
-            title: Page
+            title: Default
             tabs:
                 - name: content
                   label: Content
@@ -565,7 +614,7 @@ final class RouterIntegrationTest extends TestCase
 
     private function writePageBlueprint(string $yaml): void
     {
-        file_put_contents($this->projectRoot . '/site/blueprints/pages/page.yml', $yaml);
+        file_put_contents($this->projectRoot . '/site/blueprints/pages/default.yml', $yaml);
     }
 
     private function writeStudioBuild(): void

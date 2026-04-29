@@ -65,9 +65,9 @@ Instead:
 - the tree is stored in metadata (`parent_id`, optional `slug`, `sort`)
 - URLs are derived from indexed relationships, not from directory nesting
 
-`uuid_v7` is a good default, but the generator should be configurable so projects can choose shorter IDs or alternatives such as `cuid2` without changing the rest of the content model.
+UUID v4 is the core default for entry IDs, but the generator is a configurable application-level dependency. Page identity must stay independent from slugs regardless of the selected generator.
 
-This makes page moves and slug changes much cheaper, keeps identity stable even when the visible URL changes, and still allows pages to fall back to their UUID when no custom slug is needed.
+This makes page moves and slug changes much cheaper, keeps identity stable even when the visible URL changes, and still allows pages to fall back to their generated ID when no custom slug is needed.
 
 ### 3. Runtime Lookup Strategy
 
@@ -87,7 +87,7 @@ That gives you:
 
 The on-disk shape should stay simple:
 
-- one UUID directory per page
+- one generated-ID directory per page
 - one `+page.json` file per page
 - page-owned files stored next to the page document
 
@@ -96,7 +96,7 @@ That keeps ownership obvious without making cross-page file usage impossible.
 File ownership and file accessibility should be separate concepts:
 
 - a file has one owning page
-- any page can reference that file by file UUID
+- any page can reference that file by file ID
 - SQLite indexes those references for fast lookup and safe deletion checks
 
 ### 4. Distribution and Package Hygiene
@@ -249,7 +249,7 @@ then the project will absorb a lot of effort before its differentiators are prov
 The technically strongest first version is smaller:
 
 - JSON content documents
-- stable generated identity with `uuid_v7` as the default
+- stable generated identity with configurable ID generation and UUID v4 as the default
 - SQLite path index
 - Twig rendering
 - Studio shell plus basic CRUD

@@ -38,6 +38,9 @@ return [
     'studio' => [
         'build_path' => 'frontend/build',
     ],
+    'ids' => [
+        'generator' => 'uuid_v4',
+    ],
     'rendering' => [
         'default_template' => 'default',
         'engine' => 'twig',

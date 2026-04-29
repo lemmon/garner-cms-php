@@ -1,0 +1,19 @@
+title: Default
+description: Default blueprint for standard content pages.
+
+tabs:
+  - name: content
+    label: Content
+    nodes:
+      - type: text
+        name: eyebrow
+        label: Eyebrow
+
+      - type: text
+        name: lead
+        label: Lead
+
+      - type: textarea
+        name: text
+        label: Text
+        rows: 12

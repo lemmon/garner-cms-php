@@ -11,6 +11,7 @@
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
   import NodeSection from '$lib/components/nodes/NodeSection.svelte';
+  import PageCreateButton from '$lib/components/nodes/PageCreateButton.svelte';
   import Shimmer from '$lib/components/Shimmer.svelte';
 
   let { node } = $props();
@@ -25,6 +26,12 @@
 </script>
 
 <NodeSection class="not-last:mb-12" label={node.label} help={node.help}>
+  {#snippet actions()}
+    {#if node.create?.enabled}
+      <PageCreateButton source={node.source} />
+    {/if}
+  {/snippet}
+
   {#await loadData(node)}
     <Shimmer class="h-14 w-full" />
   {:then data}
@@ -41,7 +48,8 @@
               {/if}
             </div>
             <h2 class="flex flex-1">
-              <a class="py-border-4 underline" href={detailHref}>{item.title}</a
+              <a class="py-border-4 flex-1 underline" href={detailHref}
+                >{item.title}</a
               >
             </h2>
             {#if item.status}

@@ -1,13 +1,13 @@
 <script>
   import PencilLineIcon from '@lucide/svelte/icons/pencil-line';
   import WandSparklesIcon from '@lucide/svelte/icons/wand-sparkles';
-  import slugify from 'slugify';
 
   import { invalidate } from '$app/navigation';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Form from '$lib/components/forms/Form.svelte';
   import TextInput from '$lib/components/forms/TextInput.svelte';
+  import { generateSlug } from '$lib/slug';
 
   let {
     title = '',
@@ -29,14 +29,6 @@
   let accessibleEditLabel = $derived(
     title ? `${editLabel} for ${title}` : editLabel
   );
-
-  function generateSlug(value) {
-    return slugify(value, {
-      lower: true,
-      strict: true,
-      trim: true,
-    });
-  }
 
   function openDialog() {
     let generatedSlug = generateSlug(title);

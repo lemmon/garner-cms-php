@@ -9,7 +9,7 @@ use Garner\Content\PathIndexer;
 use Garner\Content\PathResolver;
 use Garner\Content\SiteRepository;
 use Garner\Site\Site;
-use Illuminate\Support\Str;
+use Garner\Support\Slug;
 
 final class PageUpdate
 {
@@ -80,35 +80,10 @@ final class PageUpdate
     public function slugExistsAmongSiblingsForPage(array $page, string $slug): bool
     {
         $id = (string) $page['id'];
-        $normalizedSlug = Str::slug($slug);
-
-        if ($normalizedSlug === '') {
-            return false;
-        }
-
         $parentId = is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null;
+        $normalizedSlug = Slug::normalize($slug);
 
-        foreach ($this->pageRepository->all() as $candidate) {
-            $candidateId = is_string($candidate['id'] ?? null) ? $candidate['id'] : '';
-            $candidateParentId = is_string($candidate['parent_id'] ?? null)
-                ? $candidate['parent_id']
-                : null;
-            $candidateSlug = is_string($candidate['slug'] ?? null) ? $candidate['slug'] : '';
-
-            if ($candidateId === '' || $candidateId === $id) {
-                continue;
-            }
-
-            if ($candidateParentId !== $parentId) {
-                continue;
-            }
-
-            if ($candidateSlug === $normalizedSlug) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->pageRepository->slugExistsAmongSiblings($parentId, $normalizedSlug, $id);
     }
 
     public function slugEditable(string $id): bool

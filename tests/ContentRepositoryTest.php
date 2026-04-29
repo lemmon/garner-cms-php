@@ -51,7 +51,7 @@ final class ContentRepositoryTest extends TestCase
         self::assertArrayHasKey('slug', $stored);
         self::assertArrayHasKey('created_at', $stored);
         self::assertNull($stored['slug']);
-        self::assertSame('page', $stored['blueprint']);
+        self::assertSame('default', $stored['blueprint']);
         self::assertSame('default', $stored['template']);
         self::assertSame('listed', $stored['status']);
     }
@@ -78,6 +78,45 @@ final class ContentRepositoryTest extends TestCase
 
         self::assertSame('unlisted', $stored['status']);
         self::assertNull($stored['sort']);
+    }
+
+    public function testPageRepositoryChecksSiblingSlugConflicts(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+
+        $pages->save([
+            'id' => 'home-page',
+            'slug' => 'home',
+            'status' => null,
+            'fields' => [
+                'title' => 'Home',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'about-page',
+            'parent_id' => 'home-page',
+            'slug' => 'about',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'About',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'nested-about-page',
+            'parent_id' => 'about-page',
+            'slug' => 'about',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Nested About',
+            ],
+        ]);
+
+        self::assertTrue($pages->slugExistsAmongSiblings('home-page', 'about'));
+        self::assertFalse($pages->slugExistsAmongSiblings('home-page', 'about', 'about-page'));
+        self::assertFalse($pages->slugExistsAmongSiblings(null, 'about'));
+        self::assertFalse($pages->slugExistsAmongSiblings('home-page', ''));
     }
 
     public function testPageRepositoryCanonicalizesBlueprintAndTemplateIdentifiers(): void
@@ -262,6 +301,70 @@ final class ContentRepositoryTest extends TestCase
         self::assertSame('privacy-page', $resolver->resolve('/privacy')['id']);
         self::assertSame('generated-page', $resolver->resolve('/generated-page')['id']);
         self::assertNull($resolver->resolve('/draft'));
+    }
+
+    public function testRebuildKeepsExistingIndexWhenReplacementIndexFails(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+        $site = new SiteRepository($this->projectRoot . '/content');
+
+        $site->save([
+            'home_page_id' => 'home-page',
+            'title' => 'Test Site',
+        ]);
+
+        $pages->save([
+            'id' => 'home-page',
+            'slug' => 'home',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Home',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'about-page',
+            'parent_id' => 'home-page',
+            'slug' => 'about',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'About',
+            ],
+        ]);
+
+        $indexer = new PathIndexer(
+            siteRepository: $site,
+            pageRepository: $pages,
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+        );
+        $resolver = new PathResolver(
+            sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            pageRepository: $pages,
+        );
+
+        $indexer->rebuild();
+
+        self::assertSame('about-page', $resolver->resolve('/about')['id']);
+
+        $pages->save([
+            'id' => 'duplicate-about-page',
+            'parent_id' => 'home-page',
+            'slug' => 'about',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Duplicate About',
+            ],
+        ]);
+
+        try {
+            $indexer->rebuild();
+            self::fail('Rebuild should fail when two pages resolve to the same path.');
+        } catch (Throwable $exception) {
+            self::assertStringContainsString('UNIQUE', $exception->getMessage());
+        }
+
+        self::assertSame('about-page', $resolver->resolve('/about')['id']);
+        self::assertNull($resolver->resolve('/duplicate-about-page'));
     }
 
     public function testRebuildReflectsSlugAndStatusChangesAcrossDescendants(): void

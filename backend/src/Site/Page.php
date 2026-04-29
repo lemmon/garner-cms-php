@@ -75,15 +75,15 @@ final class Page
 
     public function blueprint(): string
     {
-        $blueprint = $this->data['blueprint'] ?? 'page';
+        $blueprint = $this->data['blueprint'] ?? 'default';
 
         if (!is_string($blueprint) || $blueprint === '') {
-            return 'page';
+            return 'default';
         }
 
         $normalized = Identifier::kebab($blueprint);
 
-        return $normalized !== '' ? $normalized : 'page';
+        return $normalized !== '' ? $normalized : 'default';
     }
 
     public function title(): string

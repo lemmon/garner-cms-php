@@ -48,7 +48,7 @@
   aria-haspopup="dialog"
   onclick={openDialog}
 >
-  <PlusIcon size={16} aria-hidden="true" />
+  <PlusIcon size={20} aria-hidden="true" />
   Create Page
 </Button>
 

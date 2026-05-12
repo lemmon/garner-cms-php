@@ -200,27 +200,29 @@ Open follow-up:
 
 Current state:
 
-- the page update endpoint treats `title` and `slug` as reserved payload keys
-  with special validation and persistence behavior
+- the page update endpoint treats `title`, `slug`, `status`, `sort`, and
+  `position` as reserved payload keys with special validation and persistence
+  behavior
 - blueprint field nodes are validated separately from these reserved keys
 - reserved page-level validators are applied after blueprint field validators so
-  `title` and `slug` keep their dedicated validation behavior even if a
-  blueprint uses those names
+  reserved keys keep their dedicated validation behavior even if a blueprint
+  uses those names
 - nothing currently prevents a blueprint author from declaring a node named
-  `title` or `slug`
+  after a reserved key
 
 Why this is a question:
 
-- a blueprint node named `slug` would collide with the reserved slug key in the
-  update payload, so the value would still be handled as a page-level slug
-  change instead of a field update
+- a blueprint node named after a reserved key would collide with page-level
+  update payload behavior, so the value would still be handled as page metadata
+  instead of a field update
 - `title` is implicit and should never appear as a blueprint field node
 
 Current desired direction:
 
 - add validation in blueprint loading or in `BlueprintFieldNodes` that rejects
   nodes whose names collide with reserved keys
-- the reserved set is currently `title` and `slug`; this may grow
+- the reserved set is currently `title`, `slug`, `status`, `sort`, and
+  `position`
 
 ## IntersectionObserver Lazy Loading for List Nodes
 

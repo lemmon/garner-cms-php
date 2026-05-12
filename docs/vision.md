@@ -62,7 +62,8 @@ Instead:
 
 - every entry gets a stable generated ID
 - one JSON document represents one entry
-- the tree is stored in metadata (`parent_id`, optional `slug`, `sort`)
+- tree, visibility, and ordering are stored in metadata (`parent_id`, optional
+  `slug`, `status`, and listed-page `sort`)
 - URLs are derived from indexed relationships, not from directory nesting
 
 UUID v4 is the core default for entry IDs, but the generator is a configurable application-level dependency. Page identity must stay independent from slugs regardless of the selected generator.

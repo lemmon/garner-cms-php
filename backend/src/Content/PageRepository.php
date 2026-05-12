@@ -242,7 +242,7 @@ final class PageRepository
 
     private function normalizeSort(mixed $sort, ?string $status): ?int
     {
-        if ($status === null || $status === 'unlisted') {
+        if ($status !== 'listed') {
             return null;
         }
 

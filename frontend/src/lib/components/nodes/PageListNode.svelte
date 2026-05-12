@@ -6,17 +6,21 @@
   import FileTextIcon from '@lucide/svelte/icons/file-text';
   import HouseIcon from '@lucide/svelte/icons/house';
 
-  import { resolve } from '$app/paths';
   import { api } from '$lib/api';
+  import Button from '$lib/components/Button.svelte';
   import NodeEmptyState from '$lib/components/nodes/NodeEmptyState.svelte';
   import NodeErrorState from '$lib/components/nodes/NodeErrorState.svelte';
   import NodeSection from '$lib/components/nodes/NodeSection.svelte';
   import PageCreateButton from '$lib/components/nodes/PageCreateButton.svelte';
+  import PageStatusButton from '$lib/components/nodes/PageStatusButton.svelte';
   import Shimmer from '$lib/components/Shimmer.svelte';
 
   let { node } = $props();
+  let refreshKey = $state(0);
 
-  async function loadData(node) {
+  async function loadData(node, refreshKey) {
+    void refreshKey;
+
     return await api('studio/nodes/query', {
       type: node.type,
       source: node.source,
@@ -32,13 +36,12 @@
     {/if}
   {/snippet}
 
-  {#await loadData(node)}
+  {#await loadData(node, refreshKey)}
     <Shimmer class="h-14 w-full" />
   {:then data}
     {#if data.items.length > 0}
       <div class="border-t border-neutral-100">
         {#each data.items as item (item.id)}
-          {@const detailHref = resolve(`/site/pages/${item.id}`)}
           <article class="flex flex-row border-b border-neutral-100 text-lg/6">
             <div class="py-border-4 flex px-4">
               {#if item.is_home}
@@ -48,12 +51,21 @@
               {/if}
             </div>
             <h2 class="flex flex-1">
-              <a class="py-border-4 flex-1 underline" href={detailHref}
-                >{item.title}</a
+              <Button
+                class="py-border-4 -ml-2 flex-1 pl-2 text-lg/6 underline"
+                align="start"
+                kind="ghost"
+                href="/site/pages/{item.id}">{item.title}</Button
               >
             </h2>
             {#if item.status}
-              <div class="py-border-4 px-4 text-neutral-500">{item.status}</div>
+              <PageStatusButton
+                {item}
+                siblings={data.items}
+                onsaved={() => {
+                  refreshKey += 1;
+                }}
+              />
             {/if}
           </article>
         {/each}

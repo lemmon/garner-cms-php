@@ -8,6 +8,7 @@ use Garner\Core\Request;
 use Garner\Studio\PageUpdate;
 use Garner\Support\Slug;
 use Illuminate\Support\Str;
+use Lemmon\Validator\ValidationException;
 use Lemmon\Validator\Validator;
 
 return static function (Application $app): array {
@@ -49,8 +50,39 @@ return static function (Application $app): array {
             );
     }
 
-    /** @var array<string, string> $validated */
+    if (array_key_exists('status', $payload) && $updater->statusEditableForPage($page)) {
+        $schema['status'] = Validator::isString()->required()->in(['draft', 'unlisted', 'listed']);
+    }
+
+    $currentStatus = is_string($page['status'] ?? null) ? $page['status'] : null;
+    $requestedStatus = is_string($payload['status'] ?? null) ? $payload['status'] : $currentStatus;
+
+    if (
+        $updater->statusEditableForPage($page)
+        && $requestedStatus === 'listed'
+        && (
+            array_key_exists('status', $payload)
+            || array_key_exists('position', $payload)
+            || array_key_exists('sort', $payload)
+        )
+    ) {
+        if (array_key_exists('position', $payload) || !array_key_exists('sort', $payload)) {
+            $schema['position'] = Validator::isInt()->required()->min(1);
+        }
+
+        if (!array_key_exists('position', $payload) && array_key_exists('sort', $payload)) {
+            $schema['sort'] = Validator::isInt()->required()->min(1);
+        }
+    }
+
+    /** @var array<string, mixed> $validated */
     $validated = Validator::isAssociative($schema)->validate($payload);
+
+    if ($validated === []) {
+        throw new ValidationException([
+            'payload' => ['At least one editable page field is required'],
+        ]);
+    }
 
     return $updater->update(page: $page, validated: $validated);
 };

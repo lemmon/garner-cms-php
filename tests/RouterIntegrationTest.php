@@ -84,6 +84,16 @@ final class RouterIntegrationTest extends TestCase
             json_encode(['id' => $createdPageId], JSON_THROW_ON_ERROR),
             'application/json',
         );
+        $createdPageStatusUpdate = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            json_encode([
+                'id' => $createdPageId,
+                'status' => 'listed',
+                'position' => 1,
+            ], JSON_THROW_ON_ERROR),
+            'application/json',
+        );
 
         self::assertSame('200', $studio['status']);
         self::assertStringContainsString('<title>Test Garner Studio</title>', $studio['body']);
@@ -152,6 +162,11 @@ final class RouterIntegrationTest extends TestCase
         );
         self::assertStringContainsString('"blueprint": "default"', $createdPageShow['body']);
         self::assertStringContainsString('"title": "Default"', $createdPageShow['body']);
+
+        self::assertSame('200', $createdPageStatusUpdate['status']);
+        self::assertStringContainsString('"status": "listed"', $createdPageStatusUpdate['body']);
+        self::assertStringContainsString('"sort": 10', $createdPageStatusUpdate['body']);
+        self::assertStringContainsString('"path": "/new-draft"', $createdPageStatusUpdate['body']);
     }
 
     public function testRouterUsesValidationForSlugRulesOnPageUpdates(): void
@@ -172,6 +187,18 @@ final class RouterIntegrationTest extends TestCase
             '/api/studio/pages/create',
             'POST',
             '{"source":"site","title":"Contact Duplicate","slug":"Contact"}',
+            'application/json',
+        );
+        $listedWithoutSort = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page","status":"listed"}',
+            'application/json',
+        );
+        $withoutEditableFields = $this->dispatch(
+            '/api/studio/pages/update',
+            'POST',
+            '{"id":"about-page"}',
             'application/json',
         );
 
@@ -195,6 +222,14 @@ final class RouterIntegrationTest extends TestCase
             '"message": "Slug must be unique among sibling pages"',
             $duplicateCreateSlug['body'],
         );
+
+        self::assertSame('400', $listedWithoutSort['status']);
+        self::assertStringContainsString('"invalid": true', $listedWithoutSort['body']);
+        self::assertStringContainsString('"path": "position"', $listedWithoutSort['body']);
+
+        self::assertSame('400', $withoutEditableFields['status']);
+        self::assertStringContainsString('"invalid": true', $withoutEditableFields['body']);
+        self::assertStringContainsString('"path": "payload"', $withoutEditableFields['body']);
     }
 
     public function testRouterKeepsReservedSlugValidationAheadOfCollidingBlueprintNodes(): void

@@ -434,7 +434,7 @@ Current API surface:
 - `/api/studio/nodes/query`: resolves blueprint list-node queries from JSON payload
 - `/api/studio/pages/show`: returns page detail plus the resolved blueprint payload when available
 - `/api/studio/pages/create`: creates a draft default page from a page-list source
-- `/api/studio/pages/update`: unified page update accepting any combination of title, slug, and blueprint field nodes; validates only present keys
+- `/api/studio/pages/update`: unified page update accepting any combination of title, slug, status, position, sort, and blueprint field nodes; validates only present keys
 
 Current `nodes/query` payload contract:
 
@@ -453,22 +453,25 @@ Current Studio page-detail behavior:
 - page detail lives under `/studio/site/pages/[id]`
 - the page list links directly to that nested Studio route
 - the detail endpoint returns stored page metadata, raw `fields`, and the loaded blueprint when present
-- Studio keeps page metadata loaded but does not display it yet
+- the detail screen keeps page metadata loaded but does not display it yet
 - page title is implicit for every page and is not declared as a blueprint node
 - title and slug editing should use a separate page-level affordance, not blueprint field nodes
 - the current detail screen renders supported field nodes from the loaded blueprint
 - supported field nodes currently include `text` and `textarea`
 - page-list nodes with `create.enabled: true` render a create action that opens a title/slug dialog
+- page-list rows allow normal pages to edit status through a dialog; `listed` pages choose a sibling position
 - the current page create flow creates draft pages with the default blueprint and default template
 - page create uses the page-list `source` as the parent context: `site` and `site.home` create under the configured home page, and `site.page("id")` creates under that page
 - the current update flow uses a single unified endpoint:
-  - accepts any combination of title, slug, and blueprint fields in one payload
+  - accepts any combination of title, slug, status, position, sort, and blueprint fields in one payload
   - validates only present keys
-  - blueprint field validators are collected first, then reserved page-level `title` and `slug` validators are applied last so reserved keys win over colliding blueprint node names
+  - blueprint field validators are collected first, then reserved page-level validators are applied last so reserved keys win over colliding blueprint node names
   - title values are squished before save
   - editable page slugs are normalized to ASCII, non-alphanumeric runs become `-`, and values must be unique among sibling pages, checked against canonical JSON content
+  - normal page status values are `draft`, `unlisted`, and `listed`; configured system page status is not editable
+  - `listed` status requires a positive integer sibling `position` from Studio or a direct positive integer `sort` order; non-listed normal pages do not persist sort
   - slug is silently excluded from validation for system pages
-  - path index rebuilds only when slug changes
+  - path index rebuilds when slug, status, or sort changes
   - Studio tab panels render all tabs persistently (hidden when inactive) so saveable inputs across all tabs are always in the DOM for form submission
 - missing page blueprints do not fail the entire detail view; they return `blueprint: null` with a `blueprint_issue`
 - Studio frontend error handling currently aims for two distinct behaviors:

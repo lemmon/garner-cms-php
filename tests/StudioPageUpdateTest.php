@@ -149,6 +149,166 @@ final class StudioPageUpdateTest extends TestCase
         self::assertSame('New body', $result['page']['fields']['text']);
     }
 
+    public function testPageUpdateCanChangeStatusToDraftAndRebuildPathIndex(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $page = $pageRepository->findOrFail('about-page');
+
+        $result = (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $page, validated: ['status' => 'draft']);
+
+        $stored = $pageRepository->find('about-page');
+
+        if (!is_array($stored)) {
+            self::fail('Updated page must exist.');
+        }
+
+        self::assertSame('draft', $stored['status']);
+        self::assertNull($stored['sort']);
+        self::assertSame('draft', $result['page']['status']);
+        self::assertNull($result['page']['sort']);
+        self::assertNull($result['page']['path']);
+        self::assertNull($pathResolver->resolve('/about'));
+    }
+
+    public function testPageUpdateCanChangeStatusToListedWithSortAndRebuildPathIndex(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $pageRepository->save([
+            'id' => 'draft-page',
+            'parent_id' => 'home-page',
+            'slug' => 'draft',
+            'status' => 'draft',
+            'fields' => [
+                'title' => 'Draft',
+            ],
+        ]);
+
+        $page = $pageRepository->findOrFail('draft-page');
+
+        $result = (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $page, validated: ['status' => 'listed', 'sort' => 30]);
+
+        $stored = $pageRepository->find('draft-page');
+
+        if (!is_array($stored)) {
+            self::fail('Updated page must exist.');
+        }
+
+        self::assertSame('listed', $stored['status']);
+        self::assertSame(30, $stored['sort']);
+        self::assertSame('listed', $result['page']['status']);
+        self::assertSame(30, $result['page']['sort']);
+        self::assertSame('/draft', $result['page']['path']);
+        self::assertSame('draft-page', $pathResolver->resolve('/draft')['id']);
+    }
+
+    public function testPageUpdateCanChangeStatusToListedWithPositionAndReorderSiblings(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $pageRepository->save([
+            'id' => 'draft-page',
+            'parent_id' => 'home-page',
+            'slug' => 'draft',
+            'status' => 'draft',
+            'fields' => [
+                'title' => 'Draft',
+            ],
+        ]);
+
+        $page = $pageRepository->findOrFail('draft-page');
+
+        $result = (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $page, validated: ['status' => 'listed', 'position' => 1]);
+
+        $stored = $pageRepository->find('draft-page');
+        $about = $pageRepository->find('about-page');
+        $contact = $pageRepository->find('contact-page');
+
+        if (!is_array($stored) || !is_array($about) || !is_array($contact)) {
+            self::fail('Updated sibling pages must exist.');
+        }
+
+        self::assertSame('listed', $stored['status']);
+        self::assertSame(10, $stored['sort']);
+        self::assertSame(20, $about['sort']);
+        self::assertSame(30, $contact['sort']);
+        self::assertNotSame('2026-01-01T00:00:00+00:00', $about['updated_at']);
+        self::assertNotSame('2026-01-01T00:00:00+00:00', $contact['updated_at']);
+        self::assertSame('listed', $result['page']['status']);
+        self::assertSame(10, $result['page']['sort']);
+        self::assertSame('/draft', $result['page']['path']);
+        self::assertSame('draft-page', $pathResolver->resolve('/draft')['id']);
+    }
+
+    public function testPageUpdateRejectsEmptyValidatedPayload(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $this->expectException(InvalidArgumentException::class);
+
+        (new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        ))->update(page: $pageRepository->findOrFail('about-page'), validated: []);
+    }
+
+    public function testPageUpdateCanReportStatusEditability(): void
+    {
+        [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
+
+        $updater = new PageUpdate(
+            siteRepository: $siteRepository,
+            pageRepository: $pageRepository,
+            pathIndexer: new PathIndexer(
+                siteRepository: $siteRepository,
+                pageRepository: $pageRepository,
+                sqlitePath: $this->projectRoot . '/runtime/index.sqlite',
+            ),
+            pathResolver: $pathResolver,
+        );
+
+        self::assertFalse($updater->statusEditableForPage($pageRepository->findOrFail(
+            'home-page',
+        )));
+        self::assertTrue($updater->statusEditableForPage($pageRepository->findOrFail(
+            'about-page',
+        )));
+    }
+
     public function testPageUpdateCanReportSiblingSlugConflicts(): void
     {
         [$siteRepository, $pageRepository, $pathResolver] = $this->seedSite();
@@ -190,6 +350,7 @@ final class StudioPageUpdateTest extends TestCase
             'fields' => [
                 'title' => 'Home',
             ],
+            'updated_at' => '2026-01-01T00:00:00+00:00',
         ]);
 
         $pageRepository->save([
@@ -202,6 +363,7 @@ final class StudioPageUpdateTest extends TestCase
                 'title' => 'About',
                 'text' => 'About body',
             ],
+            'updated_at' => '2026-01-01T00:00:00+00:00',
         ]);
 
         $pageRepository->save([
@@ -213,6 +375,7 @@ final class StudioPageUpdateTest extends TestCase
             'fields' => [
                 'title' => 'Contact',
             ],
+            'updated_at' => '2026-01-01T00:00:00+00:00',
         ]);
 
         (new PathIndexer(

@@ -122,7 +122,7 @@
         {/if}
         {#if hasSaveableNodes}
           <Button
-            class="min-w-32 px-2 py-1.5 text-lg/6"
+            class="min-w-32 p-2 text-lg/5"
             type="submit"
             form={contentFormId}
             loading={contentLoading}

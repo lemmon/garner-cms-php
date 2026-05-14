@@ -18,7 +18,7 @@
 </script>
 
 {#if items.length > 0}
-  <nav aria-label="Breadcrumb" class="mb-12 text-lg/6">
+  <nav aria-label="Breadcrumb" class="mb-12 py-0.5 text-lg/5">
     <ol class="flex flex-wrap gap-x-2 gap-y-1">
       {#each items as item, index (item.label + ':' + index)}
         {@const Icon = activeNavigationItem?.icon}

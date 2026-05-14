@@ -42,7 +42,7 @@
 </script>
 
 <Button
-  class="-my-1 px-1.5 py-1 text-lg/6"
+  class="-my-1 p-1.5 text-lg/5"
   type="button"
   kind="secondary"
   aria-haspopup="dialog"
@@ -97,7 +97,7 @@
           >
             {#snippet actions()}
               <Button
-                class="-my-0.5 px-1.5 py-0.5 text-lg/6"
+                class="-my-0.5 p-1 text-lg/5"
                 type="button"
                 kind="secondary"
                 onclick={handleSlugGenerate}

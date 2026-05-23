@@ -3,7 +3,13 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
 
-  let { item, siblings = [], onsaved } = $props();
+  let {
+    item,
+    siblings = [],
+    onsaved,
+    kind = 'ghost',
+    class: classname = 'py-border-4 text-lg/6 underline decoration-current/20',
+  } = $props();
   const uid = $props.id();
 
   let dialogOpen = $state(false);
@@ -75,14 +81,21 @@
   function compareItems(left, right) {
     return (
       sortValue(left) - sortValue(right) ||
-      String(left.title ?? left.slug ?? left.id ?? '').localeCompare(
-        String(right.title ?? right.slug ?? right.id ?? '')
-      )
+      slugValue(left).localeCompare(slugValue(right)) ||
+      idValue(left).localeCompare(idValue(right))
     );
   }
 
   function sortValue(page) {
     return typeof page.sort === 'number' ? page.sort : Number.MAX_SAFE_INTEGER;
+  }
+
+  function slugValue(page) {
+    return typeof page.slug === 'string' ? page.slug : '';
+  }
+
+  function idValue(page) {
+    return typeof page.id === 'string' ? page.id : '';
   }
 
   function openDialog() {
@@ -137,8 +150,8 @@
 
 <Button
   type="button"
-  kind="ghost"
-  class="py-border-4 text-lg/6 underline decoration-current/20"
+  {kind}
+  class={classname}
   aria-haspopup="dialog"
   onclick={openDialog}
 >

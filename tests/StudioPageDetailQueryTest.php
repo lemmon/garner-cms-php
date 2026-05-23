@@ -67,6 +67,27 @@ final class StudioPageDetailQueryTest extends TestCase
             ],
         ]);
 
+        $pageRepository->save([
+            'id' => 'contact-page',
+            'parent_id' => 'home-page',
+            'slug' => 'contact',
+            'status' => 'listed',
+            'sort' => 20,
+            'fields' => [
+                'title' => 'Contact',
+            ],
+        ]);
+
+        $pageRepository->save([
+            'id' => 'draft-page',
+            'parent_id' => 'home-page',
+            'slug' => 'draft',
+            'status' => 'draft',
+            'fields' => [
+                'title' => 'Draft',
+            ],
+        ]);
+
         (new PathIndexer(
             siteRepository: $siteRepository,
             pageRepository: $pageRepository,
@@ -119,6 +140,36 @@ final class StudioPageDetailQueryTest extends TestCase
         );
         self::assertFalse($payload['page']['is_system']);
         self::assertTrue($payload['page']['slug_editable']);
+        self::assertTrue($payload['page']['status_editable']);
+        self::assertSame(
+            [
+                [
+                    'id' => 'about-page',
+                    'parent_id' => 'home-page',
+                    'slug' => 'about',
+                    'status' => 'listed',
+                    'sort' => 10,
+                    'title' => 'About',
+                ],
+                [
+                    'id' => 'contact-page',
+                    'parent_id' => 'home-page',
+                    'slug' => 'contact',
+                    'status' => 'listed',
+                    'sort' => 20,
+                    'title' => 'Contact',
+                ],
+                [
+                    'id' => 'draft-page',
+                    'parent_id' => 'home-page',
+                    'slug' => 'draft',
+                    'status' => 'draft',
+                    'sort' => null,
+                    'title' => 'Draft',
+                ],
+            ],
+            $payload['status_siblings'],
+        );
         self::assertSame('Default', $payload['blueprint']['title']);
         self::assertNull($payload['blueprint_issue']);
     }
@@ -166,6 +217,7 @@ final class StudioPageDetailQueryTest extends TestCase
 
         self::assertTrue($payload['page']['is_system']);
         self::assertFalse($payload['page']['slug_editable']);
+        self::assertFalse($payload['page']['status_editable']);
     }
 
     private function deleteDirectory(string $path): void

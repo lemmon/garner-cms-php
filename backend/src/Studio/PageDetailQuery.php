@@ -58,12 +58,57 @@ final class PageDetailQuery
                 'is_error' => $isError,
                 'is_system' => $isSystem,
                 'slug_editable' => !$isSystem,
+                'status_editable' => !$isSystem,
                 'children_count' => $page->children(true)->count(),
                 'fields' => $page->fields(),
             ],
+            'status_siblings' => $this->buildStatusSiblings($data),
             'blueprint' => $blueprint,
             'blueprint_issue' => $blueprintIssue,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $page
+     * @return list<array<string, mixed>>
+     */
+    private function buildStatusSiblings(array $page): array
+    {
+        $parentId = is_string($page['parent_id'] ?? null) ? $page['parent_id'] : null;
+
+        return array_values(
+            $this->pageRepository
+                ->all()
+                ->filter(static function (array $candidate) use ($parentId): bool {
+                    $candidateParentId = is_string($candidate['parent_id'] ?? null)
+                        ? $candidate['parent_id']
+                        : null;
+
+                    return $candidateParentId === $parentId
+                    && is_string($candidate['status'] ?? null);
+                })
+                ->map(static function (array $candidate): array {
+                    $fields = is_array($candidate['fields'] ?? null) ? $candidate['fields'] : [];
+                    $title = is_string($fields['title'] ?? null) && $fields['title'] !== ''
+                        ? $fields['title']
+                        : (string) ($candidate['id'] ?? '');
+
+                    return [
+                        'id' => (string) ($candidate['id'] ?? ''),
+                        'parent_id' => is_string($candidate['parent_id'] ?? null)
+                            ? $candidate['parent_id']
+                            : null,
+                        'slug' => is_string($candidate['slug'] ?? null) ? $candidate['slug'] : null,
+                        'status' => is_string($candidate['status'] ?? null)
+                            ? $candidate['status']
+                            : null,
+                        'sort' => is_int($candidate['sort'] ?? null) ? $candidate['sort'] : null,
+                        'title' => $title,
+                    ];
+                })
+                ->values()
+                ->all(),
+        );
     }
 
     /**

@@ -119,6 +119,103 @@ final class ContentRepositoryTest extends TestCase
         self::assertFalse($pages->slugExistsAmongSiblings('home-page', ''));
     }
 
+    public function testPageRepositorySortsSiblingPagesBySortThenSlugThenId(): void
+    {
+        $pages = new PageRepository($this->projectRoot . '/content');
+
+        $pages->save([
+            'id' => 'home-page',
+            'slug' => 'home',
+            'status' => null,
+            'fields' => [
+                'title' => 'Home',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'zed-page',
+            'parent_id' => 'home-page',
+            'slug' => 'zed',
+            'status' => 'listed',
+            'sort' => 20,
+            'fields' => [
+                'title' => 'Zed',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'middle-page',
+            'parent_id' => 'home-page',
+            'slug' => 'middle',
+            'status' => 'listed',
+            'sort' => 10,
+            'fields' => [
+                'title' => 'Middle',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'alpha-page',
+            'parent_id' => 'home-page',
+            'slug' => 'alpha',
+            'status' => 'listed',
+            'sort' => 20,
+            'fields' => [
+                'title' => 'Alpha',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'same-slug-b-page',
+            'parent_id' => 'home-page',
+            'slug' => 'same',
+            'status' => 'listed',
+            'sort' => 30,
+            'fields' => [
+                'title' => 'Same B',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'same-slug-a-page',
+            'parent_id' => 'home-page',
+            'slug' => 'same',
+            'status' => 'listed',
+            'sort' => 30,
+            'fields' => [
+                'title' => 'Same A',
+            ],
+        ]);
+
+        $pages->save([
+            'id' => 'unsorted-page',
+            'parent_id' => 'home-page',
+            'slug' => 'unsorted',
+            'status' => 'listed',
+            'fields' => [
+                'title' => 'Unsorted',
+            ],
+        ]);
+
+        $ids = $pages
+            ->all()
+            ->filter(static fn(array $page): bool => ($page['parent_id'] ?? null) === 'home-page')
+            ->pluck('id')
+            ->all();
+
+        self::assertSame(
+            [
+                'middle-page',
+                'alpha-page',
+                'zed-page',
+                'same-slug-a-page',
+                'same-slug-b-page',
+                'unsorted-page',
+            ],
+            $ids,
+        );
+    }
+
     public function testPageRepositoryCanonicalizesBlueprintAndTemplateIdentifiers(): void
     {
         $pages = new PageRepository($this->projectRoot . '/content');

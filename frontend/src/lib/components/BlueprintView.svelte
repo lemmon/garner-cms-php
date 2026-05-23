@@ -28,6 +28,7 @@
     invalidateKeys = [],
     slugEditable = false,
     editTitleLabel = 'Edit title and slug',
+    toolbarActions,
   } = $props();
   const uid = $props.id();
 
@@ -108,6 +109,9 @@
 
     <Tabs items={tabs} value={activeTab}>
       {#snippet actions()}
+        {#if toolbarActions}
+          {@render toolbarActions()}
+        {/if}
         {#if openHref}
           <Button
             class="p-2"

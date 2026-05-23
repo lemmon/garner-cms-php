@@ -2,7 +2,7 @@
     "id": "1c3463cc-2684-4ad5-a5d3-ce9ec3a8c9ae",
     "kind": "page",
     "parent_id": "018f3b82-5742-7e45-9e86-5f8c7d2779e1",
-    "slug": "\u010destn\u00fd-\u0161ek",
+    "slug": "aboutx",
     "blueprint": "default",
     "template": "default",
     "status": "draft",
@@ -11,5 +11,5 @@
         "title": "aboutx"
     },
     "created_at": "2026-04-28T05:36:11+00:00",
-    "updated_at": "2026-04-28T06:24:45+00:00"
+    "updated_at": "2026-05-14T05:29:07+00:00"
 }

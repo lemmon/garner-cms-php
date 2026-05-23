@@ -7,7 +7,7 @@ namespace Garner\Content;
 /**
  * Composite comparator for ordering page arrays.
  *
- * Sort priority: parent_id → status rank → listed sort key → slug/id.
+ * Sort priority: parent_id → status rank → listed sort key → slug → id.
  */
 trait SortsPages
 {
@@ -24,7 +24,9 @@ trait SortsPages
             // @mago-expect lint:no-shorthand-ternary
             ?: self::listedSortKey($left) <=> self::listedSortKey($right)
             // @mago-expect lint:no-shorthand-ternary
-            ?: self::slugOrId($left) <=> self::slugOrId($right)
+            ?: self::slugKey($left) <=> self::slugKey($right)
+            // @mago-expect lint:no-shorthand-ternary
+            ?: self::idKey($left) <=> self::idKey($right)
         );
     }
 
@@ -56,14 +58,16 @@ trait SortsPages
     /**
      * @param array<string, mixed> $page
      */
-    private static function slugOrId(array $page): string
+    private static function slugKey(array $page): string
     {
-        $slug = is_string($page['slug'] ?? null) ? $page['slug'] : '';
+        return is_string($page['slug'] ?? null) ? $page['slug'] : '';
+    }
 
-        if ($slug !== '') {
-            return $slug;
-        }
-
+    /**
+     * @param array<string, mixed> $page
+     */
+    private static function idKey(array $page): string
+    {
         return is_string($page['id'] ?? null) ? $page['id'] : '';
     }
 }

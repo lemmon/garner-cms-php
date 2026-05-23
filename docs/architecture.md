@@ -183,8 +183,9 @@ Current site and page traversal semantics:
 - `Site.children(drafts: true)` returns the editorial root slice: home plus home's direct children
 - `Site.index(drafts: true)` returns the full public tree: home plus all of its descendants
 - `Site.systemPages()` returns dedicated system pages outside the public tree, such as the error page
-- sibling ordering is: listed pages first by `sort`, then unlisted pages by `slug` with `id` fallback
-- when drafts are requested, drafts come last and are ordered by `slug` with `id` fallback
+- sibling ordering is: listed pages first by `sort`, then `slug`, then `id`
+- unlisted pages follow listed pages and use the same `slug`, then `id` fallback order
+- when drafts are requested, drafts come last and use the same `slug`, then `id` fallback order
 - unlisted pages do not persist a meaningful `sort`
 - `Site.children()` and `Site.index()` still force home to the first position
 

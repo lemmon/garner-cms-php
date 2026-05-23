@@ -122,6 +122,64 @@ Future fix options:
 - implement `file_list` source resolution for `site` and page-owned files
 - add shared node-query validation so unsupported node types fail more explicitly
 
+## Blueprint Actions Depend On Rendered Tabs
+
+Current state:
+
+- `BlueprintView` renders toolbar actions inside the tab chrome
+- `Tabs` renders no markup when a blueprint has no tabs
+- page-level actions such as status changes and public preview are therefore
+  hidden when a page has a missing, invalid, or otherwise tabless blueprint
+
+Why this matters:
+
+- status and preview actions are page metadata actions, not blueprint field
+  actions
+- broken or empty blueprint definitions should not make page-level actions
+  disappear
+- the correct layout needs testing across tabbed, tabless, and invalid
+  blueprint states before the action chrome is moved
+
+Current decision:
+
+- keep the current behavior visible as a known issue
+- do not solve it incidentally while changing page status ordering
+
+Future fix options:
+
+- move page-level actions outside the tab component
+- or make the tab component render its action slot independently of tab items
+- add Studio coverage for tabbed, tabless, and invalid blueprint states before
+  choosing the final layout
+
+## Draft Page Preview Is Not Designed Yet
+
+Current state:
+
+- Studio builds public preview links from the indexed public page path
+- draft pages do not have public paths in the current derived index
+- the preview action may disappear or point nowhere for draft pages
+
+Why this matters:
+
+- authors should be able to preview draft pages from Studio
+- draft preview must not publish the page or expose draft content to anonymous
+  public visitors
+- the implementation depends on the future authenticated Studio/session model
+
+Current decision:
+
+- keep the preview requirement documented until authenticated draft preview is
+  designed
+- the preview button should remain a page-level action even for draft pages, but
+  the route and access rules still need to be defined
+
+Future fix options:
+
+- add an authenticated preview route that resolves draft pages by id
+- teach the public runtime to serve drafts only for authorized Studio users
+- model preview URLs separately from normal public URLs in the Studio page API
+
 ## Node help text and validation errors can show simultaneously
 
 `TextNode` and `TextareaNode` render blueprint `node.help` as a trailing paragraph

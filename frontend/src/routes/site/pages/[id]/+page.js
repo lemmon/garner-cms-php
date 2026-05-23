@@ -12,5 +12,6 @@ export async function load({ depends, params }) {
     blueprintIssue: detail.blueprint_issue,
     breadcrumbs: detail.breadcrumbs,
     page: detail.page,
+    statusSiblings: detail.status_siblings,
   };
 }

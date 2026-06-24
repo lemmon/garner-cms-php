@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page.title ?? 'Home' }} &middot; {{ site.title }}</title>
+</head>
+<body>
+    <main>
+        <h1>{{ page.title }}</h1>
+        {{ content.main|markdown }}
+
+        <nav>
+            <h2>Pages</h2>
+            <ul>
+                {# site.children is a collection: hide pages that opt out with "nav": false #}
+                {% for child in site.children.reject(child => child.get('nav') is same as false) %}
+                    <li><a href="{{ child.url }}">{{ child.title ?? child.id }}</a></li>
+                {% endfor %}
+            </ul>
+        </nav>
+    </main>
+</body>
+</html>

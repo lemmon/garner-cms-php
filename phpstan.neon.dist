@@ -1,0 +1,12 @@
+parameters:
+	level: 7
+	paths:
+		- bin/garner
+		- boot
+		- config
+		- public
+		- src
+		- tests
+	tmpDir: runtime/phpstan
+	parallel:
+		maximumNumberOfProcesses: 1

@@ -1,0 +1,61 @@
+{
+    "name": "lemmon/garner",
+    "description": "Agent-first, flat-file PHP CMS with filesystem routing and Twig rendering",
+    "license": "proprietary",
+    "type": "library",
+    "require": {
+        "php": "^8.4",
+        "ext-pdo": "*",
+        "ext-pdo_sqlite": "*",
+        "illuminate/collections": "^13.17",
+        "league/commonmark": "^2.8",
+        "lemmon/validator": "^0.15.0",
+        "symfony/console": "^8.1",
+        "symfony/error-handler": "^8.1",
+        "symfony/uid": "^8.1",
+        "symfony/var-dumper": "^8.1",
+        "symfony/yaml": "^8.1",
+        "twig/twig": "^3.0",
+        "visus/cuid2": "^6.0"
+    },
+    "require-dev": {
+        "carthage-software/mago": "^1.18",
+        "ergebnis/composer-normalize": "^2.50",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Garner\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Garner\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "ergebnis/composer-normalize": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "analyze": "vendor/bin/phpstan analyse --memory-limit=1G",
+        "check": [
+            "@platform-check",
+            "vendor/bin/mago format --check",
+            "@analyze",
+            "@lint",
+            "@test"
+        ],
+        "format": "vendor/bin/mago format",
+        "lint": "vendor/bin/mago lint",
+        "platform-check": "composer check-platform-reqs",
+        "start": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -S localhost:8040 -t public boot/server.php"
+        ],
+        "test": "phpunit"
+    }
+}

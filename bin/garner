@@ -1,0 +1,17 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Garner\Cli\Console;
+use Garner\Core\Application;
+
+$corePath = dirname(__DIR__);
+require $corePath . '/vendor/autoload.php';
+
+$projectPath = getenv('GARNER_PROJECT_ROOT') ?: getcwd() ?: $corePath;
+
+/** @var callable(string, string): Application $factory */
+$factory = require $corePath . '/boot/app.php';
+
+exit((new Console($factory($projectPath, $corePath)))->run());

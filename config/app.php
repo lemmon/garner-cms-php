@@ -27,6 +27,7 @@ return [
         'routes' => 'routes',
         'runtime' => 'runtime',
         'storage' => 'storage',
+        'public' => 'public',
     ],
     'markdown' => [
         'allow_unsafe_links' => false,

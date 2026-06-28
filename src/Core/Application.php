@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Garner\Core;
 
 use Garner\Content\ContentIndex;
+use Garner\Content\MediaPublisher;
 use Garner\Content\PageLoader;
 use Garner\Content\Pages;
 use Garner\Content\PublicSite;
@@ -29,6 +30,7 @@ final class Application
     private ?Favicon $favicon = null;
     private ?IdGenerator $idGenerator = null;
     private ?MarkdownRenderer $markdownRenderer = null;
+    private ?MediaPublisher $mediaPublisher = null;
     private ?PageControllers $pageControllers = null;
     private ?PageLoader $pageLoader = null;
     private ?Pages $pages = null;
@@ -102,7 +104,14 @@ final class Application
 
     public function pageLoader(): PageLoader
     {
-        return $this->pageLoader ??= new PageLoader();
+        return $this->pageLoader ??= new PageLoader($this->mediaPublisher());
+    }
+
+    public function mediaPublisher(): MediaPublisher
+    {
+        return $this->mediaPublisher ??= new MediaPublisher(publicPath: $this->projectPath(
+            'public',
+        ));
     }
 
     public function treeValidator(): TreeValidator

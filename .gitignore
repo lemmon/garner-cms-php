@@ -2,5 +2,6 @@
 /vendor/
 /storage/
 /runtime/
+/public/media/
 /.phpunit.result.cache
 /.claude/settings.local.json

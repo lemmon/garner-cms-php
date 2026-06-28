@@ -144,6 +144,12 @@ final class TreeValidator
                 continue;
             }
 
+            // Mirror the content loader: a structured file beside an asset is that
+            // asset's sidecar, not content, so it never collides.
+            if (Page::isAssetSidecar($dir, $name)) {
+                continue;
+            }
+
             $key = pathinfo($name, PATHINFO_FILENAME);
 
             if (array_key_exists($key, $seen)) {

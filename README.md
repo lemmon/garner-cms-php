@@ -75,6 +75,36 @@ its basename:
 So `main.md` → `content.main`, `data.json` → `content.data`. Files beginning with
 `+` or `.` are reserved and never loaded as content.
 
+### Files and media
+
+Any _other_ file beside a page (an image, PDF, video, download) is a file asset owned
+by that page. Reach them from the page:
+
+```twig
+{% set photo = page.file('team.jpg') %}
+{% if photo %}<img src="{{ photo.url }}" alt="{{ photo.get('alt') }}">{% endif %}
+
+{% for image in page.files.images %}
+  <img src="{{ image.url }}">
+{% endfor %}
+```
+
+`file.url()` publishes the file into the gitignored `public/media/<hash>/` directory
+(a content hash, so the URL is immutable and cache-busts on edit) and the web server
+serves it directly. Publishing makes a file publicly downloadable — keep private files
+out of `url()` and stream them through a controller instead.
+
+Metadata is optional and lives in a sibling sidecar, never created automatically:
+
+```text
+routes/about/team.jpg          a file asset
+routes/about/team.jpg.json     { "alt": "The team", "credit": "Jane" }
+```
+
+The sidecar attaches to the file (`page.file('team.jpg').meta`) and is not loaded as a
+content value. See [`docs/media-handling.md`](docs/media-handling.md) for the full
+design and open questions.
+
 ### Co-located template and controller
 
 Two optional `+` files let a page override its view and behavior:

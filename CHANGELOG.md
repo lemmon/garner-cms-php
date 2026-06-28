@@ -37,6 +37,14 @@ Initial implementation of the agent-first, flat-file CMS.
 - **Traversal and references** — `site.home`, `site.children`, `site.index`,
   `page.children`, `page.index`, and `findById()` to resolve a stable id to its
   current page (surviving moves).
+- **Files & media** — non-content files beside a page entry are page-owned assets,
+  reached with `page.file('photo.jpg')` and `page.files()` (a `FileCollection` with
+  an `images()` filter). Optional sidecars (`photo.jpg.json`) carry metadata and are
+  never created automatically. `file.url()` publishes the file into the gitignored
+  `public/media/<hash>/` directory and returns a content-hashed, immutable URL; the
+  web server then serves it directly. See `docs/media-handling.md` for the design and
+  the deferred questions (cache/proxy interaction, garbage collection, loose/site
+  assets, private streaming, thumbnails).
 - **Rendering** — Twig templates resolved by the page's `template` field (falling
   back to `default`), Markdown through `league/commonmark` exposed as a
   `markdown` filter, and a `dump()` extension. Co-located `+template.twig` (a

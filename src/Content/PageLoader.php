@@ -11,6 +11,10 @@ final class PageLoader
     private const TEMPLATE_FILE = '+template.twig';
     private const CONTROLLER_FILE = '+controller.php';
 
+    public function __construct(
+        private readonly ?MediaPublisher $publisher = null,
+    ) {}
+
     public function load(string $dir, string $url, ?Pages $pages = null): Page
     {
         $entry = EntryFile::find($dir);
@@ -33,11 +37,13 @@ final class PageLoader
             url: $url,
             meta: $meta,
             content: $this->loadContentFiles($dir, $entry),
+            dir: $dir,
             draft: PageMeta::isDraft($meta),
             sort: PageMeta::sort($meta),
             templateFile: $this->siblingFile($dir, self::TEMPLATE_FILE),
             controllerFile: $this->siblingFile($dir, self::CONTROLLER_FILE),
             pages: $pages,
+            publisher: $this->publisher,
         );
     }
 
@@ -76,6 +82,12 @@ final class PageLoader
             $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
             if (!FormatParser::supportsContent($extension)) {
+                continue;
+            }
+
+            // A structured file beside a real asset (photo.jpg.json next to photo.jpg)
+            // is that asset's sidecar metadata, not a content value; skip it.
+            if (Page::isAssetSidecar($dir, $name)) {
                 continue;
             }
 

@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
+use Garner\Support\Env;
 use Garner\Support\IdGeneratorType;
 
 $debug = (static function (): bool {
-    $configured = $_ENV['APP_DEBUG'] ?? null;
+    $configured = Env::get('APP_DEBUG');
 
     if ($configured !== null) {
         return filter_var($configured, FILTER_VALIDATE_BOOL);
@@ -19,9 +20,12 @@ $debug = (static function (): bool {
 
 return [
     'name' => 'Garner',
-    'environment' => $_ENV['APP_ENV'] ?? ($debug ? 'development' : 'production'),
+    'environment' => Env::get('APP_ENV') ?? ($debug ? 'development' : 'production'),
     'debug' => $debug,
-    'url' => $_ENV['APP_URL'] ?? null,
+    // Site base URL (scheme://host, no trailing slash) exposed as `site.url`. When
+    // null it is inferred from each request; pin it (or set APP_URL) for a canonical
+    // origin in CLI builds, sitemaps, and absolute links.
+    'url' => Env::get('APP_URL'),
     'paths' => [
         'app' => 'app',
         'routes' => 'routes',

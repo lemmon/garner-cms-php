@@ -21,6 +21,7 @@ use Garner\Support\CallbackIdGenerator;
 use Garner\Support\IdGenerator;
 use Garner\Support\IdGeneratorType;
 use RuntimeException;
+use Twig\Environment;
 
 final class Application
 {
@@ -37,6 +38,7 @@ final class Application
     private ?PublicSite $publicSite = null;
     private ?RendererInterface $siteRenderer = null;
     private ?SiteLoader $siteLoader = null;
+    private ?string $siteUrl = null;
     private ?TreeValidator $treeValidator = null;
 
     /**
@@ -104,7 +106,10 @@ final class Application
 
     public function pageLoader(): PageLoader
     {
-        return $this->pageLoader ??= new PageLoader($this->mediaPublisher());
+        return $this->pageLoader ??= new PageLoader(
+            publisher: $this->mediaPublisher(),
+            baseUrl: $this->siteUrl(),
+        );
     }
 
     public function mediaPublisher(): MediaPublisher
@@ -131,7 +136,28 @@ final class Application
         return $this->siteLoader ??= new SiteLoader(
             contentPath: $this->projectPath('routes'),
             defaultTitle: (string) $this->config('app.name', 'Garner'),
+            baseUrl: $this->siteUrl(),
         );
+    }
+
+    /**
+     * The site's base URL (scheme://host, no trailing slash): the `app.url` config
+     * when set, otherwise inferred from the current request. Resolved once.
+     */
+    public function siteUrl(): string
+    {
+        return $this->siteUrl ??= $this->resolveSiteUrl();
+    }
+
+    private function resolveSiteUrl(): string
+    {
+        $configured = $this->config('app.url');
+
+        if (is_string($configured) && trim($configured) !== '') {
+            return rtrim(trim($configured), '/');
+        }
+
+        return Request::baseUrl();
     }
 
     public function favicon(): Favicon
@@ -178,7 +204,38 @@ final class Application
             defaultTemplate: (string) $this->config('app.rendering.default_template', 'default'),
             markdownRenderer: $this->markdownRenderer(),
             options: $twigOptions,
+            extensions: $this->twigExtensions(),
         );
+    }
+
+    /**
+     * Site Twig extensions from app/twig.php — a file returning a callable
+     * `(Environment $twig, Application $app): void` that registers functions,
+     * filters, or globals. Returns the hook bound to this Application, or null
+     * when the site defines none.
+     *
+     * @return (callable(Environment): void)|null
+     */
+    private function twigExtensions(): ?callable
+    {
+        $file = $this->projectPath('app') . '/twig.php';
+
+        if (!is_file($file)) {
+            return null;
+        }
+
+        $register = require $file;
+
+        if (!is_callable($register)) {
+            throw new RuntimeException(sprintf(
+                'Twig extensions "%s" must return a callable',
+                $file,
+            ));
+        }
+
+        return function (Environment $twig) use ($register): void {
+            $register($twig, $this);
+        };
     }
 
     public function publicSite(): PublicSite
@@ -265,11 +322,28 @@ final class Application
     private function resolveTwigCache(mixed $cache, bool $debug): string|false
     {
         if ($cache === null) {
-            return $debug ? false : $this->projectPath('runtime') . '/cache/twig';
+            return $debug ? false : $this->twigCachePath();
         }
 
         if (!is_string($cache) || $cache === '') {
             return false;
+        }
+
+        return $this->twigCachePath();
+    }
+
+    /**
+     * Where compiled Twig templates accumulate: the `app.twig.cache` path when
+     * configured, otherwise the default runtime location. Debug mode only decides
+     * whether rendering uses the cache, not where it lives — so clearing (e.g.
+     * `garner cache:clear` on deploy) targets the same path in every mode.
+     */
+    public function twigCachePath(): string
+    {
+        $cache = $this->config('app.twig.cache');
+
+        if (!is_string($cache) || $cache === '') {
+            return $this->projectPath('runtime') . '/cache/twig';
         }
 
         return str_starts_with($cache, '/') ? $cache : $this->rootPath() . '/' . ltrim($cache, '/');

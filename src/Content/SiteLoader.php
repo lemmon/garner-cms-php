@@ -11,6 +11,7 @@ final class SiteLoader
     public function __construct(
         private readonly string $contentPath,
         private readonly string $defaultTitle = 'Garner',
+        private readonly string $baseUrl = '',
     ) {}
 
     public function load(?Pages $pages = null): Site
@@ -32,9 +33,9 @@ final class SiteLoader
                 $data['title'] = $this->defaultTitle;
             }
 
-            return new Site($data, $pages);
+            return new Site($data, $pages, $this->baseUrl);
         }
 
-        return new Site(['title' => $this->defaultTitle], $pages);
+        return new Site(['title' => $this->defaultTitle], $pages, $this->baseUrl);
     }
 }

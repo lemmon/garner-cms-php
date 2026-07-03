@@ -18,15 +18,22 @@ final class Pages
 
     public function find(string $path): ?Page
     {
-        $normalized = $this->normalize($path);
+        $normalized = RoutePath::normalize($path);
         $dir = $this->index->dirForPath($normalized);
 
         return $dir === null ? null : $this->loader->load($dir, $normalized, $this);
     }
 
+    /**
+     * The home page (route "/"), or null when none is defined. A root endpoint
+     * still routes via find('/'), but it is not a page — so it is not home, and
+     * it never anchors site.children / site.index.
+     */
     public function home(): ?Page
     {
-        return $this->find('/');
+        $home = $this->find('/');
+
+        return $home === null || $home->isEndpoint() ? null : $home;
     }
 
     /**
@@ -45,7 +52,7 @@ final class Pages
      */
     public function children(string $path, bool $drafts = false): PageCollection
     {
-        return $this->hydrate($this->index->children($this->normalize($path), $drafts));
+        return $this->hydrate($this->index->children(RoutePath::normalize($path), $drafts));
     }
 
     /**
@@ -53,7 +60,7 @@ final class Pages
      */
     public function index(string $path, bool $drafts = false): PageCollection
     {
-        return $this->hydrate($this->index->descendants($this->normalize($path), $drafts));
+        return $this->hydrate($this->index->descendants(RoutePath::normalize($path), $drafts));
     }
 
     /**
@@ -68,16 +75,5 @@ final class Pages
         }
 
         return new PageCollection($pages);
-    }
-
-    private function normalize(string $path): string
-    {
-        $trimmed = trim($path);
-
-        if ($trimmed === '' || $trimmed === '/') {
-            return '/';
-        }
-
-        return '/' . trim($trimmed, '/');
     }
 }

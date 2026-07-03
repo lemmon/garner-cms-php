@@ -7,11 +7,41 @@ use Garner\Cli\Console;
 use Garner\Core\Application;
 
 $corePath = dirname(__DIR__);
-require $corePath . '/vendor/autoload.php';
 
-$projectPath = getenv('GARNER_PROJECT_ROOT') ?: getcwd() ?: $corePath;
+// Composer's vendor/bin proxy (Composer >= 2.2) provides the consumer project's
+// autoloader; when run directly, fall back to the in-repo vendor (development)
+// or the parent vendor dir (installed as a dependency without the proxy).
+$autoloadPaths = [
+    $GLOBALS['_composer_autoload_path'] ?? null,
+    $corePath . '/vendor/autoload.php',
+    dirname($corePath, 2) . '/autoload.php',
+];
+
+$autoloadPath = null;
+
+foreach ($autoloadPaths as $candidate) {
+    if (is_string($candidate) && is_file($candidate)) {
+        $autoloadPath = $candidate;
+        break;
+    }
+}
+
+if ($autoloadPath === null) {
+    fwrite(STDERR, 'Composer autoload not found. Run "composer install".' . PHP_EOL);
+    exit(1);
+}
+
+require $autoloadPath;
+
+$projectRoot = getenv('GARNER_PROJECT_ROOT');
+if (is_string($projectRoot) && $projectRoot !== '') {
+    $projectPath = $projectRoot;
+} else {
+    $cwd = getcwd();
+    $projectPath = $cwd !== false ? $cwd : $corePath;
+}
 
 /** @var callable(string, string): Application $factory */
 $factory = require $corePath . '/boot/app.php';
 
-exit((new Console($factory($projectPath, $corePath)))->run());
+exit(new Console($factory($projectPath, $corePath))->run());

@@ -50,6 +50,10 @@ final class TreeValidator
             $this->checkEntry($dir, $entry, $issues, $seenIds);
         }
 
+        if ($entry === null && is_file($dir . '/+controller.php')) {
+            $this->checkEndpoint($dir, $issues, $seenIds);
+        }
+
         $names = scandir($dir);
 
         if ($names === false) {
@@ -112,6 +116,30 @@ final class TreeValidator
         $seenIds[$id] ??= $relative;
 
         $this->checkContentCollisions($dir, $entry, $issues);
+    }
+
+    /**
+     * A directory with a +controller.php but no entry file is a route endpoint: it
+     * carries no metadata, but its id (the directory name) shares the global id
+     * namespace, so duplicates are reported here just as ContentIndex enforces them.
+     *
+     * @param list<ValidationIssue> $issues
+     * @param array<string, string> $seenIds
+     */
+    private function checkEndpoint(string $dir, array &$issues, array &$seenIds): void
+    {
+        $id = PageMeta::resolveId([], $dir);
+        $relative = $this->relative($dir);
+
+        if (array_key_exists($id, $seenIds)) {
+            $issues[] = new ValidationIssue($relative, sprintf(
+                'Duplicate page id "%s" (already used by "%s")',
+                $id,
+                $seenIds[$id],
+            ));
+        }
+
+        $seenIds[$id] ??= $relative;
     }
 
     /**

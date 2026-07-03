@@ -12,7 +12,17 @@ final class Site
     public function __construct(
         private readonly array $meta,
         private readonly ?Pages $pages = null,
+        private readonly string $url = '',
     ) {}
+
+    /**
+     * The site's base URL (scheme://host), without a trailing slash. Resolved from
+     * the `app.url` config when set, otherwise inferred from the request.
+     */
+    public function url(): string
+    {
+        return $this->url;
+    }
 
     public function title(): string
     {

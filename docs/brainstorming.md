@@ -364,3 +364,64 @@ project/
 ```
 
 PHAR support is not an initial priority. The architecture should avoid unnecessarily preventing it, but packaging, update strategy, signature verification, PHP extension requirements, and host compatibility can be designed after the core content and routing model is proven.
+
+## 2026-07-02 — Endpoints cannot reference each other's URLs
+
+Surfaced while building `/robots.txt` for the first consumer site. Its `Sitemap:`
+line must be an absolute URL, but the sitemap is a route endpoint — invisible to
+traversal and `findById` by design — so there is nothing to resolve. The
+controller hand-composes `$site->url() . '/sitemap.txt'`.
+
+For author-owned routes this is acceptable (you named the directory, you know the
+path), and it is the only place the API currently hands back string concatenation
+instead of an accessor. If endpoints multiply, the natural fix is a composition
+helper in the `url()`/`path()` family — e.g. `site.url(path)` returning the base
+URL joined with a path — rather than making endpoints traversable, which would
+reintroduce the tree pollution the endpoint model exists to avoid.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-02 — Form submissions / POST handling (assumptions, untested)
+
+> Status: **brainstorm only.** Nothing below is implemented or verified — these are
+> working assumptions to be tested and discussed before any of it becomes design.
+
+### Assumption: the existing controller contract is already the form contract
+
+A form's target is just a controller — the page's own `+controller.php` or an
+endpoint. PHP parses `application/x-www-form-urlencoded` and multipart bodies into
+`$_POST` natively (the LAMP platform is the middleware), so a controller could
+branch on the request method today:
+
+- **Return an array** on validation failure → the same page re-renders with
+  `errors` / `old` input in template context. Repopulated form, same URL.
+- **Return `RenderedResponse::redirect($target, 303)`** on success →
+  Post/Redirect/Get, using the redirect support built for canonical paths.
+  `303 See Other` is the correct PRG status (client re-requests with GET).
+- Validation belongs to `lemmon/validator`, already a dependency.
+- The trailing-slash canonicalization uses **308** (method-preserving), so a
+  `POST /contact/` survives the canonical redirect with its body intact — this
+  was a deliberate reason to prefer 308 over 301.
+
+Believed to work with zero core changes; **not yet exercised by any real form.**
+
+### Open questions (decide before building)
+
+1. **CSRF — the foundation decision.** Garner has no session story. Options:
+   real PHP sessions (LAMP-native, heavyweight), stateless signed tokens
+   (HMAC + timestamp, no server state), or relying on `SameSite=Lax` cookies for
+   content-site forms. Whatever is chosen also answers question 2.
+2. **Flash messages / repopulation across the PRG redirect** — needs one-request
+   state (session or one-shot cookie).
+3. **`Request` niceties** — `method()`, `post()` wrappers for testability;
+   `getInput()`/`getPayload()` already cover JSON bodies.
+4. **Form-created content** — a POST that writes a page into `routes/` is the
+   "runtime content writes" future in `index-freshness.md`: Garner owns the
+   write, so it invalidates the index inline. File uploads would flow into the
+   page-owned-assets media model.
+5. **Named form actions (SvelteKit-style `?/action`) vs. single-controller
+   method branching** — branching is the simplicity-bias default until a real
+   site proves it insufficient.
+
+First real test candidate: a contact form on a consumer site, built with nothing
+but a `+controller.php` and `$_POST`, to validate assumption #1 before touching core.

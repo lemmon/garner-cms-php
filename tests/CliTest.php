@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Tests;
 
+use Garner\Cli\CacheClearCommand;
 use Garner\Cli\CreatePageCommand;
 use Garner\Cli\ReindexCommand;
 use Garner\Cli\ValidateCommand;
@@ -120,6 +121,25 @@ final class CliTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertFileExists($this->root . '/runtime/index.sqlite');
+    }
+
+    public function testCacheClearRemovesCompiledTemplates(): void
+    {
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Cleared template cache', $tester->getDisplay());
+        self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
+    }
+
+    public function testCacheClearSucceedsWithNothingToClear(): void
+    {
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('already clear', $tester->getDisplay());
     }
 
     /**

@@ -26,6 +26,7 @@ final class Page
     ];
 
     /**
+     * @param string               $path           Route path (e.g. "/about") — the page's routing identity.
      * @param array<string, mixed> $meta         Full decoded entry document (freeform metadata).
      * @param array<string, mixed> $content      Parsed sibling content files, keyed by basename.
      * @param string               $dir            Absolute path to the page directory (owns its files).
@@ -33,11 +34,13 @@ final class Page
      * @param string|null          $controllerFile Absolute path to a co-located +controller.php, if present.
      * @param Pages|null           $pages          Repository used to resolve children/descendants lazily.
      * @param MediaPublisher|null  $publisher      Publishes owned files and resolves their public URLs.
+     * @param string               $baseUrl        Site base URL (no trailing slash) used to compose url().
+     * @param bool                 $endpoint       Route endpoint (controller-only directory), not a tree page.
      */
     public function __construct(
         private readonly string $id,
         private readonly ?string $template,
-        private readonly string $url,
+        private readonly string $path,
         private readonly array $meta,
         private readonly array $content,
         private readonly string $dir,
@@ -47,6 +50,8 @@ final class Page
         private readonly ?string $controllerFile = null,
         private readonly ?Pages $pages = null,
         private readonly ?MediaPublisher $publisher = null,
+        private readonly string $baseUrl = '',
+        private readonly bool $endpoint = false,
     ) {}
 
     public function id(): string
@@ -59,14 +64,36 @@ final class Page
         return $this->template;
     }
 
+    /**
+     * The page's route path (e.g. "/about"): its routing identity, independent of
+     * where the site is hosted.
+     */
+    public function path(): string
+    {
+        return $this->path;
+    }
+
+    /**
+     * The page's absolute URL: the site base URL plus the route path (e.g.
+     * "https://example.com/about"). Use path() for the bare route path.
+     */
     public function url(): string
     {
-        return $this->url;
+        return $this->baseUrl . $this->path;
     }
 
     public function isDraft(): bool
     {
         return $this->draft;
+    }
+
+    /**
+     * Whether this is a route endpoint (a controller-only directory): routable
+     * and dispatchable, but not part of the page tree.
+     */
+    public function isEndpoint(): bool
+    {
+        return $this->endpoint;
     }
 
     public function sort(): int
@@ -89,7 +116,7 @@ final class Page
      */
     public function children(bool $drafts = false): PageCollection
     {
-        return $this->pages?->children($this->url, $drafts) ?? new PageCollection();
+        return $this->pages?->children($this->path, $drafts) ?? new PageCollection();
     }
 
     /**
@@ -97,7 +124,7 @@ final class Page
      */
     public function index(bool $drafts = false): PageCollection
     {
-        return $this->pages?->index($this->url, $drafts) ?? new PageCollection();
+        return $this->pages?->index($this->path, $drafts) ?? new PageCollection();
     }
 
     public function title(): ?string

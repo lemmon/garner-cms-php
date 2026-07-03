@@ -1,7 +1,7 @@
 php-version = "8.4.0"
 
 [source]
-paths = ["boot", "config", "public", "src", "tests"]
+paths = ["bin", "boot", "config", "public", "src", "tests"]
 excludes = [
   "runtime",
   "storage",

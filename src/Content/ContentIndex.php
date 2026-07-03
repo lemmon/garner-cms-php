@@ -26,11 +26,22 @@ use Throwable;
  *     depth: int,
  *     mtime: int,
  *     draft: bool,
- *     sort: int
+ *     sort: int,
+ *     endpoint: bool
  * }
  */
 final class ContentIndex
 {
+    private const CONTROLLER_FILE = '+controller.php';
+
+    /**
+     * Bump whenever the SQLite schema changes (new/removed/renamed columns or
+     * tables). An index built under a different version is treated as stale and
+     * rebuilt regardless of the content fingerprint, so engine upgrades self-heal
+     * instead of surfacing as a "no such column" 500. See docs/index-freshness.md.
+     */
+    private const SCHEMA_VERSION = 1;
+
     private bool $fresh = false;
 
     public function __construct(
@@ -52,7 +63,7 @@ final class ContentIndex
         $statement = $pdo->prepare(
             'SELECT dir FROM pages WHERE path = :path AND draft = 0 LIMIT 1',
         );
-        $statement->execute([':path' => $this->normalizePath($path)]);
+        $statement->execute([':path' => RoutePath::normalize($path)]);
         $row = $statement->fetch();
 
         return is_array($row) && is_string($row['dir'] ?? null) ? $row['dir'] : null;
@@ -72,7 +83,9 @@ final class ContentIndex
             return null;
         }
 
-        $statement = $pdo->prepare('SELECT path FROM pages WHERE id = :id AND draft = 0 LIMIT 1');
+        $statement = $pdo->prepare(
+            'SELECT path FROM pages WHERE id = :id AND draft = 0 AND endpoint = 0 LIMIT 1',
+        );
         $statement->execute([':id' => $id]);
         $row = $statement->fetch();
 
@@ -90,8 +103,9 @@ final class ContentIndex
         $draftClause = $drafts ? '' : ' AND draft = 0';
 
         return $this->select(
-            "SELECT path, dir FROM pages WHERE parent_path = :path{$draftClause} ORDER BY sort, path",
-            [':path' => $this->normalizePath($path)],
+            "SELECT path, dir FROM pages WHERE parent_path = :path AND endpoint = 0{$draftClause}"
+            . ' ORDER BY sort, path',
+            [':path' => RoutePath::normalize($path)],
         );
     }
 
@@ -103,19 +117,20 @@ final class ContentIndex
      */
     public function descendants(string $path, bool $drafts = false): array
     {
-        $normalized = $this->normalizePath($path);
+        $normalized = RoutePath::normalize($path);
         $draftClause = $drafts ? '' : ' AND draft = 0';
 
         if ($normalized === '/') {
             return $this->select(
-                "SELECT path, dir FROM pages WHERE path != :root{$draftClause} ORDER BY sort, path",
+                "SELECT path, dir FROM pages WHERE path != :root AND endpoint = 0{$draftClause}"
+                . ' ORDER BY sort, path',
                 [':root' => '/'],
             );
         }
 
         return $this->select(
-            "SELECT path, dir FROM pages WHERE path LIKE :prefix ESCAPE '\\'{$draftClause}"
-            . ' ORDER BY sort, path',
+            "SELECT path, dir FROM pages WHERE path LIKE :prefix ESCAPE '\\' AND endpoint = 0"
+            . "{$draftClause} ORDER BY sort, path",
             [':prefix' => $this->escapeLike($normalized) . '/%'],
         );
     }
@@ -138,9 +153,11 @@ final class ContentIndex
         }
 
         $this->fresh = true;
+        $meta = $this->readMeta();
+        $schemaStale = $meta['schema_version'] !== self::SCHEMA_VERSION;
 
         if ($this->mode === 'locked') {
-            if (!is_file($this->sqlitePath)) {
+            if ($schemaStale) {
                 $this->rebuild();
             }
 
@@ -150,7 +167,7 @@ final class ContentIndex
         $pages = $this->scan();
         $fingerprint = $this->fingerprint($pages);
 
-        if (is_file($this->sqlitePath) && $this->storedFingerprint() === $fingerprint) {
+        if (!$schemaStale && $meta['fingerprint'] === $fingerprint) {
             return;
         }
 
@@ -177,32 +194,10 @@ final class ContentIndex
     private function collect(string $dir, array &$pages): void
     {
         $entry = EntryFile::find($dir);
+        $isEndpoint = $entry === null && is_file($dir . '/' . self::CONTROLLER_FILE);
 
-        if ($entry !== null) {
-            $meta = FormatParser::parse($entry);
-
-            if (!is_array($meta)) {
-                throw new InvalidEntryException(sprintf(
-                    'Entry "%s" must decode to an object',
-                    $entry,
-                ));
-            }
-
-            PageMeta::assertValid($meta, $entry);
-
-            $path = $this->routePath($dir);
-            $pages[] = [
-                'path' => $path,
-                'dir' => $dir,
-                'id' => PageMeta::resolveId($meta, $dir),
-                'template' => PageMeta::template($meta),
-                'title' => is_string($meta['title'] ?? null) ? $meta['title'] : null,
-                'created' => is_string($meta['created'] ?? null) ? $meta['created'] : null,
-                'depth' => $this->depth($path),
-                'mtime' => (int) filemtime($entry),
-                'draft' => PageMeta::isDraft($meta),
-                'sort' => PageMeta::sort($meta),
-            ];
+        if ($entry !== null || $isEndpoint) {
+            $pages[] = $this->pageRow($dir, $entry, $isEndpoint);
         }
 
         $names = scandir($dir);
@@ -222,6 +217,50 @@ final class ContentIndex
                 $this->collect($child, $pages);
             }
         }
+    }
+
+    /**
+     * Build the index row for a routable directory. A directory with an entry file
+     * is a content page; one with only a +controller.php is a route endpoint —
+     * routable and dispatchable, but carrying no metadata and kept out of the tree.
+     *
+     * @return PageRow
+     */
+    private function pageRow(string $dir, ?string $entry, bool $isEndpoint): array
+    {
+        $meta = [];
+        $mtimeSource = $dir . '/' . self::CONTROLLER_FILE;
+
+        if ($entry !== null) {
+            $parsed = FormatParser::parse($entry);
+
+            if (!is_array($parsed)) {
+                throw new InvalidEntryException(sprintf(
+                    'Entry "%s" must decode to an object',
+                    $entry,
+                ));
+            }
+
+            PageMeta::assertValid($parsed, $entry);
+            $meta = $parsed;
+            $mtimeSource = $entry;
+        }
+
+        $path = $this->routePath($dir);
+
+        return [
+            'path' => $path,
+            'dir' => $dir,
+            'id' => PageMeta::resolveId($meta, $dir),
+            'template' => PageMeta::template($meta),
+            'title' => is_string($meta['title'] ?? null) ? $meta['title'] : null,
+            'created' => is_string($meta['created'] ?? null) ? $meta['created'] : null,
+            'depth' => $this->depth($path),
+            'mtime' => (int) filemtime($mtimeSource),
+            'draft' => PageMeta::isDraft($meta),
+            'sort' => PageMeta::sort($meta),
+            'endpoint' => $isEndpoint,
+        ];
     }
 
     private function routePath(string $dir): string
@@ -310,15 +349,22 @@ final class ContentIndex
             $pathSet = [];
 
             foreach ($pages as $page) {
+                // Endpoints are routable but not part of the page tree, so they never
+                // serve as a parent when resolving parent_path.
+                if ($page['endpoint']) {
+                    continue;
+                }
+
                 $pathSet[$page['path']] = true;
             }
 
             $insert = $pdo->prepare(
                 'INSERT INTO pages'
-                . ' (path, dir, id, template, title, created, depth, parent_path, draft, sort)'
+                . ' (path, dir, id, template, title, created, depth, parent_path, draft, sort,'
+                . ' endpoint)'
                 . ' VALUES'
                 . ' (:path, :dir, :id, :template, :title, :created, :depth, :parent_path, :draft,'
-                . ' :sort)',
+                . ' :sort, :endpoint)',
             );
 
             foreach ($pages as $page) {
@@ -333,12 +379,14 @@ final class ContentIndex
                     ':parent_path' => $this->parentPath($page['path'], $pathSet),
                     ':draft' => $page['draft'] ? 1 : 0,
                     ':sort' => $page['sort'],
+                    ':endpoint' => $page['endpoint'] ? 1 : 0,
                 ]);
             }
 
             $meta = $pdo->prepare('INSERT INTO meta (key, value) VALUES (:key, :value)');
             $meta->execute([':key' => 'fingerprint', ':value' => $fingerprint]);
             $meta->execute([':key' => 'built_at', ':value' => gmdate('c')]);
+            $meta->execute([':key' => 'schema_version', ':value' => (string) self::SCHEMA_VERSION]);
 
             $pdo->commit();
         } catch (Throwable $exception) {
@@ -388,7 +436,8 @@ final class ContentIndex
             'CREATE TABLE pages ('
             . 'path TEXT PRIMARY KEY, dir TEXT NOT NULL, id TEXT NOT NULL, template TEXT NULL,'
             . ' title TEXT NULL, created TEXT NULL, depth INTEGER NOT NULL, parent_path TEXT NULL,'
-            . ' draft INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0)',
+            . ' draft INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0,'
+            . ' endpoint INTEGER NOT NULL DEFAULT 0)',
         );
         $pdo->exec('CREATE UNIQUE INDEX pages_id ON pages (id)');
         $pdo->exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
@@ -466,26 +515,52 @@ final class ContentIndex
         return $pdo;
     }
 
-    private function storedFingerprint(): ?string
+    /**
+     * Reads the index's own bookkeeping (content fingerprint + schema version) in
+     * a single query. Missing file/table/keys all read as null, which naturally
+     * compares unequal to any real fingerprint or the current SCHEMA_VERSION —
+     * so an index with no meta at all is just another flavor of "stale".
+     *
+     * @return array{fingerprint: ?string, schema_version: ?int}
+     */
+    private function readMeta(): array
     {
+        $empty = ['fingerprint' => null, 'schema_version' => null];
         $pdo = $this->reader();
 
         if ($pdo === null) {
-            return null;
+            return $empty;
         }
 
         try {
-            $statement = $pdo->query("SELECT value FROM meta WHERE key = 'fingerprint' LIMIT 1");
+            $statement = $pdo->query('SELECT key, value FROM meta');
 
             if ($statement === false) {
-                return null;
+                return $empty;
             }
 
-            $row = $statement->fetch();
+            $values = [];
 
-            return is_array($row) && is_string($row['value'] ?? null) ? $row['value'] : null;
+            foreach ($statement->fetchAll() as $row) {
+                if (
+                    !is_array($row)
+                    || !is_string($row['key'] ?? null)
+                    || !is_string($row['value'] ?? null)
+                ) {
+                    continue;
+                }
+
+                $values[$row['key']] = $row['value'];
+            }
+
+            $schemaVersion = $values['schema_version'] ?? null;
+
+            return [
+                'fingerprint' => $values['fingerprint'] ?? null,
+                'schema_version' => $schemaVersion !== null ? (int) $schemaVersion : null,
+            ];
         } catch (Throwable) {
-            return null;
+            return $empty;
         }
     }
 
@@ -497,16 +572,5 @@ final class ContentIndex
     private function escapeLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
-    }
-
-    private function normalizePath(string $path): string
-    {
-        $trimmed = trim($path);
-
-        if ($trimmed === '' || $trimmed === '/') {
-            return '/';
-        }
-
-        return '/' . trim($trimmed, '/');
     }
 }

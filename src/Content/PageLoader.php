@@ -13,37 +13,53 @@ final class PageLoader
 
     public function __construct(
         private readonly ?MediaPublisher $publisher = null,
+        private readonly string $baseUrl = '',
     ) {}
 
-    public function load(string $dir, string $url, ?Pages $pages = null): Page
+    public function load(string $dir, string $path, ?Pages $pages = null): Page
     {
         $entry = EntryFile::find($dir);
+        $controllerFile = $this->siblingFile($dir, self::CONTROLLER_FILE);
 
-        if ($entry === null) {
+        if ($entry === null && $controllerFile === null) {
             throw new RuntimeException(sprintf('No entry file found in "%s"', $dir));
         }
 
-        $meta = FormatParser::parse($entry);
+        // A controller-only directory is a route endpoint: no metadata or content
+        // (see ContentIndex), it exists only to dispatch its controller.
+        $meta = [];
+        $content = [];
 
-        if (!is_array($meta)) {
-            throw new InvalidEntryException(sprintf('Entry "%s" must decode to an object', $entry));
+        if ($entry !== null) {
+            $parsed = FormatParser::parse($entry);
+
+            if (!is_array($parsed)) {
+                throw new InvalidEntryException(sprintf(
+                    'Entry "%s" must decode to an object',
+                    $entry,
+                ));
+            }
+
+            PageMeta::assertValid($parsed, $entry);
+            $meta = $parsed;
+            $content = $this->loadContentFiles($dir, $entry);
         }
-
-        PageMeta::assertValid($meta, $entry);
 
         return new Page(
             id: PageMeta::resolveId($meta, $dir),
             template: PageMeta::template($meta),
-            url: $url,
+            path: $path,
             meta: $meta,
-            content: $this->loadContentFiles($dir, $entry),
+            content: $content,
             dir: $dir,
             draft: PageMeta::isDraft($meta),
             sort: PageMeta::sort($meta),
             templateFile: $this->siblingFile($dir, self::TEMPLATE_FILE),
-            controllerFile: $this->siblingFile($dir, self::CONTROLLER_FILE),
+            controllerFile: $controllerFile,
             pages: $pages,
             publisher: $this->publisher,
+            baseUrl: $this->baseUrl,
+            endpoint: $entry === null,
         );
     }
 

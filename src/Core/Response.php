@@ -33,6 +33,16 @@ final class Response
         exit();
     }
 
+    public static function redirect(string $location, int $status = 308): never
+    {
+        if (!headers_sent()) {
+            http_response_code($status);
+            header('Location: ' . $location);
+        }
+
+        exit();
+    }
+
     private static function applyHeaders(string $contentType, int $status): void
     {
         if (headers_sent()) {

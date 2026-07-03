@@ -11,7 +11,9 @@
         "league/commonmark": "^2.8",
         "lemmon/validator": "^0.15.0",
         "symfony/console": "^8.1",
+        "symfony/dotenv": "^8.1",
         "symfony/error-handler": "^8.1",
+        "symfony/filesystem": "^8.1",
         "symfony/uid": "^8.1",
         "symfony/var-dumper": "^8.1",
         "symfony/yaml": "^8.1",
@@ -34,6 +36,9 @@
             "Garner\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/garner"
+    ],
     "config": {
         "allow-plugins": {
             "ergebnis/composer-normalize": true

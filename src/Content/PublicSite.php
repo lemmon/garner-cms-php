@@ -19,10 +19,24 @@ final class PublicSite
         private readonly RendererInterface $renderer,
     ) {}
 
-    public function respond(string $path): RenderedResponse
+    /**
+     * @param string $query Raw query string of the request (no "?"), preserved on
+     *        canonical redirects. Controller-returned redirects are emitted verbatim.
+     */
+    public function respond(string $path, string $query = ''): RenderedResponse
     {
+        $canonical = RoutePath::normalize($path);
+        $page = $this->pages->find($canonical);
+
+        // Trailing-slash (and extra leading-slash) spellings of a routable path
+        // redirect permanently to the canonical form instead of serving the same
+        // content at many URLs. Non-routable paths fall through to a plain 404 —
+        // which also keeps drafts from being revealed through a redirect.
+        if ($page !== null && $canonical !== $path) {
+            return RenderedResponse::redirect($canonical . ($query === '' ? '' : '?' . $query));
+        }
+
         $site = $this->siteLoader->load($this->pages);
-        $page = $this->pages->find($path);
 
         if ($page === null) {
             return RenderedResponse::html($this->renderer->renderNotFound($site, $path), 404);

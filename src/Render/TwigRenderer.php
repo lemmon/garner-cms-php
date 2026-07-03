@@ -20,12 +20,16 @@ final class TwigRenderer implements RendererInterface
 
     /**
      * @param array<string, mixed> $options
+     * @param (callable(Environment): void)|null $extensions Site hook run against the
+     *        environment after the built-ins register (typically app/twig.php, bound
+     *        to the Application by the caller).
      */
     public function __construct(
         string $templatesPath,
         string $defaultTemplate = 'default',
         ?MarkdownRenderer $markdownRenderer = null,
         array $options = [],
+        ?callable $extensions = null,
     ) {
         $this->loader = new FilesystemLoader($templatesPath);
         $this->markdownRenderer = $markdownRenderer ?? new MarkdownRenderer();
@@ -43,6 +47,10 @@ final class TwigRenderer implements RendererInterface
             ['is_safe' => ['html']],
         ));
         $this->twig->addExtension(new TwigDumpExtension());
+
+        if ($extensions !== null) {
+            $extensions($this->twig);
+        }
     }
 
     /**

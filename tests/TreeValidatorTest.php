@@ -45,6 +45,21 @@ final class TreeValidatorTest extends TestCase
         self::assertNotEmpty($this->collisions());
     }
 
+    public function testEndpointSharesTheGlobalIdNamespace(): void
+    {
+        // A page id that collides with an endpoint's directory name is a duplicate,
+        // reported here just as ContentIndex rejects it at build time.
+        $this->writeEntry('duplicate', ['id' => 'feed.xml']);
+        $this->writeFile('feed.xml/+controller.php', "<?php\nreturn static fn() => null;\n");
+
+        $messages = implode("\n", array_map(
+            static fn(ValidationIssue $issue): string => $issue->message,
+            new TreeValidator($this->root)->validate(),
+        ));
+
+        self::assertStringContainsString('Duplicate page id "feed.xml"', $messages);
+    }
+
     /**
      * @return list<string>
      */

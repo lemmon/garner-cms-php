@@ -12,6 +12,7 @@ final class RenderedResponse
         private readonly string $body,
         private readonly int $status = 200,
         private readonly string $contentType = 'text/html; charset=utf-8',
+        private readonly ?string $location = null,
     ) {}
 
     public static function html(string $body, int $status = 200): self
@@ -38,6 +39,15 @@ final class RenderedResponse
         return new self($body, $status, 'text/plain; charset=utf-8');
     }
 
+    /**
+     * A permanent redirect to a URL or path. 308 preserves the request method
+     * across the redirect (301 lets clients replay a POST as a GET).
+     */
+    public static function redirect(string $location, int $status = 308): self
+    {
+        return new self('', $status, 'text/html; charset=utf-8', $location);
+    }
+
     public function body(): string
     {
         return $this->body;
@@ -51,5 +61,13 @@ final class RenderedResponse
     public function status(): int
     {
         return $this->status;
+    }
+
+    /**
+     * Redirect target, or null for a regular content response.
+     */
+    public function location(): ?string
+    {
+        return $this->location;
     }
 }

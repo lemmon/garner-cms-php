@@ -26,11 +26,38 @@ final class Request
         return (string) ($_SERVER['REQUEST_SCHEME'] ?? '') === 'https';
     }
 
+    /**
+     * The site's base URL (scheme://host[:port]) inferred from the current request,
+     * without a trailing slash. Falls back to http://localhost when no Host header
+     * is available (e.g. CLI), where the origin should be pinned via the app.url config.
+     */
+    public static function baseUrl(): string
+    {
+        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+
+        if ($host === '') {
+            $host = 'localhost';
+        }
+
+        return (self::isHttps() ? 'https' : 'http') . '://' . $host;
+    }
+
     public static function path(): string
     {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
         return is_string($path) && $path !== '' ? $path : '/';
+    }
+
+    /**
+     * The raw query string of the current request, without the leading "?".
+     * Empty when the request has none.
+     */
+    public static function query(): string
+    {
+        $query = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_QUERY);
+
+        return is_string($query) ? $query : '';
     }
 
     public static function getInput(): string

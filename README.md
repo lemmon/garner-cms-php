@@ -48,6 +48,18 @@ A page is a directory under `routes/`. Its route is its path: `routes/+page.json
 → `/`, `routes/blog/post/+page.json` → `/blog/post`. A directory without an entry
 file is a non-routable container; its children still route.
 
+Route paths are canonical without a trailing slash (the root `/` being the only
+exception). A request that differs from a routable path only by slashes (`/about/`,
+`/about////`) gets a permanent redirect (308, query string preserved) to the
+canonical form, so the same content is never served at more than one URL. Paths
+whose canonical form doesn't route just 404.
+
+A directory that has a `+controller.php` but no entry file is a **route endpoint**:
+it routes and dispatches its controller (the usual `(page, site, app)` contract,
+returning a `RenderedResponse`), but carries no metadata and is excluded from the
+page tree — it never appears in `site.index`, `children`, or `findById`. Use it for
+`sitemap.txt`, feeds, and JSON APIs that should not be treated as content pages.
+
 ### The `+page.json` contract
 
 `+page.json` is the only file Garner constrains, and it has no required fields — a
@@ -199,6 +211,18 @@ This follows `app.debug` by default; override with `app.index.mode` (`scan` /
 php bin/garner reindex
 ```
 
+Compiled Twig templates are cached the same way (`runtime/cache/twig`, never
+recompiled in production), so a deploy must refresh both derived caches or keep
+serving stale pages:
+
+```sh
+php bin/garner cache:clear && php bin/garner reindex
+```
+
+For the freshness model in depth — the two kinds of staleness, per-environment
+guidance, and the schema-version auto-heal that recovers from engine upgrades — see
+[`docs/index-freshness.md`](docs/index-freshness.md).
+
 ## Rendering
 
 Twig templates live in `app/templates/`, resolved by the page's `template` field
@@ -210,11 +234,58 @@ exposed as a `markdown` Twig filter:
 {{ content.main|markdown }}
 ```
 
+### Controllers
+
+Data for a template comes from up to two controllers, both with the same
+`(page, site, app)` contract:
+
+- **The page's own controller** — a co-located `+controller.php`, or
+  `app/controllers/{template}.php` for its template. May return an array of
+  context, or a `RenderedResponse` to bypass rendering entirely.
+- **`app/controllers/site.php`** — shared context, run for every rendered page.
+  Must return an array (it provides data, not responses). Page controller keys
+  win on conflict. The name `site` is reserved for this role.
+
+### Twig extensions
+
+`app/twig.php` extends the Twig environment: it returns a callable
+`(Environment $twig, Application $app): void` that registers functions, filters,
+or globals. Use it for render-time computation that belongs in templates — e.g.
+values derived from a title that child templates override via blocks, which no
+controller can know ahead of rendering:
+
+```php
+return static function (Environment $twig, Application $app): void {
+    $twig->addFunction(new TwigFunction('og_image', /* ... */));
+};
+```
+
 ## Configuration
 
-See `config/app.php`. Notable keys: `debug`, `ids.generator` (`cuid2` default,
-also `ulid`, `uuid_v4`, `uuid_v7`, or a custom generator), `index.mode`,
-`rendering.default_template`, and `twig.*`.
+See `config/app.php`. Notable keys: `debug`, `url` (site base URL — see below),
+`ids.generator` (`cuid2` default, also `ulid`, `uuid_v4`, `uuid_v7`, or a custom
+generator), `index.mode`, `rendering.default_template`, and `twig.*`.
+
+Environment variables (`APP_URL`, `APP_DEBUG`, `APP_ENV`) can come from the real
+environment or from a `.env` file in the project root, loaded via `symfony/dotenv`
+before config is read. The Symfony cascade applies — `.env`, `.env.local`,
+`.env.{APP_ENV}`, `.env.{APP_ENV}.local` — and real environment variables always
+win over file values. Variables are read from the process environment (`getenv()`)
+first, then `$_ENV` and `$_SERVER` (the stock php.ini leaves `$_ENV` empty), so a
+deployment can skip `.env` entirely and configure through the server. The file is optional; keep `.env` out of version
+control (it may hold secrets) and commit a `.env.example` documenting the keys
+instead.
+
+`site.url` is the site's base URL (`scheme://host`, no trailing slash), available
+in templates and via `Application::siteUrl()`. It is inferred from each request by
+default; set `app.url` (or the `APP_URL` env) to pin a canonical origin — needed
+for CLI builds, sitemaps, and stable canonical URLs.
+
+One rule across the API: **`url()` means absolute URL, `path()` means route path.**
+`page.url` is the page's full URL (`site.url` plus the route path, e.g.
+`https://example.com/about`) — ready for hrefs, sitemaps, `og:url`, and
+`rel=canonical` as-is. `page.path` is the bare route path (`/about`): the page's
+routing identity, independent of where the site is hosted.
 
 ## Development
 

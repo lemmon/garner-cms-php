@@ -1,0 +1,17 @@
+{
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    ".phpunit.result.cache": true,
+    "public/media": true,
+    "runtime": true,
+    "vendor": true,
+    "composer.lock": true
+  },
+  "files.insertFinalNewline": false,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": false,
+  "search.exclude": {
+    "site/plugins/tablo-theme/assets/main.css": true,
+    "site/plugins/tablo-theme/assets/main.js": true
+  }
+}

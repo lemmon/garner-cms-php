@@ -1,0 +1,187 @@
+# Garner llms.txt
+
+Garner is an agent-first, flat-file PHP CMS for building websites and small web
+apps. This file is for LLMs and agents working on a site built with Garner. It is
+not contributor guidance for changing Garner's CMS engine.
+
+## Primary Working Areas
+
+- `routes/` is the site tree. Each route is a directory.
+- `routes/+site.json` stores site-level metadata such as the site title.
+- A directory with `+page.json`, `+page.yaml`, or `+page.yml` is a page.
+- `app/templates/` contains shared Twig templates.
+- A page may use a co-located `+template.twig` to override its template.
+- A page may use a co-located `+controller.php` for page-specific data or a
+  custom response.
+- `config/app.php` contains project configuration.
+- `public/` is the web root. Do not place source content here.
+- `runtime/` contains derived indexes and caches. Treat it as disposable.
+
+Avoid editing `src/`, `boot/`, `bin/`, `tests/`, or Composer metadata unless the
+task is explicitly to change Garner itself rather than build the current site.
+
+## Pages And Routes
+
+The filesystem path under `routes/` defines the public route:
+
+- `routes/+page.json` routes to `/`.
+- `routes/about/+page.json` routes to `/about`.
+- `routes/blog/post/+page.json` routes to `/blog/post`.
+
+Canonical route paths do not use a trailing slash, except for `/`.
+
+`+page.json` has no required fields. Common fields are:
+
+- `id`: stable page identifier. Use this for references between pages.
+- `title`: human-readable page title.
+- `template`: shared Twig template name from `app/templates/`.
+- `draft`: when `true`, the page 404s publicly and is hidden from listings.
+- `sort`: integer ordering value. Lower values sort first.
+- `created`: non-empty timestamp string when useful for ordering or display.
+
+Keep route identity, page identity, ordering, and presentation separate. Do not
+rename directories just to reorder navigation; use `sort` or project-specific
+metadata.
+
+## Content Files
+
+Content lives beside the page entry file:
+
+- `main.md` becomes `content.main`.
+- `intro.md` becomes `content.intro`.
+- `data.json` becomes `content.data`.
+- `settings.yaml` or `settings.yml` becomes `content.settings`.
+
+Markdown, text, JSON, and YAML files are parsed into the `content` namespace
+unless they are reserved files or media sidecars.
+
+Files beginning with `+` or `.` are reserved. Do not create arbitrary public
+content files with those prefixes.
+
+## Templates
+
+Twig templates render pages. Shared templates live in `app/templates/`.
+
+Typical template usage:
+
+```twig
+<h1>{{ page.title }}</h1>
+{{ content.main|markdown }}
+```
+
+Useful values in templates:
+
+- `page`: the current page.
+- `site`: site data and traversal helpers.
+- `content`: parsed content files for the current page.
+- `page.url`: absolute URL.
+- `page.path`: route path only.
+- `site.children`: home plus direct children, excluding drafts.
+- `site.index`: home plus all descendants, excluding drafts.
+- `page.children`: direct child pages, excluding drafts.
+- `site.findById(id)`: resolve a stable page id.
+
+Use `|markdown` when rendering Markdown content. Prefer escaping/default Twig
+behavior for ordinary values.
+
+## Navigation And Listings
+
+Garner listings exclude drafts and sort by `sort`, then route path. Filter
+project-specific visibility with freeform metadata instead of inventing global
+publication states.
+
+Example:
+
+```twig
+{% for child in site.children.reject(child => child.get('nav') is same as false) %}
+  <a href="{{ child.url }}">{{ child.title ?? child.id }}</a>
+{% endfor %}
+```
+
+Use stable page ids for cross-page references. Avoid hard-coding URLs when a
+relationship should survive a page move.
+
+## Media And Files
+
+Non-content files beside a page are page-owned assets:
+
+```text
+routes/about/
+├── +page.json
+├── main.md
+├── team.jpg
+└── team.jpg.json
+```
+
+Use page file accessors in Twig:
+
+```twig
+{% set photo = page.file('team.jpg') %}
+{% if photo %}
+  <img src="{{ photo.url }}" alt="{{ photo.get('alt') }}">
+{% endif %}
+```
+
+Sidecar metadata is optional and lives in a sibling file such as
+`team.jpg.json`, `team.jpg.yaml`, or `team.jpg.yml`.
+
+Calling `file.url()` publishes the file to `public/media/<hash>/` and makes it
+publicly downloadable. Do not call `url()` for private or access-controlled
+files; stream those through a controller with an access check.
+
+## Controllers And Endpoints
+
+A co-located `+controller.php` may return:
+
+- an array, merged into the Twig context;
+- a `Garner\Render\RenderedResponse`, which bypasses Twig.
+
+A directory with `+controller.php` and no page entry file is a route endpoint.
+Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
+in the page tree.
+
+## Validation And Local Checks
+
+For site-building tasks, prefer these commands when available:
+
+```sh
+php bin/garner validate
+php bin/garner reindex
+composer test
+```
+
+When changing PHP code, also run:
+
+```sh
+composer analyze
+composer lint
+```
+
+Use `composer start` to run the local server at `http://localhost:8040`.
+
+## Caches And Generated Files
+
+The source of truth is the file tree, not generated caches.
+
+- `runtime/index.sqlite` is a rebuildable route index.
+- Twig cache files under `runtime/cache/` are rebuildable.
+- Published media under `public/media/` is derived from page-owned files.
+
+After content, template, or deployment changes, `php bin/garner reindex` may be
+needed. For production deploys, refresh derived caches with:
+
+```sh
+php bin/garner cache:clear
+php bin/garner reindex
+```
+
+## Site-Building Principles
+
+- Prefer simple, inspectable files over hidden state.
+- Preserve existing content and metadata unless the task asks for a change.
+- Keep Markdown prose in Markdown files and structured data in JSON or YAML.
+- Add templates and controllers only when content files and shared templates are
+  not enough.
+- Keep public copy respectful when comparing Garner with other CMSs or tools.
+- Do not treat `runtime/` or generated `public/media/` files as authoring
+  surfaces.

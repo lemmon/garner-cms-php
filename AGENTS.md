@@ -2,6 +2,11 @@
 
 Guidance for AI agents and contributors working in this repository.
 
+## Site-building agent guidance
+
+See `llms.txt` for short, practical guidance aimed at LLMs building a site or app
+with Garner, rather than changing Garner itself.
+
 ## Documentation lives in `docs/`
 
 Project notes, design thinking, and brainstorming are kept in `docs/`. These are

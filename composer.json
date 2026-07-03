@@ -7,24 +7,24 @@
         "php": "^8.4",
         "ext-pdo": "*",
         "ext-pdo_sqlite": "*",
-        "illuminate/collections": "^13.17",
-        "league/commonmark": "^2.8",
-        "lemmon/validator": "^0.15.0",
-        "symfony/console": "^8.1",
-        "symfony/dotenv": "^8.1",
-        "symfony/error-handler": "^8.1",
-        "symfony/filesystem": "^8.1",
-        "symfony/uid": "^8.1",
-        "symfony/var-dumper": "^8.1",
-        "symfony/yaml": "^8.1",
-        "twig/twig": "^3.0",
-        "visus/cuid2": "^6.0"
+        "illuminate/collections": "^13",
+        "league/commonmark": "^2",
+        "lemmon/validator": "^0.15",
+        "symfony/console": "^8",
+        "symfony/dotenv": "^8",
+        "symfony/error-handler": "^8",
+        "symfony/filesystem": "^8",
+        "symfony/uid": "^8",
+        "symfony/var-dumper": "^8",
+        "symfony/yaml": "^8",
+        "twig/twig": "^3",
+        "visus/cuid2": "^6"
     },
     "require-dev": {
-        "carthage-software/mago": "^1.18",
-        "ergebnis/composer-normalize": "^2.50",
-        "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^13.0"
+        "carthage-software/mago": "^1",
+        "ergebnis/composer-normalize": "^2",
+        "phpstan/phpstan": "^2",
+        "phpunit/phpunit": "^13"
     },
     "autoload": {
         "psr-4": {

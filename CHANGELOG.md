@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-03
+
 Initial implementation of the agent-first, flat-file CMS.
 
 ### Added
@@ -97,4 +99,5 @@ Initial implementation of the agent-first, flat-file CMS.
 - **Tooling** — a single `composer check` gate running Mago (format + lint),
   PHPStan (level 7), and PHPUnit.
 
-[Unreleased]: https://github.com/lemmon/garner-cms-php/commits/main
+[Unreleased]: https://github.com/lemmon/garner-cms-php/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/lemmon/garner-cms-php/releases/tag/v0.1.0

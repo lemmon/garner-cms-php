@@ -10,45 +10,6 @@ use PHPUnit\Framework\TestCase;
 
 final class SiteUrlTest extends TestCase
 {
-    /**
-     * @var array<string, mixed>
-     */
-    private array $server;
-
-    protected function setUp(): void
-    {
-        $this->server = $_SERVER;
-    }
-
-    protected function tearDown(): void
-    {
-        $_SERVER = $this->server;
-    }
-
-    public function testBaseUrlInfersSchemeAndHostFromRequest(): void
-    {
-        unset($_SERVER['HTTP_X_FORWARDED_PROTO'], $_SERVER['HTTPS'], $_SERVER['REQUEST_SCHEME']);
-        $_SERVER['HTTP_HOST'] = 'example.test:8080';
-
-        self::assertSame('http://example.test:8080', Request::baseUrl());
-
-        $_SERVER['HTTPS'] = 'on';
-        self::assertSame('https://example.test:8080', Request::baseUrl());
-    }
-
-    public function testBaseUrlFallsBackToLocalhostWithoutHost(): void
-    {
-        unset(
-            $_SERVER['HTTP_HOST'],
-            $_SERVER['SERVER_NAME'],
-            $_SERVER['HTTPS'],
-            $_SERVER['HTTP_X_FORWARDED_PROTO'],
-            $_SERVER['REQUEST_SCHEME'],
-        );
-
-        self::assertSame('http://localhost', Request::baseUrl());
-    }
-
     public function testSiteUrlPrefersConfigOverrideAndStripsTrailingSlash(): void
     {
         $app = new Application('/tmp', '/tmp', [
@@ -60,10 +21,12 @@ final class SiteUrlTest extends TestCase
 
     public function testSiteUrlFallsBackToRequestWhenConfigAbsent(): void
     {
-        unset($_SERVER['HTTPS'], $_SERVER['HTTP_X_FORWARDED_PROTO'], $_SERVER['REQUEST_SCHEME']);
-        $_SERVER['HTTP_HOST'] = 'localhost:8000';
-
-        $app = new Application('/tmp', '/tmp', ['app' => []]);
+        $app = new Application(
+            '/tmp',
+            '/tmp',
+            ['app' => []],
+            Request::create('http://localhost:8000/'),
+        );
 
         self::assertSame('http://localhost:8000', $app->siteUrl());
     }

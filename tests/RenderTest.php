@@ -232,6 +232,17 @@ final class RenderTest extends TestCase
         self::assertSame('/about?foo=bar&baz=1', $response->location());
     }
 
+    public function testCanonicalRedirectPreservesTheBasePath(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'About']);
+
+        $response = $this->app()->publicSite()->respond('/about/', 'x=1', '/blog');
+
+        self::assertSame(308, $response->status());
+        self::assertSame('/blog/about?x=1', $response->location());
+    }
+
     public function testControllerRedirectLocationIsEmittedVerbatim(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

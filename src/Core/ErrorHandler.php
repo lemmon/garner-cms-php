@@ -128,7 +128,7 @@ final class ErrorHandler
     {
         try {
             $site = $this->app->siteLoader()->load();
-            $path = Request::path();
+            $path = $this->app->request()->path();
 
             return new RenderedResponse(
                 body: $this->app->siteRenderer()->renderError($site, 500, 'application_error', [

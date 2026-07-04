@@ -4,93 +4,113 @@ declare(strict_types=1);
 
 namespace Garner\Core;
 
-use JsonException;
+use Symfony\Component\HttpFoundation\Request as HttpFoundationRequest;
 
+/**
+ * The current HTTP request. A thin, instance-based facade over HttpFoundation:
+ * Garner code and userland see only this surface, never the wrapped request,
+ * so the public API stays small and bare-accessor styled. One instance serves
+ * the whole request; obtain it from Application::request().
+ */
 final class Request
 {
-    /**
-     * Detect if the current request arrived over HTTPS.
-     * Checks common proxy headers and server variables.
-     */
-    public static function isHttps(): bool
+    private function __construct(
+        private readonly HttpFoundationRequest $inner,
+    ) {}
+
+    public static function fromGlobals(): self
     {
-        $forwarded = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
-        if (strtolower((string) $forwarded) === 'https') {
-            return true;
-        }
-
-        if (in_array((string) ($_SERVER['HTTPS'] ?? ''), ['on', '1'], true)) {
-            return true;
-        }
-
-        return (string) ($_SERVER['REQUEST_SCHEME'] ?? '') === 'https';
+        return new self(HttpFoundationRequest::createFromGlobals());
     }
 
     /**
-     * The site's base URL (scheme://host[:port]) inferred from the current request,
-     * without a trailing slash. Falls back to http://localhost when no Host header
-     * is available (e.g. CLI), where the origin should be pinned via the app.url config.
+     * Build a request from a URI, primarily for tests and custom boot paths.
+     * Scheme, host, port, path, and query are taken from the URI; `$server`
+     * entries (e.g. HTTP_X_FORWARDED_PROTO) override the derived defaults.
+     *
+     * @param array<string, mixed> $server
      */
-    public static function baseUrl(): string
+    public static function create(string $uri, string $method = 'GET', array $server = []): self
     {
-        $host = trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        return new self(HttpFoundationRequest::create(uri: $uri, method: $method, server: $server));
+    }
+
+    /**
+     * The HTTP method, uppercased.
+     */
+    public function method(): string
+    {
+        return $this->inner->getMethod();
+    }
+
+    /**
+     * The route path of the request: no query string, and with any front-controller
+     * base path stripped, so a subdirectory install still yields "/about".
+     */
+    public function path(): string
+    {
+        return $this->inner->getPathInfo();
+    }
+
+    /**
+     * The base path stripped from path(), without a trailing slash: "" at web
+     * root, "/blog" for a subdirectory install, "/blog/index.php" when the front
+     * controller is addressed directly. Framework-built redirects re-attach it
+     * so they stay inside the app.
+     */
+    public function basePath(): string
+    {
+        return $this->inner->getBaseUrl();
+    }
+
+    /**
+     * The raw query string without the leading "?", verbatim as sent — canonical
+     * redirects re-attach it, so it must not be re-encoded or re-ordered. Empty
+     * when the request has none.
+     */
+    public function query(): string
+    {
+        $uri = $this->inner->getRequestUri();
+        $pos = strpos($uri, '?');
+
+        return $pos === false ? '' : substr($uri, $pos + 1);
+    }
+
+    /**
+     * Detect if the request arrived over HTTPS, honoring the X-Forwarded-Proto
+     * header set by reverse proxies alongside the direct server variables.
+     */
+    public function isHttps(): bool
+    {
+        $forwarded = (string) $this->inner->headers->get('X-Forwarded-Proto', '');
+
+        if (strtolower($forwarded) === 'https') {
+            return true;
+        }
+
+        return (
+            $this->inner->isSecure()
+            || $this->inner->server->getString('REQUEST_SCHEME') === 'https'
+        );
+    }
+
+    /**
+     * The request's base URL (scheme://host[:port]) without a trailing slash.
+     * Falls back to http://localhost when no Host header is available (e.g. CLI),
+     * where the origin should be pinned via the app.url config.
+     */
+    public function baseUrl(): string
+    {
+        $host = trim(
+            (string) (
+                $this->inner->headers->get('Host') ?? $this->inner->server->getString('SERVER_NAME')
+            ),
+        );
 
         if ($host === '') {
             $host = 'localhost';
         }
 
-        return (self::isHttps() ? 'https' : 'http') . '://' . $host;
-    }
-
-    public static function path(): string
-    {
-        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-
-        return is_string($path) && $path !== '' ? $path : '/';
-    }
-
-    /**
-     * The raw query string of the current request, without the leading "?".
-     * Empty when the request has none.
-     */
-    public static function query(): string
-    {
-        $query = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_QUERY);
-
-        return is_string($query) ? $query : '';
-    }
-
-    public static function getInput(): string
-    {
-        $input = file_get_contents('php://input');
-
-        if (($input === false || $input === '') && PHP_SAPI === 'cli') {
-            $stdin = file_get_contents('php://stdin');
-
-            return $stdin !== false ? $stdin : '';
-        }
-
-        return $input !== false ? $input : '';
-    }
-
-    /**
-     * @return array<string, mixed>
-     * @throws JsonException
-     */
-    public static function getPayload(int $maxBytes = 1_048_576): array
-    {
-        $input = self::getInput();
-
-        if ($input === '') {
-            return [];
-        }
-
-        if (strlen($input) > $maxBytes) {
-            throw new JsonException('Payload too large');
-        }
-
-        $decoded = json_decode($input, true, 512, JSON_THROW_ON_ERROR);
-
-        return is_array($decoded) ? $decoded : [];
+        return ($this->isHttps() ? 'https' : 'http') . '://' . $host;
     }
 }

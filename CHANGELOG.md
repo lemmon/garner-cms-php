@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`Garner\Core\Request` is now instance-based** — a Garner-styled facade over
+  `symfony/http-foundation` (new dependency) instead of six static helpers over
+  superglobals, per the decision in `docs/form-actions-next-steps.md`. The
+  instance lives on the application (`Application::request()`, built from
+  globals on first use, injectable via the constructor for tests and custom
+  boot), so request-dependent code is testable without mutating `$_SERVER`.
+  The surface stays small and bare-accessor styled: `method()`, `path()`,
+  `query()`, `basePath()`, `baseUrl()`, `isHttps()`, plus the `fromGlobals()` /
+  `create()` factories. The unused `getInput()` / `getPayload()` helpers are
+  gone; body and form accessors return with the action-layer work. At web root
+  behavior is unchanged: the query string is preserved verbatim for canonical
+  redirects, and scheme inference still honors `X-Forwarded-Proto`. Under a
+  front-controller base path (a subdirectory install, or the script addressed
+  directly), `path()` now yields the route path with the base stripped, and
+  canonical redirects re-attach the base so they stay inside the app.
+
 ## [0.1.0] - 2026-07-03
 
 Initial implementation of the agent-first, flat-file CMS.

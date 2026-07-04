@@ -36,6 +36,7 @@ final class Application
     private ?PageLoader $pageLoader = null;
     private ?Pages $pages = null;
     private ?PublicSite $publicSite = null;
+    private ?Request $request;
     private ?RendererInterface $siteRenderer = null;
     private ?SiteLoader $siteLoader = null;
     private ?string $siteUrl = null;
@@ -48,8 +49,19 @@ final class Application
         private readonly string $corePath,
         private readonly string $projectRootPath,
         private readonly array $config = [],
+        ?Request $request = null,
     ) {
+        $this->request = $request;
         $this->errorHandler = new ErrorHandler($this);
+    }
+
+    /**
+     * The current HTTP request: the instance injected at construction (tests,
+     * custom boot), otherwise built from PHP's globals on first use.
+     */
+    public function request(): Request
+    {
+        return $this->request ??= Request::fromGlobals();
     }
 
     public function run(): void
@@ -157,7 +169,7 @@ final class Application
             return rtrim(trim($configured), '/');
         }
 
-        return Request::baseUrl();
+        return $this->request()->baseUrl();
     }
 
     public function favicon(): Favicon

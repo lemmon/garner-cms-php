@@ -14,6 +14,7 @@
         "symfony/dotenv": "^8",
         "symfony/error-handler": "^8",
         "symfony/filesystem": "^8",
+        "symfony/http-foundation": "^8",
         "symfony/uid": "^8",
         "symfony/var-dumper": "^8",
         "symfony/yaml": "^8",

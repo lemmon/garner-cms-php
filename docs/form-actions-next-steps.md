@@ -226,8 +226,11 @@ Still open (the prototype decides):
 
 ## Near-term next steps
 
-1. Replace the static `Core\Request` with the HttpFoundation-backed facade;
-   keep the public API small and bare-accessor styled.
+1. ~~Replace the static `Core\Request` with the HttpFoundation-backed facade;
+   keep the public API small and bare-accessor styled.~~ **Done (2026-07-03):**
+   instance-based facade held by `Application::request()` (injectable for
+   tests); `getInput()`/`getPayload()` dropped, body/JSON/form accessors
+   arrive with step 3.
 2. Extend `RenderedResponse` with arbitrary headers and cookies.
 3. Add request helpers for method, headers, form data, files, JSON, and HTMX.
 4. Add the origin-check CSRF default.

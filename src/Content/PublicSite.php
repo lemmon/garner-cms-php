@@ -22,9 +22,14 @@ final class PublicSite
     /**
      * @param string $query Raw query string of the request (no "?"), preserved on
      *        canonical redirects. Controller-returned redirects are emitted verbatim.
+     * @param string $basePath Front-controller base path stripped from $path (e.g.
+     *        "/blog"), re-attached to canonical redirects so they stay inside the app.
      */
-    public function respond(string $path, string $query = ''): RenderedResponse
-    {
+    public function respond(
+        string $path,
+        string $query = '',
+        string $basePath = '',
+    ): RenderedResponse {
         $canonical = RoutePath::normalize($path);
         $page = $this->pages->find($canonical);
 
@@ -33,7 +38,9 @@ final class PublicSite
         // content at many URLs. Non-routable paths fall through to a plain 404 —
         // which also keeps drafts from being revealed through a redirect.
         if ($page !== null && $canonical !== $path) {
-            return RenderedResponse::redirect($canonical . ($query === '' ? '' : '?' . $query));
+            return RenderedResponse::redirect(
+                $basePath . $canonical . ($query === '' ? '' : '?' . $query),
+            );
         }
 
         $site = $this->siteLoader->load($this->pages);

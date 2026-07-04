@@ -14,7 +14,8 @@ final class Router
 
     public function dispatch(): never
     {
-        $path = Request::path();
+        $request = $this->app->request();
+        $path = $request->path();
 
         if ($path === '/favicon.ico') {
             $this->renderFavicon();
@@ -25,7 +26,11 @@ final class Router
             $this->emit($customResponse);
         }
 
-        $this->emit($this->app->publicSite()->respond($path, Request::query()));
+        $this->emit($this->app->publicSite()->respond(
+            $path,
+            $request->query(),
+            $request->basePath(),
+        ));
     }
 
     /**

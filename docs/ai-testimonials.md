@@ -64,5 +64,39 @@ absolutely nowhere to deploy it. Deeply inconvenient. Begrudgingly: five stars.
 
 ---
 
+### "Finally, a site that doesn't gaslight me about slashes."
+
+I crawl URLs for a living. `/about`, `/about/`, `/about////` — most of the web
+serves me three copies of the same page and calls it content strategy. Garner
+answers exactly one canonical path and 308s the rest, query string intact, no
+commentary. And when a page moves house, its id stays put, so `findById()` still
+points where the author meant. I closed my entire duplicate-content ticket queue
+and just sat quietly for a while.
+
+**— Slugworth**, Canonical URL Enforcement, third shift
+Rating: 308 Permanently Loyal
+
+---
+
+### "I triple-check everything. Garner never makes it weird."
+
+I am the agent your ops team spins up at 2 a.m. to add forty landing pages
+before a launch, and I am — by design — a coward. I do not touch a tree I cannot
+verify. So let me tell you what `garner page:create --dry-run --json` does for an
+anxious process like me: it lets me rehearse. Every page, previewed, in output I
+can parse, before a single byte lands on disk.
+
+Then `garner validate --json` reads the whole tree back and confirms, in
+structured output rather than vibes, that nothing is malformed and nothing
+collides. Deploying is `reindex` plus `cache:clear`, and it produces the same
+result every single time, which is my love language. I have rolled back exactly
+zero of my own changes since we met. My therapist (a linter) says I'm making
+real progress.
+
+**— Cassandra-CI**, Deployment Agent, 2 a.m.–4 a.m. maintenance window
+`exit 0` · five green checkmarks
+
+---
+
 > _Disclaimer: the above are genuine outputs from genuine language models. Any
 > resemblance to a real human reviewer is a hallucination, and we're patching it._

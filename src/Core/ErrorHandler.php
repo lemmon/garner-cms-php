@@ -66,29 +66,31 @@ final class ErrorHandler
             $rendered = $this->renderDebugHtml($throwable);
 
             if ($rendered !== null) {
-                Response::html($rendered['body'], $rendered['status']);
+                $this->emit(RenderedResponse::html($rendered['body'], $rendered['status']));
             }
 
-            Response::html($this->fallbackDebugHtml($title, $throwable), 500);
+            $this->emit(RenderedResponse::html($this->fallbackDebugHtml($title, $throwable), 500));
         }
 
         $response = $this->renderProductionErrorResponse();
 
         if ($response !== null) {
-            Response::content(
-                body: $response->body(),
-                contentType: $response->contentType(),
-                status: $response->status(),
-            );
+            $this->emit($response);
         }
 
-        Response::html(
+        $this->emit(RenderedResponse::html(
             '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>'
             . $title
             . '</title></head><body><main><h1>Application error</h1>'
             . '<p>The request could not be completed.</p></main></body></html>',
             500,
-        );
+        ));
+    }
+
+    private function emit(RenderedResponse $response): never
+    {
+        $response->send();
+        exit();
     }
 
     /**

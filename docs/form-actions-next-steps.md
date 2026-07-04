@@ -167,7 +167,7 @@ This probably requires two pieces:
 - request helpers such as `isHtmx()`;
 - response helpers such as `withHeader()`, `hxRedirect()`, and `partial()`.
 
-**Leaning for the partial API:** Twig named-block rendering of the *same* page
+**Leaning for the partial API:** Twig named-block rendering of the _same_ page
 template (`renderBlock`) — fragments live inside the page template they belong
 to, no new file type. This is the established htmx "template fragments"
 pattern. To be confirmed by the prototype.
@@ -231,7 +231,10 @@ Still open (the prototype decides):
    instance-based facade held by `Application::request()` (injectable for
    tests); `getInput()`/`getPayload()` dropped, body/JSON/form accessors
    arrive with step 3.
-2. Extend `RenderedResponse` with arbitrary headers and cookies.
+2. ~~Extend `RenderedResponse` with arbitrary headers and cookies.~~
+   **Done (2026-07-04):** immutable `withHeader()` / `withCookie()` backed by an
+   HttpFoundation response internally; one emission path (`send()`), static
+   `Core\Response` removed.
 3. Add request helpers for method, headers, form data, files, JSON, and HTMX.
 4. Add the origin-check CSRF default.
 5. Prototype `+action.php` on a real flow: the splash's "notify me on

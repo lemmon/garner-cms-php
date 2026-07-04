@@ -135,6 +135,15 @@ use Garner\Render\RenderedResponse;
 return static fn($page, $site, $app) => RenderedResponse::json(['ok' => true]);
 ```
 
+A `RenderedResponse` is immutable; `withHeader()` and `withCookie()` return
+modified copies for extra response headers and cookies:
+
+```php
+return static fn($page, $site, $app) => RenderedResponse::json(['ok' => true])
+    ->withHeader('X-Robots-Tag', 'noindex')
+    ->withCookie('seen', '1');
+```
+
 ## Drafts and visibility
 
 Garner has exactly one publication state in core: `draft`. A draft (`"draft": true`)

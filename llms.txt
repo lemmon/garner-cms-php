@@ -136,6 +136,9 @@ A co-located `+controller.php` may return:
 - an array, merged into the Twig context;
 - a `Garner\Render\RenderedResponse`, which bypasses Twig.
 
+A `RenderedResponse` is immutable; chain `withHeader(name, value)` and
+`withCookie(name, value)` for extra response headers and cookies.
+
 A directory with `+controller.php` and no page entry file is a route endpoint.
 Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
 in the page tree.

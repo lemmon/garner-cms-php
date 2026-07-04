@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Response headers and cookies** — `RenderedResponse` gains `withHeader()` and
+  `withCookie()` (immutable copies, chainable), with `header()` and `cookies()`
+  accessors. Cookie defaults are the safe baseline: session lifetime, whole-site
+  path, HttpOnly, SameSite=Lax. The response is backed by an HttpFoundation
+  response internally (never exposed), and emission goes through a single
+  `send()` path — the static `Garner\Core\Response` helper is gone. Existing
+  constructors and accessors are unchanged, and headers stay verbatim:
+  HttpFoundation's Cache-Control heuristics are disabled, so a response carries
+  no Cache-Control unless one is set (setting ETag / Last-Modified / Expires
+  does not add one), and an explicit value like `public, max-age=60` is sent
+  as given instead of being rewritten with `private`.
+
 ### Changed
 
 - **`Garner\Core\Request` is now instance-based** — a Garner-styled facade over

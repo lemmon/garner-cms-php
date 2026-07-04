@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Request helpers** — the `Request` facade grows the read surface the action
+  layer needs: `header()` and `cookie()` (case-insensitive names, default
+  fallback), `body()` (raw), `form()` (parsed form fields), `json()` (decoded
+  body; empty array for an empty body, `JsonException` on malformed input),
+  `file()` returning a Garner-styled `UploadedFile` (client-supplied name and
+  MIME type flagged untrusted, `moveTo()` to accept the upload; validity and
+  size are captured up front so they still describe the submission after the
+  move), and `isHtmx()` for htmx's `HX-Request` marker. `Request::create()`
+  accepts form parameters, cookies, files, and a raw body for tests. The
+  request is reachable in controllers today via `$app->request()` — prefer it
+  over PHP superglobals.
+
 - **Response headers and cookies** — `RenderedResponse` gains `withHeader()` and
   `withCookie()` (immutable copies, chainable), with `header()` and `cookies()`
   accessors. Cookie defaults are the safe baseline: session lifetime, whole-site

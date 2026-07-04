@@ -139,6 +139,10 @@ A co-located `+controller.php` may return:
 A `RenderedResponse` is immutable; chain `withHeader(name, value)` and
 `withCookie(name, value)` for extra response headers and cookies.
 
+Read the current request through `$app->request()` instead of PHP
+superglobals: `method()`, `form()`, `json()`, `body()`, `cookie(name)`,
+`header(name)`, `file(name)`, and `isHtmx()`.
+
 A directory with `+controller.php` and no page entry file is a route endpoint.
 Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
 in the page tree.

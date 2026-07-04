@@ -13,6 +13,15 @@ Project notes, design thinking, and brainstorming are kept in `docs/`. These are
 working documents: ideas are provisional and may be revised, replaced, or dropped as
 Garner develops.
 
+## Composer constraints
+
+Dependencies are constrained to major versions only (`^8`). One deliberate
+exception: `symfony/http-foundation` requires `^8.1`, because `RenderedResponse`
+passes a header bag to the `Response` constructor — an 8.1 signature (8.0 only
+accepts an array and would fail with a TypeError). Keep constraints major-only
+unless the code genuinely uses a later minor's API; then raise the floor and
+note why.
+
 ## Be respectful of other people's work
 
 Our brainstorming and design notes often reference other CMSs, projects, and

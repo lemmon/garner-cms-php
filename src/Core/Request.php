@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Garner\Core;
 
+use JsonException;
+use Symfony\Component\HttpFoundation\File\UploadedFile as HttpFoundationUploadedFile;
 use Symfony\Component\HttpFoundation\Request as HttpFoundationRequest;
 
 /**
@@ -14,6 +16,11 @@ use Symfony\Component\HttpFoundation\Request as HttpFoundationRequest;
  */
 final class Request
 {
+    /**
+     * @var array<string, UploadedFile|null>
+     */
+    private array $uploadedFiles = [];
+
     private function __construct(
         private readonly HttpFoundationRequest $inner,
     ) {}
@@ -27,12 +34,32 @@ final class Request
      * Build a request from a URI, primarily for tests and custom boot paths.
      * Scheme, host, port, path, and query are taken from the URI; `$server`
      * entries (e.g. HTTP_X_FORWARDED_PROTO) override the derived defaults.
+     * $parameters become form fields for POST-style requests, and $body is the
+     * raw request body (e.g. a JSON payload).
      *
      * @param array<string, mixed> $server
+     * @param array<string, mixed> $parameters
+     * @param array<string, string> $cookies
+     * @param array<string, mixed> $files
      */
-    public static function create(string $uri, string $method = 'GET', array $server = []): self
-    {
-        return new self(HttpFoundationRequest::create(uri: $uri, method: $method, server: $server));
+    public static function create(
+        string $uri,
+        string $method = 'GET',
+        array $server = [],
+        array $parameters = [],
+        array $cookies = [],
+        array $files = [],
+        ?string $body = null,
+    ): self {
+        return new self(HttpFoundationRequest::create(
+            uri: $uri,
+            method: $method,
+            parameters: $parameters,
+            cookies: $cookies,
+            files: $files,
+            server: $server,
+            content: $body,
+        ));
     }
 
     /**
@@ -74,6 +101,92 @@ final class Request
         $pos = strpos($uri, '?');
 
         return $pos === false ? '' : substr($uri, $pos + 1);
+    }
+
+    /**
+     * The named request header's value, or the default when the request
+     * doesn't carry it. Header names are case-insensitive.
+     */
+    public function header(string $name, ?string $default = null): ?string
+    {
+        return $this->inner->headers->get($name, $default);
+    }
+
+    /**
+     * The named request cookie's value, or the default when absent.
+     */
+    public function cookie(string $name, ?string $default = null): ?string
+    {
+        $value = $this->inner->cookies->get($name, $default);
+
+        return $value === null ? null : (string) $value;
+    }
+
+    /**
+     * The raw request body, unparsed.
+     */
+    public function body(): string
+    {
+        return $this->inner->getContent();
+    }
+
+    /**
+     * Form fields from a submitted body (urlencoded or multipart), as PHP
+     * parsed them — nested field names like `items[]` arrive as arrays.
+     *
+     * @return array<string, mixed>
+     */
+    public function form(): array
+    {
+        return $this->inner->request->all();
+    }
+
+    /**
+     * The request body decoded as JSON. An empty body yields an empty array,
+     * as does a payload that is valid JSON but not an object or list.
+     *
+     * @return array<array-key, mixed>
+     * @throws JsonException on a malformed body
+     */
+    public function json(): array
+    {
+        $body = $this->body();
+
+        if ($body === '') {
+            return [];
+        }
+
+        $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * The named uploaded file from a multipart submission, or null when the
+     * field is absent (or holds multiple files — take those from form-level
+     * handling when the need arises). Repeat calls return the same instance,
+     * so the captured metadata stays valid after moveTo() consumes the upload.
+     */
+    public function file(string $name): ?UploadedFile
+    {
+        if (array_key_exists($name, $this->uploadedFiles)) {
+            return $this->uploadedFiles[$name];
+        }
+
+        $file = $this->inner->files->get($name);
+
+        return $this->uploadedFiles[$name] = $file instanceof HttpFoundationUploadedFile
+            ? new UploadedFile($file)
+            : null;
+    }
+
+    /**
+     * Whether the request was made by htmx (it sends `HX-Request: true` on
+     * every request it issues).
+     */
+    public function isHtmx(): bool
+    {
+        return $this->inner->headers->get('HX-Request') === 'true';
     }
 
     /**

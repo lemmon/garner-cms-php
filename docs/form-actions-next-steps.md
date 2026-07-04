@@ -235,7 +235,11 @@ Still open (the prototype decides):
    **Done (2026-07-04):** immutable `withHeader()` / `withCookie()` backed by an
    HttpFoundation response internally; one emission path (`send()`), static
    `Core\Response` removed.
-3. Add request helpers for method, headers, form data, files, JSON, and HTMX.
+3. ~~Add request helpers for method, headers, form data, files, JSON, and
+   HTMX.~~ **Done (2026-07-04):** `header()`, `cookie()`, `body()`, `form()`,
+   `json()`, `file()` (Garner `UploadedFile` facade), `isHtmx()`;
+   `Request::create()` builds test requests with parameters, cookies, files,
+   and a raw body.
 4. Add the origin-check CSRF default.
 5. Prototype `+action.php` on a real flow: the splash's "notify me on
    release" email-capture form — single field, spam-exposed (exercises the

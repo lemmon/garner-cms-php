@@ -42,6 +42,39 @@ runtime/   derived index + caches (disposable, rebuildable)
 storage/   persistent app state
 ```
 
+## Using Garner as a package
+
+A site can require Garner as a Composer dependency and keep only its own
+content and configuration (`routes/`, `app/`, `config/`, `public/`). The web
+entry point is a two-liner — `public/index.php`:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+define('GARNER_PROJECT_ROOT', dirname(__DIR__));
+
+require dirname(__DIR__) . '/vendor/lemmon/garner/boot/web.php';
+```
+
+`GARNER_PROJECT_ROOT` declares where the site lives — the directory holding
+`routes/`, `app/`, and `config/`. The boot cannot reliably infer it on its
+own: it runs before the autoloader exists, server variables vary across
+SAPIs, and Garner's own file location is misleading once it is a vendor
+package — under a symlinked Composer `path` repository, PHP resolves
+`__DIR__` to the real checkout. The constant also tells the boot which
+`vendor/autoload.php` to load: the project's, never Garner's own development
+install.
+
+For local development, serve through the bundled router script — it sets
+`GARNER_PROJECT_ROOT` from the document root, serves published media and
+other static files directly, and hands everything else to Garner:
+
+```sh
+php -S localhost:8000 -t public vendor/lemmon/garner/boot/server.php
+```
+
 ## How a page works
 
 A page is a directory under `routes/`. Its route is its path: `routes/+page.json`

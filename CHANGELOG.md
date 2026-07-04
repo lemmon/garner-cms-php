@@ -51,6 +51,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directly), `path()` now yields the route path with the base stripped, and
   canonical redirects re-attach the base so they stay inside the app.
 
+### Fixed
+
+- **Symlinked package installs load the right autoloader** — `boot/web.php`
+  now prefers `GARNER_PROJECT_ROOT` when locating `vendor/autoload.php`. PHP
+  resolves `__DIR__` through symlinks, so with Garner installed as a symlinked
+  Composer `path` repository the boot found Garner's own development `vendor/`
+  and silently loaded it instead of the consumer project's, dropping the
+  project's classes and dependencies. The constant is set by the entry script
+  or derived from the document root, so it survives symlinks; the previous
+  core-relative candidates remain as fallbacks for Garner's standalone use.
+  The consumer `public/index.php` recipe is now documented in the README.
+
 ## [0.1.0] - 2026-07-03
 
 Initial implementation of the agent-first, flat-file CMS.

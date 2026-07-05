@@ -462,12 +462,75 @@ silently decoding as plain arrays). Sweep expired sessions with
 generic primitive, not a "logged-in user" concept — a future auth feature
 would store a user id in it rather than inventing its own storage.
 
+## Key-value store
+
+`$app->store()` is durable site-wide storage — string keys, JSON values —
+for the things an action needs to _keep_: form submissions, counters, site
+state. Where sessions are per-visitor and expiring, the store remembers
+indefinitely, keyed by what the data is rather than who sent it:
+
+```php
+// routes/subscribe/+action.php
+$hash = hash('sha256', strtolower(trim($email)));
+
+if (!$app->store()->add("email:$hash", ['email' => $email, 'created' => gmdate('c')])) {
+    return ActionResult::failure(['error' => 'Already subscribed.']);
+}
+```
+
+`add()` is the uniqueness primitive: an atomic insert-if-absent that
+returns `false` when the key already exists — no check-then-insert race
+between concurrent POSTs, because the key _is_ the primary key. `set()` is
+the upsert for genuinely mutable keys, and `get(key, default)` / `has()` /
+`remove()` mirror the `Session` surface exactly. Multi-item data follows a
+one-key-per-item convention (`email:<hash>`, not one growing array under a
+single key — a read-modify-write on a shared array would race and lose
+updates); key construction stays in userland — Garner does not hash,
+normalize, or namespace on the site's behalf. `items(prefix)` lists a
+namespace as an Illuminate Collection keyed by full key (plain string
+prefix matching — `:` is a convention, not an API concept; note it loads
+the whole namespace, fine at the hundreds-of-items scale this targets),
+and `count(prefix)` answers "how many" without loading anything.
+
+Values are JSON: scalars, lists, and maps round-trip; the contract is
+"JSON-encodable in, decoded value out," so objects come back as arrays by
+contract, and a non-encodable value throws rather than storing garbage.
+One caveat inherited from PHP's JSON functions: whole-number floats are
+preserved on the write Garner controls (`2.0` stays a float), but a site
+needing exact float typing through arbitrary tooling should store the
+value as a string. This is deliberately a key-value store, not a database
+layer — no queries into values, no TTL, no multiple stores. A site that
+outgrows it brings its own PDO connection (SQLite is already a hard
+dependency) and its own file under `storage/`.
+
+Data lives in a single SQLite file, `storage/store.sqlite` by default
+(`store.path` config), created lazily on first write — never touching the
+store never creates the file. Unlike `runtime/index.sqlite` (a disposable,
+rebuildable cache), the store is canonical: there is nothing to rebuild it
+from, so back up `storage/` and ignore `runtime/`. The file is kept
+owner-only (0600, re-asserted when a process first writes; a created
+storage directory is 0700 — store values are site data, possibly personal,
+the same stance as session files), and Garner refuses to open a
+`store.sqlite` that is a symlink — a link there is never
+Garner's own doing. The store is
+never a black box: values sit as JSON in a plain TEXT column, inspectable
+with the `sqlite3` CLI or the console commands:
+
+```sh
+php bin/garner store:list [prefix] [--json]   # list items, optionally by prefix
+php bin/garner store:get <key>                # print one value as JSON
+php bin/garner store:set <key> <json>         # upsert a value ('"text"', '42', '{"a":1}')
+php bin/garner store:remove <key>             # delete a key
+```
+
 ## Configuration
 
 See `config/app.php`. Notable keys: `debug`, `url` (site base URL — see below),
 `ids.generator` (`cuid2` default, also `ulid`, `uuid_v4`, `uuid_v7`, or a custom
 generator), `index.mode`, `rendering.default_template`, `twig.*`,
-`session.*` (`cookie`, `lifetime`, `store`, `path` — see Sessions above), and
+`session.*` (`cookie`, `lifetime`, `store`, `path` — see Sessions above),
+`store.path` (where the key-value store keeps its SQLite file — see
+Key-value store above), and
 `csrf.check_origin` (on by default: cross-site form POSTs — mismatched
 `Origin` / `Sec-Fetch-Site` — answer 403; JSON APIs and header-less
 non-browser clients are unaffected).

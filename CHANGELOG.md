@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Key-value store** — `$app->store()` gives actions and controllers
+  durable site-wide storage: string keys, JSON values, backed by a single
+  SQLite file (`storage/store.sqlite`, `app.store.path` config) created
+  lazily on first write. This is the "keep something" half of the action
+  layer — a notify-me form finally has somewhere framework-provided to put
+  its email addresses instead of bring-your-own PDO. `add()` is the
+  uniqueness primitive (atomic insert-if-absent, `false` when the key
+  exists — no check-then-insert race between concurrent POSTs), `set()` is
+  the upsert, and `get()`/`has()`/`remove()` match the `Session` surface
+  exactly. `items(prefix)` lists a key namespace as an Illuminate
+  Collection keyed by full key; `count(prefix)` answers "how many" without
+  loading values. Multi-item data follows a one-key-per-item convention
+  (`email:<hash>`), with key construction deliberately left in userland.
+  The value contract is "JSON-encodable in, decoded value out" — objects
+  come back as arrays by contract, non-encodable values throw, and
+  whole-number floats are preserved on write
+  (`JSON_PRESERVE_ZERO_FRACTION`). Unlike `runtime/index.sqlite` the store
+  file is canonical, not rebuildable — back up `storage/` — and shared-host
+  hardening matches the sessions feature: the file is kept owner-only
+  (0600, re-asserted on each process's first write, so a pre-created or
+  crash-orphaned file self-heals — and a write fails rather than proceed
+  when the file cannot be tightened, e.g. a writable file another local
+  user planted) and a created storage directory 0700, since store values
+  are site data (possibly personal), and Garner refuses to open the store
+  through a symlink — another local user must not be able to pre-create
+  `store.sqlite` as a link and redirect writes to a path they chose. Reads treat a file whose schema doesn't exist yet (the
+  brief window a concurrent first write opens, or an empty pre-created
+  file) as "nothing stored" rather than erroring on the missing table.
+  Deliberately
+  a key-value store, not a database layer: no queries into values, no TTL,
+  no multiple stores; a site that outgrows it brings its own PDO. Values
+  sit as plain-TEXT JSON, inspectable via `sqlite3` or the new console
+  commands `store:list [prefix] [--json]`, `store:get <key>`,
+  `store:set <key> <json>`, `store:remove <key>`. Testable via
+  `Application::withStore()` (same callback-scoped shape as
+  `withSession()`). See `docs/key-value-store-next-steps.md`.
+
 ## [0.2.0] - 2026-07-05
 
 ### Added

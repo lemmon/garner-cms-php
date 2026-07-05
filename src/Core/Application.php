@@ -46,6 +46,7 @@ final class Application
     private ?SessionStore $sessionStore = null;
     private ?SiteLoader $siteLoader = null;
     private ?string $siteUrl = null;
+    private ?Store $store = null;
     private ?TreeValidator $treeValidator = null;
 
     /**
@@ -149,6 +150,59 @@ final class Application
     public function sessionStore(): SessionStore
     {
         return $this->sessionStore ??= $this->makeSessionStore($this->config('app.session.store'));
+    }
+
+    /**
+     * The site's durable key-value store (see Store). Obtaining it costs
+     * nothing: the SQLite file behind it is only created on first write,
+     * so a site that never stores anything never grows a
+     * storage/store.sqlite.
+     */
+    public function store(): Store
+    {
+        return $this->store ??= new Store($this->storePath());
+    }
+
+    /**
+     * Run $callback with store() answering $store, restoring the previous
+     * store afterwards. Same callback-scoped shape as withSession(): a test
+     * can point the store at a temp file (or a prepared fixture) without
+     * leaking it into whatever runs next.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public function withStore(Store $store, callable $callback): mixed
+    {
+        $previous = $this->store;
+        $this->store = $store;
+
+        try {
+            return $callback();
+        } finally {
+            $this->store = $previous;
+        }
+    }
+
+    /**
+     * Where the store's SQLite file lives: `app.store.path` when set
+     * (absolute, or relative to the project root), otherwise
+     * `storage/store.sqlite`. Deliberately under storage/, not runtime/:
+     * store data is canonical — there is nothing to rebuild it from — so
+     * it follows the "back up storage/, ignore runtime/" contract.
+     */
+    private function storePath(): string
+    {
+        $configured = $this->config('app.store.path');
+
+        if (is_string($configured) && $configured !== '') {
+            return str_starts_with($configured, '/')
+                ? $configured
+                : $this->projectRootPath . '/' . ltrim($configured, '/');
+        }
+
+        return $this->projectPath('storage') . '/store.sqlite';
     }
 
     /**

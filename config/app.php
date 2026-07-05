@@ -53,6 +53,12 @@ return [
         // Seconds a session (and its cookie) stays alive after its last write.
         'lifetime' => 7200,
     ],
+    'store' => [
+        // Where the durable key-value store keeps its SQLite file. null
+        // defaults to storage/store.sqlite. Relative paths resolve against
+        // the project root. Created lazily on first write.
+        'path' => null,
+    ],
     'markdown' => [
         'allow_unsafe_links' => false,
         'html_input' => 'strip',

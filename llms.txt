@@ -199,6 +199,30 @@ in `storage/sessions` by default (one file per session, serialized with PHP's
 `app.session.*` config). Not a "logged-in user" concept — a future auth
 feature builds on this rather than replacing it.
 
+## Key-Value Store
+
+`$app->store()` is durable site-wide key-value storage (string keys, JSON
+values) for data an action needs to keep — form submissions, counters, site
+settings. Unlike sessions it is not per-visitor and never expires.
+
+- `add(key, value)`: atomic insert-if-absent; `false` means the key already
+  exists. Use this for uniqueness ("already subscribed?") — one key per
+  item, namespaced by convention (`email:<hash>`), never a growing array
+  under one key.
+- `set(key, value)`: upsert, for genuinely mutable keys.
+- `get(key, default)`, `has(key)`, `remove(key)`: as on the session.
+- `items(prefix)`: Illuminate Collection of a namespace, keyed by full key.
+  Loads everything under the prefix; use `count(prefix)` when the number is
+  all that's needed.
+
+Values must be JSON-encodable: scalars, lists, and maps round-trip; objects
+come back as plain arrays. Data lives in `storage/store.sqlite` (created on
+first write; canonical — back it up, unlike `runtime/`). Inspect it without
+SQL via `php bin/garner store:list [prefix] [--json]`, `store:get <key>`,
+`store:set <key> <json>`, and `store:remove <key>`, or read the file
+directly with the `sqlite3` CLI (table `store`, JSON in the `value`
+column).
+
 ## Validation And Local Checks
 
 For site-building tasks, prefer these commands when available:

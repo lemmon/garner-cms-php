@@ -13,6 +13,7 @@ not contributor guidance for changing Garner's CMS engine.
 - A page may use a co-located `+template.twig` to override its template.
 - A page may use a co-located `+controller.php` for page-specific data or a
   custom response.
+- A page may use a co-located `+action.php` to handle its form POST.
 - `config/app.php` contains project configuration.
 - `public/` is the web root. Do not place source content here.
 - `runtime/` contains derived indexes and caches. Treat it as disposable.
@@ -146,6 +147,28 @@ superglobals: `method()`, `form()`, `json()`, `body()`, `cookie(name)`,
 Cross-site form POSTs are rejected with a 403 by default (origin check;
 stateless CSRF protection). Same-origin forms, JSON APIs, and non-browser
 clients are unaffected. Off-switch: `app.csrf.check_origin => false`.
+
+## Form Actions
+
+A co-located `+action.php` handles the page's POST (the write side; keep the
+controller read-side). It returns a callable `(request, page, site, app)` and
+must produce one of:
+
+- `Garner\Render\ActionResult::failure(data, status = 422)` — re-render the
+  page with `data` available in the template as `form`;
+- `Garner\Render\ActionResult::redirect(location, status = 303)` — the
+  Post/Redirect/Get success path. htmx-aware: an htmx POST (`HX-Request`)
+  is answered with `204` + `HX-Redirect` instead of a `3xx`, so htmx
+  navigates the whole page rather than swapping the redirect target into
+  the form's `hx-target`;
+- a `RenderedResponse` — escape hatch for JSON, HTMX fragments, or custom
+  headers.
+
+The `form` template variable is always defined (`null` on plain GET). `HEAD`
+routes like `GET`. A POST without `+action.php` (or any other unhandled verb)
+returns `405 Method Not Allowed` with an `Allow` header, unless a controller
+answers it with a `RenderedResponse`. Put success messages on the redirect
+target (e.g. `/?subscribed=1`) — there is no session or flash state.
 
 A directory with `+controller.php` and no page entry file is a route endpoint.
 Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear

@@ -1,11 +1,10 @@
 # Form actions and HTTP handling - initial next steps
 
-> Status: **reviewed, paused.** Initial ideas were recorded, then a design
-> review pass (2026-07-03) folded its conclusions in: several points moved
-> from open to decided, and the contract surface was slimmed. Work is
-> intentionally paused before the prototype. When picking this up, start at
-> step 1 of the near-term steps and re-test every decision against the first
-> real form flow.
+> Status: **prototyped (2026-07-05).** The action layer shipped and was
+> exercised on the splash's real notify-me form (steps 5–6 below). What the
+> prototype decided is folded into "Decided vs still open". Remaining: the
+> final cleanup pass (step 7) and the genuinely open points (partials,
+> named actions, flash, sessions).
 
 ## Context
 
@@ -213,16 +212,48 @@ Decided (2026-07-03 review pass):
   already answered by `docs/index-freshness.md`: Garner owns the write, so
   the write path invalidates/rebuilds the index inline.
 
-Still open (the prototype decides):
+Decided by the prototype (2026-07-05, splash notify-me form):
 
-- Whether `ActionResult` survives, or collapses to
-  array | redirect | `RenderedResponse`.
+- **`ActionResult` survives**, with two constructors that each carry a default
+  a bare `RenderedResponse` gets wrong inside actions:
+  `failure(array $data, int $status = 422)` (re-render with `form`) and
+  `redirect(string $location, int $status = 303)` (Post/Redirect/Get).
+  `success()` stayed out. Everything else is the `RenderedResponse` escape
+  hatch — the HTMX-fragment case is served by it today.
+- **Pre-action compatibility**: for POST without `+action.php` (and any other
+  non-GET/HEAD verb on a page), the page's controllers run first — a returned
+  `RenderedResponse` still answers the request (existing POST branching keeps
+  working), while a context array means the verb is unhandled and yields the
+  405 + `Allow`. Endpoints keep full method freedom, untouched.
+- **The failure re-render is the GET render plus `form`**: read-side
+  controllers are dispatched with the request presented as a true GET
+  (`Request::asGet()` via `Application::withRequest()`) — method reads GET
+  and the submitted payload is dropped (no form fields, files, body, or
+  Content-Type; URL, query, headers, and cookies stay). A method-branching
+  controller can neither hijack the re-render with its POST response nor
+  starve it of context behind a GET guard, and context built from `form()` /
+  `json()` / `body()` / `file()` cannot react to the already-handled
+  submission. `form` is reserved for the action layer — always defined,
+  `null` outside a failure, and not overridable from controller data.
+- **`lemmon/validator` integrates without coupling**: the splash action uses
+  `tryValidate()` and feeds the first error message into
+  `ActionResult::failure()` by hand. No framework-level bridge needed yet.
+- **The origin-check softenings from step 4 held**: the real same-origin form
+  passed cleanly, cross-origin POST answered 403, and the honest honeypot
+  (visibly-labeled, `display: none`, action answers it with the normal
+  success redirect and stores nothing) covers non-browser spam that the
+  origin check deliberately lets through.
+
+Still open:
+
 - The named-action URL scheme, if and when multiple actions per route arrive
   (`?/name`, `?action=name`, a submit-button field, or route endpoints).
 - Flash state — leaning: none until sessions exist; failure-data re-render
-  covers the common case, success messages ride the redirect target.
-- How `lemmon/validator` integrates with action failure.
-- Confirming the `renderBlock` partial approach against a real fragment.
+  covers the common case, success messages ride the redirect target
+  (the splash uses `/?subscribed=1`).
+- Confirming the `renderBlock` partial approach against a real fragment —
+  the splash needed no fragment, so the partial API remains unbuilt; HTMX
+  responses use the `RenderedResponse` escape hatch for now.
 
 ## Near-term next steps
 
@@ -251,12 +282,23 @@ Still open (the prototype decides):
    fallback accepts an `https` origin against an `http` base on the same
    host — both so TLS-terminating proxies that hide the protocol don't 403
    legitimate same-origin forms.
-5. Prototype `+action.php` on a real flow: the splash's "notify me on
+5. ~~Prototype `+action.php` on a real flow: the splash's "notify me on
    release" email-capture form — single field, spam-exposed (exercises the
    origin check and an honest honeypot), failure re-render, 303 success. It
-   touches every behavior above with real stakes.
-6. Add tests for POST dispatch, missing action 405 (+ `Allow`), validation
+   touches every behavior above with real stakes.~~ **Done (2026-07-05):**
+   action layer shipped (`+action.php` discovery, `PageActions`,
+   `ActionResult`, method-aware page dispatch with 405 + `Allow`, `form`
+   always defined, HEAD routes like GET) and the splash form is live on it —
+   honeypot, `lemmon/validator` failure re-render (422), `/?subscribed=1`
+   Post/Redirect/Get, verified in a real browser. Findings recorded under
+   "Decided vs still open".
+6. ~~Add tests for POST dispatch, missing action 405 (+ `Allow`), validation
    failure re-render, redirect success, HTMX partial response, and
-   origin-check rejection.
+   origin-check rejection.~~ **Done (2026-07-05):** `tests/ActionTest.php`
+   covers POST dispatch, 405 + `Allow` (with and without an action), failure
+   re-render + `form`, 303 redirect, HTMX via the `RenderedResponse` escape
+   hatch, HEAD-like-GET, endpoint method freedom, controller POST-branching
+   compatibility, and the invalid-return guard; origin-check rejection was
+   already covered by `tests/OriginCheckTest.php` in step 4.
 7. Revisit this document after the prototype and delete anything that proved
    too clever or too vague.

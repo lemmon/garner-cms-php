@@ -14,6 +14,7 @@ use Garner\Content\TreeValidator;
 use Garner\Render\CustomRoutes;
 use Garner\Render\Favicon;
 use Garner\Render\MarkdownRenderer;
+use Garner\Render\PageActions;
 use Garner\Render\PageControllers;
 use Garner\Render\RendererInterface;
 use Garner\Render\TwigRenderer;
@@ -32,6 +33,7 @@ final class Application
     private ?IdGenerator $idGenerator = null;
     private ?MarkdownRenderer $markdownRenderer = null;
     private ?MediaPublisher $mediaPublisher = null;
+    private ?PageActions $pageActions = null;
     private ?PageControllers $pageControllers = null;
     private ?PageLoader $pageLoader = null;
     private ?Pages $pages = null;
@@ -62,6 +64,27 @@ final class Application
     public function request(): Request
     {
         return $this->request ??= Request::fromGlobals();
+    }
+
+    /**
+     * Run $callback with request() answering $request, restoring the previous
+     * request afterwards. The action-failure re-render uses it to present the
+     * read-side controllers with the request as a GET (Request::asGet()).
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public function withRequest(Request $request, callable $callback): mixed
+    {
+        $previous = $this->request;
+        $this->request = $request;
+
+        try {
+            return $callback();
+        } finally {
+            $this->request = $previous;
+        }
     }
 
     public function run(): void
@@ -191,6 +214,11 @@ final class Application
         );
     }
 
+    public function pageActions(): PageActions
+    {
+        return $this->pageActions ??= new PageActions();
+    }
+
     public function markdownRenderer(): MarkdownRenderer
     {
         $config = $this->config('app.markdown', []);
@@ -257,6 +285,7 @@ final class Application
             pages: $this->pages(),
             siteLoader: $this->siteLoader(),
             controllers: $this->pageControllers(),
+            actions: $this->pageActions(),
             renderer: $this->siteRenderer(),
         );
     }

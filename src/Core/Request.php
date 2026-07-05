@@ -71,6 +71,35 @@ final class Request
     }
 
     /**
+     * A copy of this request that reads as a true GET: same URL, query,
+     * headers, and cookies, but with the submitted payload dropped — no form
+     * fields, no uploaded files, an empty body, and no Content-Type/Length.
+     * The action-failure re-render presents it to read-side controllers, so
+     * the re-render behaves exactly like the page's GET render: a controller
+     * that branches on the method — or builds context from form(), json(),
+     * body(), or file() — contributes its normal render context instead of
+     * reacting to the (already handled) POST submission.
+     */
+    public function asGet(): self
+    {
+        $server = $this->inner->server->all();
+        unset($server['CONTENT_TYPE'], $server['CONTENT_LENGTH']);
+        unset($server['HTTP_CONTENT_TYPE'], $server['HTTP_CONTENT_LENGTH']);
+        $server['REQUEST_METHOD'] = 'GET';
+
+        // Rebuilt from scratch (bags shared with the original must not be
+        // mutated), with the empty-string body deliberate: a null content
+        // would make getContent() lazily read php://input — the original
+        // POST body — on first use.
+        return new self(new HttpFoundationRequest(
+            query: $this->inner->query->all(),
+            cookies: $this->inner->cookies->all(),
+            server: $server,
+            content: '',
+        ));
+    }
+
+    /**
      * The route path of the request: no query string, and with any front-controller
      * base path stripped, so a subdirectory install still yields "/about".
      */

@@ -150,15 +150,17 @@ The sidecar attaches to the file (`page.file('team.jpg').meta`) and is not loade
 content value. See [`docs/media-handling.md`](docs/media-handling.md) for the full
 design and open questions.
 
-### Co-located template and controller
+### Co-located template, controller, and action
 
-Two optional `+` files let a page override its view and behavior:
+Three optional `+` files let a page override its view and behavior:
 
 - **`+template.twig`** — the page's own Twig view. It can `{% extends %}` /
   `{% include %}` anything in `app/templates`. Overrides the `template` field.
 - **`+controller.php`** — returns an array (merged into the template context) or a
   `RenderedResponse` (bypasses Twig — e.g. JSON). Overrides the template-based
   `app/controllers/{template}.php`.
+- **`+action.php`** — the page's POST handler, kept separate from the read-side
+  controller. See [Form actions](#form-actions).
 
 ```php
 <?php // routes/api/+controller.php
@@ -287,6 +289,60 @@ Data for a template comes from up to two controllers, both with the same
 - **`app/controllers/site.php`** — shared context, run for every rendered page.
   Must return an array (it provides data, not responses). Page controller keys
   win on conflict. The name `site` is reserved for this role.
+
+### Form actions
+
+A co-located `+action.php` handles the page's POST — the write side, kept
+separate from the controller's read side. It returns a callable with the
+controller contract plus the request prepended:
+
+```php
+<?php // routes/subscribe/+action.php
+
+use Garner\Render\ActionResult;
+
+return static function ($request, $page, $site, $app): ActionResult {
+    $email = trim((string) ($request->form()['email'] ?? ''));
+
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return ActionResult::failure([
+            'error' => 'Enter a valid email address.',
+            'email' => $email,
+        ]);
+    }
+
+    // ... persist the subscription ...
+
+    return ActionResult::redirect('/subscribe/thanks');
+};
+```
+
+- **Failure** — `ActionResult::failure($data, $status = 422)` re-renders the
+  page with `$data` available to the template as `form`. The `form` variable
+  is always defined in page render context: `null` outside a failure
+  re-render (controller data cannot override it), so templates can branch on
+  it without lax `strict_variables`. The re-render behaves exactly like the
+  page's GET render plus `form`: read-side controllers see the request as a
+  true GET — the submitted payload (form fields, files, body) is dropped — so
+  one that branches on the method or reads the request body contributes its
+  normal context instead of reacting to the POST the action already handled.
+- **Success** — `ActionResult::redirect($location, $status = 303)` answers
+  Post/Redirect/Get (303 makes the client re-request the target with GET;
+  `RenderedResponse::redirect()` keeps its method-preserving 308 default for
+  canonical redirects). htmx-aware: an htmx POST (`HX-Request`) gets `204` +
+  `HX-Redirect` instead of a `3xx` — htmx follows redirects inside its XHR
+  and would swap the target page into the form's `hx-target`, while
+  `HX-Redirect` makes it navigate the whole page, which is what an action
+  redirect means.
+- **Escape hatch** — return a full `RenderedResponse` for JSON, fragments
+  (e.g. when `$request->isHtmx()`), or custom headers.
+
+Page dispatch is method-aware: `HEAD` routes like `GET`, POST goes to the
+action, and a verb the page cannot answer returns `405 Method Not Allowed`
+with an `Allow` header. A page controller may still answer any verb with a
+`RenderedResponse` (method branching predating actions keeps working), and
+route endpoints keep full method freedom. Cross-site form POSTs are already
+rejected by the origin check before an action runs.
 
 ### Twig extensions
 

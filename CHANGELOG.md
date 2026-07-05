@@ -9,6 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Page actions (`+action.php`)** — a page's write-side POST handler, kept
+  separate from the read-side `+controller.php`. The file returns a callable
+  with the controller contract plus the request prepended —
+  `(Request, Page, Site, Application)` — and produces either an
+  `ActionResult` or a full `RenderedResponse` (JSON, fragments, custom
+  headers — e.g. answering `isHtmx()` requests), and `form` is reserved for
+  the action layer: `null` outside a failure re-render, with controller data
+  unable to override it. `ActionResult` has two
+  constructors: `failure(array $data, int $status = 422)` re-renders the page
+  with the data available to the template as `form` — the re-render behaves
+  exactly like the page's GET render plus `form`: read-side controllers see
+  the request as a true GET (`Request::asGet()` via
+  `Application::withRequest()`) with the submitted payload dropped (no form
+  fields, files, body, or Content-Type), so controllers that branch on the
+  method or build context from the request body contribute their normal
+  context instead of reacting to the already-handled POST — and
+  `redirect(string $location, int $status = 303)` answers Post/Redirect/Get
+  (`RenderedResponse::redirect()` keeps its method-preserving 308 default for
+  canonical redirects) and is htmx-aware: an htmx POST (`HX-Request`) gets
+  `204` + `HX-Redirect` instead of a `3xx`, so htmx navigates the whole page
+  rather than swapping the redirect target into the form's `hx-target`. Page dispatch is now method-aware: `form` is always
+  defined in page render context (`null` on plain GET, so templates never
+  depend on lax `strict_variables`), `HEAD` routes like `GET`, and a verb the
+  page cannot answer returns `405 Method Not Allowed` with an `Allow` header
+  (`GET, HEAD`, plus `POST` when an action exists). Compatibility is kept:
+  before the 405, the page's controllers run — a controller that answers the
+  verb with a `RenderedResponse` (pre-action POST branching) still wins — and
+  route endpoints keep full method freedom. The origin-check CSRF default
+  protects actions automatically. Prototyped end to end on the PHP Git Deploy
+  splash's "notify me on release" form per
+  `docs/form-actions-next-steps.md`.
+
 - **Origin-check CSRF protection, on by default** — a POST carrying a form
   content type (`application/x-www-form-urlencoded`, `multipart/form-data`,
   `text/plain` — the three a cross-site HTML form can send without a CORS

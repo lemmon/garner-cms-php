@@ -32,6 +32,7 @@ final class Page
      * @param string               $dir            Absolute path to the page directory (owns its files).
      * @param string|null          $templateFile   Absolute path to a co-located +template.twig, if present.
      * @param string|null          $controllerFile Absolute path to a co-located +controller.php, if present.
+     * @param string|null          $actionFile     Absolute path to a co-located +action.php, if present.
      * @param Pages|null           $pages          Repository used to resolve children/descendants lazily.
      * @param MediaPublisher|null  $publisher      Publishes owned files and resolves their public URLs.
      * @param string               $baseUrl        Site base URL (no trailing slash) used to compose url().
@@ -48,6 +49,7 @@ final class Page
         private readonly int $sort = 0,
         private readonly ?string $templateFile = null,
         private readonly ?string $controllerFile = null,
+        private readonly ?string $actionFile = null,
         private readonly ?Pages $pages = null,
         private readonly ?MediaPublisher $publisher = null,
         private readonly string $baseUrl = '',
@@ -109,6 +111,11 @@ final class Page
     public function controllerFile(): ?string
     {
         return $this->controllerFile;
+    }
+
+    public function actionFile(): ?string
+    {
+        return $this->actionFile;
     }
 
     /**

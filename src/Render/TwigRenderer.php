@@ -151,13 +151,19 @@ final class TwigRenderer implements RendererInterface
 
     private function defaultErrorMessage(string $kind): string
     {
-        return $kind === 'not_found'
-            ? 'No page matched the requested path.'
-            : 'The request could not be completed.';
+        return match ($kind) {
+            'not_found' => 'No page matched the requested path.',
+            'method_not_allowed' => 'The page does not accept the request method.',
+            default => 'The request could not be completed.',
+        };
     }
 
     private function defaultErrorTitle(int $status, string $kind): string
     {
+        if ($kind === 'method_not_allowed' || $status === 405) {
+            return 'Method Not Allowed';
+        }
+
         return $kind === 'not_found' || $status === 404 ? 'Not Found' : 'Application Error';
     }
 }

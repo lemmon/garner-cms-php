@@ -185,6 +185,62 @@ final class RequestTest extends TestCase
         }
     }
 
+    public function testAsGetDropsTheSubmittedPayloadAndKeepsTheRest(): void
+    {
+        $source = tempnam(sys_get_temp_dir(), 'garner-upload-');
+        assert(is_string($source), 'tempnam() must produce a file for the upload fixture');
+        file_put_contents($source, 'attachment-bytes');
+
+        try {
+            $post = Request::create(
+                'http://example.test/subscribe?x=1',
+                'POST',
+                server: [
+                    'CONTENT_TYPE' => 'multipart/form-data; boundary=----x',
+                    'HTTP_HX_REQUEST' => 'true',
+                ],
+                parameters: ['email' => 'reader@example.test'],
+                cookies: ['seen' => '1'],
+                files: [
+                    'doc' => new HttpFoundationUploadedFile(
+                        $source,
+                        'notes.txt',
+                        'text/plain',
+                        null,
+                        true,
+                    ),
+                ],
+                body: 'email=reader%40example.test',
+            );
+
+            $get = $post->asGet();
+
+            // The payload is gone: no form fields, files, body, or content type.
+            self::assertSame('GET', $get->method());
+            self::assertSame([], $get->form());
+            self::assertSame('', $get->body());
+            self::assertNull($get->file('doc'));
+            self::assertNull($get->header('Content-Type'));
+
+            // Everything else reads like the original request.
+            self::assertSame('/subscribe', $get->path());
+            self::assertSame('x=1', $get->query());
+            self::assertSame('1', $get->cookie('seen'));
+            self::assertTrue($get->isHtmx());
+            self::assertSame('http://example.test', $get->baseUrl());
+
+            // The original request is untouched.
+            self::assertSame('POST', $post->method());
+            self::assertSame(['email' => 'reader@example.test'], $post->form());
+            self::assertSame('email=reader%40example.test', $post->body());
+            self::assertNotNull($post->file('doc'));
+        } finally {
+            if (is_file($source)) {
+                unlink($source);
+            }
+        }
+    }
+
     public function testIsHtmxDetectsTheHxRequestHeader(): void
     {
         self::assertTrue(

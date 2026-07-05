@@ -10,6 +10,7 @@ final class PageLoader
 {
     private const TEMPLATE_FILE = '+template.twig';
     private const CONTROLLER_FILE = '+controller.php';
+    private const ACTION_FILE = '+action.php';
 
     public function __construct(
         private readonly ?MediaPublisher $publisher = null,
@@ -56,6 +57,7 @@ final class PageLoader
             sort: PageMeta::sort($meta),
             templateFile: $this->siblingFile($dir, self::TEMPLATE_FILE),
             controllerFile: $controllerFile,
+            actionFile: $this->siblingFile($dir, self::ACTION_FILE),
             pages: $pages,
             publisher: $this->publisher,
             baseUrl: $this->baseUrl,

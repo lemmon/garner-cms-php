@@ -101,6 +101,16 @@ final class RequestTest extends TestCase
         self::assertNull($request->cookie('missing'));
     }
 
+    public function testAMalformedNonScalarCookieReadsAsAbsent(): void
+    {
+        // A client can send `seen[]=x`, arriving as an array. Cookies are
+        // untrusted input; a malformed one must read as absent, not throw.
+        $request = Request::create('http://example.test/', cookies: ['seen' => ['x']]);
+
+        self::assertNull($request->cookie('seen'));
+        self::assertSame('fallback', $request->cookie('seen', 'fallback'));
+    }
+
     public function testFormExposesSubmittedFields(): void
     {
         $request = Request::create('http://example.test/subscribe', 'POST', parameters: [

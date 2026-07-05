@@ -39,7 +39,7 @@ final class Request
      *
      * @param array<string, mixed> $server
      * @param array<string, mixed> $parameters
-     * @param array<string, string> $cookies
+     * @param array<string, mixed> $cookies
      * @param array<string, mixed> $files
      */
     public static function create(
@@ -142,13 +142,17 @@ final class Request
     }
 
     /**
-     * The named request cookie's value, or the default when absent.
+     * The named request cookie's value, or the default when absent. A cookie
+     * a client sends in a non-scalar shape (e.g. `name[]=x`) also reads as
+     * absent: cookies are client input, and a malformed one should behave
+     * like the tampered values it usually is — not throw (HttpFoundation's
+     * InputBag::get() would raise BadRequestException on it).
      */
     public function cookie(string $name, ?string $default = null): ?string
     {
-        $value = $this->inner->cookies->get($name, $default);
+        $value = $this->inner->cookies->all()[$name] ?? null;
 
-        return $value === null ? null : (string) $value;
+        return is_scalar($value) ? (string) $value : $default;
     }
 
     /**

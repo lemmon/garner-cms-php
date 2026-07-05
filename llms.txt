@@ -174,12 +174,30 @@ must produce one of:
 The `form` template variable is always defined (`null` on plain GET). `HEAD`
 routes like `GET`. A POST without `+action.php` (or any other unhandled verb)
 returns `405 Method Not Allowed` with an `Allow` header, unless a controller
-answers it with a `RenderedResponse`. Put success messages on the redirect
-target (e.g. `/?subscribed=1`) — there is no session or flash state.
+answers it with a `RenderedResponse`. For a success message across a
+redirect, use `$app->session()->flash(...)` (see "Sessions" below) rather
+than baking it into the URL.
 
 A directory with `+controller.php` and no page entry file is a route endpoint.
 Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
 in the page tree.
+
+## Sessions
+
+`$app->session()` is per-visitor key/value state: `get(key, default)`,
+`set(key, value)`, `has(key)`, `remove(key)`, `flash(key, value)` (readable
+on the next request only, then expired whether or not it was read),
+`consumeFlash(key, default)` (read once and clear), `hasFlash(key)` (peek
+without consuming), `regenerate()` (rotate the session id — call after a
+login feature authenticates someone), `destroy()`. The key `_flash` is
+reserved (it carries flash metadata internally); `set('_flash', ...)` throws.
+
+Activation is lazy: a visitor whose requests never call `set()`, `flash()`,
+or `destroy()` gets no cookie and stays fully stateless/cacheable. Data lives
+in `storage/sessions` by default (one file per session, serialized with PHP's
+`serialize()` — not JSON, since session files aren't hand-edited — via
+`app.session.*` config). Not a "logged-in user" concept — a future auth
+feature builds on this rather than replacing it.
 
 ## Validation And Local Checks
 

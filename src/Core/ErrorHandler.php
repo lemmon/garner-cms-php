@@ -89,6 +89,19 @@ final class ErrorHandler
 
     private function emit(RenderedResponse $response): never
     {
+        // Error responses honor session state too: a request that flashed a
+        // message (or aged one out) before throwing must still persist and
+        // send its cookie, or the change is silently lost — flash messages
+        // would resurface on the next load. Guarded, because this runs inside
+        // the exception handler where a second throw (e.g. the session
+        // directory is unwritable — possibly the original error) would be
+        // fatal and replace the error page with a blank response.
+        try {
+            $response = $this->app->attachSessionCookie($response);
+        } catch (Throwable $throwable) {
+            $this->log($throwable);
+        }
+
         $response->send();
         exit();
     }

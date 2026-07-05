@@ -43,11 +43,13 @@ final class Router
      * Send a rendered response from any producer (custom routes, canonical-path
      * handling, and page/endpoint controllers alike). Redirects need no special
      * casing: the Location header rides the response verbatim — whoever built
-     * the redirect owns its query.
+     * the redirect owns its query. Session persistence and the session cookie
+     * ride along via Application::attachSessionCookie() — shared with
+     * ErrorHandler::emit(), so error responses honor session state too.
      */
     private function emit(RenderedResponse $response): never
     {
-        $response->send();
+        $this->app->attachSessionCookie($response)->send();
         exit();
     }
 

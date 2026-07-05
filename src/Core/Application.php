@@ -16,11 +16,13 @@ use Garner\Render\Favicon;
 use Garner\Render\MarkdownRenderer;
 use Garner\Render\PageActions;
 use Garner\Render\PageControllers;
+use Garner\Render\RenderedResponse;
 use Garner\Render\RendererInterface;
 use Garner\Render\TwigRenderer;
 use Garner\Support\CallbackIdGenerator;
 use Garner\Support\IdGenerator;
 use Garner\Support\IdGeneratorType;
+use Garner\Support\SecureRandomIdGenerator;
 use RuntimeException;
 use Twig\Environment;
 
@@ -40,6 +42,8 @@ final class Application
     private ?PublicSite $publicSite = null;
     private ?Request $request;
     private ?RendererInterface $siteRenderer = null;
+    private ?Session $session = null;
+    private ?SessionStore $sessionStore = null;
     private ?SiteLoader $siteLoader = null;
     private ?string $siteUrl = null;
     private ?TreeValidator $treeValidator = null;
@@ -85,6 +89,125 @@ final class Application
         } finally {
             $this->request = $previous;
         }
+    }
+
+    /**
+     * The current session, created on first access. Merely calling this
+     * (e.g. to read a value that isn't there) activates nothing by itself —
+     * no store write and no cookie happen until session code calls set(),
+     * flash(), or destroy(). See attachSessionCookie(), which persists
+     * changes and attaches the session cookie once per request.
+     *
+     * Session ids come from a dedicated CSPRNG generator, never from
+     * idGenerator(): app.ids.generator exists for scaffolded content ids
+     * and a project may legitimately make those predictable (sequential,
+     * slug-derived), but a session id is a bearer token — a guessable one
+     * would let a visitor load someone else's session.
+     */
+    public function session(): Session
+    {
+        return $this->session ??= Session::fromCookie(
+            store: $this->sessionStore(),
+            idGenerator: new SecureRandomIdGenerator(),
+            lifetime: $this->sessionLifetime(),
+            cookieId: $this->request()->cookie($this->sessionCookieName()),
+        );
+    }
+
+    /**
+     * The session already built by session(), or null when nothing in this
+     * request has touched it yet. Router uses this at the end of dispatch so
+     * a request that never calls session() skips persistence entirely
+     * instead of creating one just to find it untouched.
+     */
+    public function sessionIfStarted(): ?Session
+    {
+        return $this->session;
+    }
+
+    /**
+     * Run $callback with session() answering $session, restoring the
+     * previous session afterwards. Lets tests inject a fake session (or a
+     * store double) without touching the filesystem.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public function withSession(Session $session, callable $callback): mixed
+    {
+        $previous = $this->session;
+        $this->session = $session;
+
+        try {
+            return $callback();
+        } finally {
+            $this->session = $previous;
+        }
+    }
+
+    public function sessionStore(): SessionStore
+    {
+        return $this->sessionStore ??= $this->makeSessionStore($this->config('app.session.store'));
+    }
+
+    /**
+     * Persist the session (if this request touched it) and attach its cookie
+     * to $response. The single seam session state reaches the response
+     * through — called by both response emitters, Router::emit() and
+     * ErrorHandler::emit(), so session changes survive even when the request
+     * ends in an error page. A request that never touched the session
+     * (sessionIfStarted() is null) gets no cookie at all, keeping plain
+     * content pages stateless and cache-friendly.
+     */
+    public function attachSessionCookie(RenderedResponse $response): RenderedResponse
+    {
+        $session = $this->sessionIfStarted();
+
+        if ($session === null) {
+            return $response;
+        }
+
+        $name = $this->sessionCookieName();
+
+        if ($session->wasDestroyed()) {
+            return $response->withCookie($name, '', expires: 1);
+        }
+
+        $id = $session->save();
+
+        if ($id === null) {
+            return $response;
+        }
+
+        return $response->withCookie(
+            $name,
+            $id,
+            expires: time() + $this->sessionLifetime(),
+            secure: $this->request()->isHttps(),
+        );
+    }
+
+    /**
+     * The session cookie's name (`app.session.cookie`, default
+     * "garner_session").
+     */
+    public function sessionCookieName(): string
+    {
+        $configured = $this->config('app.session.cookie');
+
+        return is_string($configured) && $configured !== '' ? $configured : 'garner_session';
+    }
+
+    /**
+     * How long, in seconds, a session (and its cookie) stays alive after its
+     * last write (`app.session.lifetime`, default 2 hours).
+     */
+    public function sessionLifetime(): int
+    {
+        $configured = $this->config('app.session.lifetime');
+
+        return is_int($configured) && $configured > 0 ? $configured : 7200;
     }
 
     public function run(): void
@@ -333,6 +456,54 @@ final class Application
         }
 
         throw new RuntimeException('Invalid ID generator configuration');
+    }
+
+    private function makeSessionStore(mixed $configured): SessionStore
+    {
+        if ($configured === null) {
+            return new FileSessionStore($this->sessionStorePath());
+        }
+
+        if ($configured instanceof SessionStore) {
+            return $configured;
+        }
+
+        if (
+            is_string($configured)
+            && class_exists($configured)
+            && is_subclass_of($configured, SessionStore::class)
+        ) {
+            /** @var class-string<SessionStore> $configured */
+            return new $configured();
+        }
+
+        if (is_callable($configured)) {
+            $store = $configured();
+
+            if ($store instanceof SessionStore) {
+                return $store;
+            }
+        }
+
+        throw new RuntimeException('Invalid session store configuration');
+    }
+
+    /**
+     * Where the default FileSessionStore keeps session files:
+     * `app.session.path` when set (absolute, or relative to the project
+     * root), otherwise `storage/sessions`.
+     */
+    private function sessionStorePath(): string
+    {
+        $configured = $this->config('app.session.path');
+
+        if (is_string($configured) && $configured !== '') {
+            return str_starts_with($configured, '/')
+                ? $configured
+                : $this->projectRootPath . '/' . ltrim($configured, '/');
+        }
+
+        return $this->projectPath('storage') . '/sessions';
     }
 
     /**

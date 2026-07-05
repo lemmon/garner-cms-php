@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Sessions** — `$app->session()` gives controllers and actions per-visitor
+  key/value state: `get()`, `set()`, `remove()`, `flash()`/`consumeFlash()`
+  (a value readable on the next request only, answering the
+  Post/Redirect/Get flash-message gap), `regenerate()` (rotate the session
+  id, e.g. after a future login feature authenticates someone), and
+  `destroy()`. Activation is lazy and explicit: nothing is written and no
+  cookie is sent until a request actually calls `set()`, `flash()`, or
+  `destroy()`, so a plain content page stays exactly as stateless and
+  cache-friendly as before. An incoming session cookie is only trusted when
+  it names a session Garner itself issued (`SessionStore::exists()`); an
+  unrecognized or tampered id is never adopted, preventing session
+  fixation. Session ids come from a dedicated CSPRNG generator
+  (`SecureRandomIdGenerator`, 128 bits via `random_bytes()`), deliberately
+  independent of `app.ids.generator` — that setting scaffolds content ids
+  and may be made predictable, but a session id is a bearer token.
+  Persistence is pluggable via `app.session.store` (same shape as
+  `app.ids.generator`); the built-in `FileSessionStore` keeps one file per
+  session under `storage/sessions` — no extra dependency. The directory is
+  created owner-only (0700) and files are chmod'd 0600 before becoming
+  visible: session files hold per-visitor state and their names are the
+  bearer-token ids, so other local users on a shared host must not see
+  them. Writes go to a unique temp file renamed into place, so a
+  concurrent read (or `session:gc`) always sees a complete file — never
+  empty or half-written. Session files use
+  PHP's `serialize()`/`unserialize()` rather than JSON: JSON carries known
+  PHP round-trip hazards (whole-number float precision, objects silently
+  decoding as plain arrays) that don't matter for hand-edited content but do
+  for values stored blindly; `unserialize()` reads with
+  `allowed_classes: false` to avoid PHP object-injection risk from a
+  corrupted or tampered file. Sweep expired
+  sessions with the new `php bin/garner session:gc` command. This is a
+  generic primitive, not a "logged-in user" concept — see
+  `docs/sessions-next-steps.md`.
+
 - **Template fragments for htmx failure re-renders** —
   `ActionResult::failure()` accepts an optional `fragment` naming a Twig
   block in the page template. On an htmx POST (`HX-Request`), the failure
@@ -76,7 +110,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Request helpers** — the `Request` facade grows the read surface the action
   layer needs: `header()` and `cookie()` (case-insensitive names, default
-  fallback), `body()` (raw), `form()` (parsed form fields), `json()` (decoded
+  fallback; a cookie a client sends in a non-scalar shape like `name[]=x`
+  reads as absent rather than throwing — malformed client input, not an
+  application error), `body()` (raw), `form()` (parsed form fields), `json()` (decoded
   body; empty array for an empty body, `JsonException` on malformed input),
   `file()` returning a Garner-styled `UploadedFile` (client-supplied name and
   MIME type flagged untrusted, `moveTo()` to accept the upload; validity and

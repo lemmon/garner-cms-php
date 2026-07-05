@@ -371,13 +371,16 @@ the box, so a `422` failure would be silently ignored. Opt the site in with
 htmx's own configuration mechanism, e.g.:
 
 ```html
-<meta name="htmx-config" content='{"responseHandling": [
+<meta
+  name="htmx-config"
+  content='{"responseHandling": [
   {"code":"422", "swap": true},
   {"code":"204", "swap": false},
   {"code":"[23]..", "swap": true},
   {"code":"[45]..", "swap": false, "error":true},
   {"code":"...", "swap": false}
-]}'>
+]}'
+/>
 ```
 
 Page dispatch is method-aware: `HEAD` routes like `GET`, POST goes to the
@@ -401,11 +404,70 @@ return static function (Environment $twig, Application $app): void {
 };
 ```
 
+## Sessions
+
+`$app->session()` gives a controller or action per-visitor key/value state —
+`get()`, `set()`, `has()`, `remove()`, plus `flash()`/`consumeFlash()`
+(and `hasFlash()` to peek without consuming) for a value that survives
+exactly one redirect (the Post/Redirect/Get flash-message case). One key
+is reserved: `_flash` carries flash metadata internally, and `set('_flash', ...)`
+throws rather than letting the value be silently lost:
+
+```php
+// routes/subscribe/+action.php
+$app->session()->flash('notice', 'Subscribed!');
+
+return ActionResult::redirect('/subscribe/thanks');
+```
+
+```php
+// routes/subscribe/thanks/+controller.php
+return static fn(Request $request, Page $page, Site $site, Application $app): array => [
+    'notice' => $app->session()->consumeFlash('notice'),
+];
+```
+
+```twig
+{# routes/subscribe/thanks/+template.twig #}
+{% if notice %}<p>{{ notice }}</p>{% endif %}
+```
+
+Activation is lazy: for a visitor with no session, reading or never touching
+the session costs nothing and sends no cookie, so a plain content page stays
+exactly as stateless and cache-friendly as it would be without this feature
+at all. A cookie is only set once a request calls `set()`, `flash()`, or
+`destroy()`. A flashed value survives exactly one request whether or not it
+is consumed — the load that makes it readable also expires it. An
+incoming session cookie is only trusted when it names a session Garner
+itself issued — an unrecognized or tampered value is never adopted, so a
+client can't plant a session id (session fixation). Call `regenerate()` the
+moment a session's privilege changes (e.g. right after a login feature
+authenticates someone). Session ids always come from a dedicated
+cryptographically random generator, independent of `ids.generator` — that
+setting shapes scaffolded content ids and may be made predictable, but a
+session id is a bearer token and must stay unguessable.
+
+Data persists through a pluggable `SessionStore` — `FileSessionStore` by
+default, one file per session under `storage/sessions`, no extra dependency
+required. The directory and its files are owner-only (0700/0600 — session
+files hold per-visitor state and their names are the session ids), and each
+write lands atomically via a temp-file rename, so concurrent requests never
+see a half-written session. Session files use PHP's `serialize()`, not JSON: nobody hand-edits
+them, so Garner's file-legibility bias (which is about content meant for
+human editing) doesn't apply, and `serialize()` avoids known JSON round-trip
+hazards for values stored blindly (whole-number float precision, objects
+silently decoding as plain arrays). Sweep expired sessions with
+`php bin/garner session:gc`
+(wire it into a deploy hook or cron, the same way `reindex` is). This is a
+generic primitive, not a "logged-in user" concept — a future auth feature
+would store a user id in it rather than inventing its own storage.
+
 ## Configuration
 
 See `config/app.php`. Notable keys: `debug`, `url` (site base URL — see below),
 `ids.generator` (`cuid2` default, also `ulid`, `uuid_v4`, `uuid_v7`, or a custom
-generator), `index.mode`, `rendering.default_template`, `twig.*`, and
+generator), `index.mode`, `rendering.default_template`, `twig.*`,
+`session.*` (`cookie`, `lifetime`, `store`, `path` — see Sessions above), and
 `csrf.check_origin` (on by default: cross-site form POSTs — mismatched
 `Origin` / `Sec-Fetch-Site` — answer 403; JSON APIs and header-less
 non-browser clients are unaffected).

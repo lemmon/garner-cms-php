@@ -33,6 +33,7 @@ final class Console
         $cli->setAutoExit(false);
         $cli->addCommand(new CacheClearCommand($this->app));
         $cli->addCommand(new ReindexCommand($this->app));
+        $cli->addCommand(new SessionGcCommand($this->app));
         $cli->addCommand(new ValidateCommand($this->app));
         $cli->addCommand(new CreatePageCommand($this->app));
 

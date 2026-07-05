@@ -40,6 +40,19 @@ return [
         // (e.g. third-party webhook deliveries that send Origin headers).
         'check_origin' => true,
     ],
+    'session' => [
+        // Persistence for Session data. null uses the built-in FileSessionStore
+        // (one file per session under `path`, PHP-serialized). Pass a
+        // SessionStore instance, a class-string, or a callable returning one
+        // for a custom backend (e.g. Redis) — same shape as `ids.generator`.
+        'store' => null,
+        // Where FileSessionStore keeps session files. null defaults to
+        // storage/sessions. Relative paths resolve against the project root.
+        'path' => null,
+        'cookie' => 'garner_session',
+        // Seconds a session (and its cookie) stays alive after its last write.
+        'lifetime' => 7200,
+    ],
     'markdown' => [
         'allow_unsafe_links' => false,
         'html_input' => 'strip',
@@ -47,7 +60,8 @@ return [
     'ids' => [
         // Generator for scaffolded ids. Use an IdGeneratorType case for a built-in,
         // or an IdGenerator instance / callable / class-string for a custom one.
-        // (Any unique string is a valid id regardless of generator.)
+        // (Any unique string is a valid id regardless of generator.) Session ids
+        // are unaffected — they always come from a dedicated CSPRNG generator.
         'generator' => IdGeneratorType::Cuid2,
     ],
     'rendering' => [

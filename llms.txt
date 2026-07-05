@@ -154,8 +154,15 @@ A co-located `+action.php` handles the page's POST (the write side; keep the
 controller read-side). It returns a callable `(request, page, site, app)` and
 must produce one of:
 
-- `Garner\Render\ActionResult::failure(data, status = 422)` — re-render the
-  page with `data` available in the template as `form`;
+- `Garner\Render\ActionResult::failure(data, status = 422, fragment = null)` —
+  re-render the page with `data` available in the template as `form`.
+  `fragment` names a Twig block in the page template; an htmx POST is then
+  answered with just that block (same context and status) so the form swaps
+  in place. The block renders alone (`{% set %}` outside it does not run),
+  so keep fragment blocks self-contained — compute derived values in the
+  controller or inside the block. htmx ignores `4xx` responses by default —
+  include the `htmx-config` meta tag that allows `422` to swap (see README,
+  "Form actions") whenever a site uses fragment failures;
 - `Garner\Render\ActionResult::redirect(location, status = 303)` — the
   Post/Redirect/Get success path. htmx-aware: an htmx POST (`HX-Request`)
   is answered with `204` + `HX-Redirect` instead of a `3xx`, so htmx

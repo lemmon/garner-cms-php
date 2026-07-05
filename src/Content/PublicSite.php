@@ -92,7 +92,8 @@ final class PublicSite
 
     /**
      * Dispatch the page's +action.php. A failure re-renders the page with the
-     * failure data exposed to the template as `form`; a redirect answers
+     * failure data exposed to the template as `form` (for htmx, optionally
+     * just a named template fragment of it); a redirect answers
      * Post/Redirect/Get; a full RenderedResponse passes through verbatim.
      */
     private function respondWithAction(Page $page, Site $site): RenderedResponse
@@ -133,10 +134,26 @@ final class PublicSite
             return $context;
         }
 
-        return RenderedResponse::html($this->renderer->renderPage($page, $site, [
-            ...$context,
-            'form' => $result->data(),
-        ]), $result->status());
+        $renderContext = [...$context, 'form' => $result->data()];
+        $fragment = $result->fragment();
+
+        // An htmx form swaps its hx-target with the response, so a full-page
+        // failure re-render is useless to it (worse: htmx ignores 4xx bodies
+        // by default, making the submit a silent no-op). A failure carrying a
+        // fragment name answers htmx with just that template block — same
+        // context, same status — so the form can swap in place. The site opts
+        // htmx into swapping 422s via the documented htmx-config meta tag.
+        if ($fragment !== null && $this->app->request()->isHtmx()) {
+            return RenderedResponse::html(
+                $this->renderer->renderPageFragment($page, $site, $fragment, $renderContext),
+                $result->status(),
+            );
+        }
+
+        return RenderedResponse::html(
+            $this->renderer->renderPage($page, $site, $renderContext),
+            $result->status(),
+        );
     }
 
     private function methodNotAllowed(Page $page, Site $site, string $path): RenderedResponse

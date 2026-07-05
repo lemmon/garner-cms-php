@@ -166,10 +166,23 @@ This probably requires two pieces:
 - request helpers such as `isHtmx()`;
 - response helpers such as `withHeader()`, `hxRedirect()`, and `partial()`.
 
-**Leaning for the partial API:** Twig named-block rendering of the _same_ page
-template (`renderBlock`) — fragments live inside the page template they belong
-to, no new file type. This is the established htmx "template fragments"
-pattern. To be confirmed by the prototype.
+**Decided (2026-07-05): the partial API is Twig named-block rendering of the
+_same_ page template** (`renderPageFragment()` on the renderer) — fragments
+live inside the page template they belong to, no new file type. This is the
+established htmx "template fragments" pattern. First consumer: failure
+re-renders, via `ActionResult::failure(data, status, fragment: 'block')` —
+an htmx POST failure answers with just the named block (same rebuilt
+context, same status) so the form swaps in place. The motivating gotcha:
+htmx ignores `4xx` responses by default, so a full-page 422 re-render was a
+_silent no-op_ for an htmx form. The fragment answer keeps the honest 422;
+the site opts htmx into swapping it with the `htmx-config` meta tag
+(documented in the README). Success-side navigation was already covered by
+the `HX-Redirect` translation of `ActionResult::redirect()`. Known
+trade-off of `renderBlock`: the block renders alone, so `{% set %}`
+statements outside it do not run — fragment blocks must be self-contained
+(derived values go in the controller or inside the block); a template that
+cannot comply skips the fragment and uses client-side `hx-select` against
+the full re-render instead.
 
 ## Compatibility
 
@@ -251,9 +264,13 @@ Still open:
 - Flash state — leaning: none until sessions exist; failure-data re-render
   covers the common case, success messages ride the redirect target
   (the splash uses `/?subscribed=1`).
-- Confirming the `renderBlock` partial approach against a real fragment —
-  the splash needed no fragment, so the partial API remains unbuilt; HTMX
-  responses use the `RenderedResponse` escape hatch for now.
+- ~~Confirming the `renderBlock` partial approach against a real fragment.~~
+  **Done (2026-07-05):** built as `renderPageFragment()` +
+  `ActionResult::failure(..., fragment:)`, driven by the htmx failure
+  gotcha (4xx responses don't swap by default, so a full-page 422 re-render
+  was a silent no-op for htmx forms). See "HTMX implications" above.
+  Fragments beyond failure re-renders (e.g. `hx-get` partials) still go
+  through the `RenderedResponse` escape hatch.
 
 ## Near-term next steps
 

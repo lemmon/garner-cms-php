@@ -317,15 +317,18 @@ return static function ($request, $page, $site, $app): ActionResult {
 };
 ```
 
-- **Failure** — `ActionResult::failure($data, $status = 422)` re-renders the
-  page with `$data` available to the template as `form`. The `form` variable
-  is always defined in page render context: `null` outside a failure
-  re-render (controller data cannot override it), so templates can branch on
-  it without lax `strict_variables`. The re-render behaves exactly like the
-  page's GET render plus `form`: read-side controllers see the request as a
-  true GET — the submitted payload (form fields, files, body) is dropped — so
-  one that branches on the method or reads the request body contributes its
-  normal context instead of reacting to the POST the action already handled.
+- **Failure** — `ActionResult::failure($data, $status = 422, $fragment = null)`
+  re-renders the page with `$data` available to the template as `form`. The
+  `form` variable is always defined in page render context: `null` outside a
+  failure re-render (controller data cannot override it), so templates can
+  branch on it without lax `strict_variables`. The re-render behaves exactly
+  like the page's GET render plus `form`: read-side controllers see the
+  request as a true GET — the submitted payload (form fields, files, body) is
+  dropped — so one that branches on the method or reads the request body
+  contributes its normal context instead of reacting to the POST the action
+  already handled. `$fragment` names a Twig block in the page template: an
+  htmx POST is then answered with just that block (same context, same status)
+  so the form swaps in place instead of receiving a whole page — see below.
 - **Success** — `ActionResult::redirect($location, $status = 303)` answers
   Post/Redirect/Get (303 makes the client re-request the target with GET;
   `RenderedResponse::redirect()` keeps its method-preserving 308 default for
@@ -336,6 +339,46 @@ return static function ($request, $page, $site, $app): ActionResult {
   redirect means.
 - **Escape hatch** — return a full `RenderedResponse` for JSON, fragments
   (e.g. when `$request->isHtmx()`), or custom headers.
+
+For htmx forms, wrap the form in a named block and point the failure at it —
+the fragment lives inside the page template it belongs to, no separate
+partial file:
+
+```twig
+{% block subscribe_form %}
+  <form hx-post="{{ page.path }}" hx-swap="outerHTML">
+    {% if form is not null %}<p class="error">{{ form.error }}</p>{% endif %}
+    <input type="email" name="email" value="{{ form.email ?? '' }}">
+    <button>Subscribe</button>
+  </form>
+{% endblock %}
+```
+
+```php
+return ActionResult::failure(['error' => '…'], fragment: 'subscribe_form');
+```
+
+The fragment block renders alone: `{% set %}` statements elsewhere in the
+template do not run, so keep the block self-contained — derived values
+belong in the controller (its data is part of the fragment context) or
+inside the block itself. Under `strict_variables` an outside dependency
+throws; under Twig's lax default it silently renders empty. A template that
+cannot meet this should skip `fragment:` and let the form pluck its piece
+from the full re-render with [`hx-select`](https://htmx.org/attributes/hx-select/).
+
+One htmx default to know about: htmx does not swap `4xx` responses out of
+the box, so a `422` failure would be silently ignored. Opt the site in with
+htmx's own configuration mechanism, e.g.:
+
+```html
+<meta name="htmx-config" content='{"responseHandling": [
+  {"code":"422", "swap": true},
+  {"code":"204", "swap": false},
+  {"code":"[23]..", "swap": true},
+  {"code":"[45]..", "swap": false, "error":true},
+  {"code":"...", "swap": false}
+]}'>
+```
 
 Page dispatch is method-aware: `HEAD` routes like `GET`, POST goes to the
 action, and a verb the page cannot answer returns `405 Method Not Allowed`

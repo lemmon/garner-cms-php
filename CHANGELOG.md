@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Template fragments for htmx failure re-renders** —
+  `ActionResult::failure()` accepts an optional `fragment` naming a Twig
+  block in the page template. On an htmx POST (`HX-Request`), the failure
+  answers with just that block — rendered with the same rebuilt context as
+  the full re-render (read-side controller data plus `form`), same status —
+  so the form swaps in place instead of receiving a whole page. Without a
+  fragment (or for plain browser POSTs) the full-page re-render is
+  unchanged. This is the htmx "template fragments" pattern: the fragment
+  lives inside the page template it belongs to
+  (`renderPageFragment()` on the renderer), no separate partial file. Note
+  htmx does not swap 4xx responses out of the box — a site returning 422
+  failures to htmx forms opts in via the documented `htmx-config` meta tag
+  (see README).
+
 - **Page actions (`+action.php`)** — a page's write-side POST handler, kept
   separate from the read-side `+controller.php`. The file returns a callable
   with the controller contract plus the request prepended —
@@ -29,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`RenderedResponse::redirect()` keeps its method-preserving 308 default for
   canonical redirects) and is htmx-aware: an htmx POST (`HX-Request`) gets
   `204` + `HX-Redirect` instead of a `3xx`, so htmx navigates the whole page
-  rather than swapping the redirect target into the form's `hx-target`. Page dispatch is now method-aware: `form` is always
+  rather than swapping the redirect target into the form's `hx-target`.
+  Page dispatch is now method-aware: `form` is always
   defined in page render context (`null` on plain GET, so templates never
   depend on lax `strict_variables`), `HEAD` routes like `GET`, and a verb the
   page cannot answer returns `405 Method Not Allowed` with an `Allow` header

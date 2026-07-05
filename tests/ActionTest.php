@@ -136,6 +136,70 @@ final class ActionTest extends TestCase
         self::assertStringNotContainsString('hijacked', $response->body());
     }
 
+    public function testFailureWithFragmentAnswersHtmxWithJustTheBlock(): void
+    {
+        $this->writeSubscribeActionWithFragment();
+        // The fragment renders with the same rebuilt read-side context as a
+        // full failure re-render.
+        $this->writeFile(
+            'routes/subscribe/+controller.php',
+            '<?php return static fn(): array => ["extra" => "READ-SIDE"];',
+        );
+
+        $response = $this->respond($this->formPost(
+            '/subscribe',
+            ['email' => 'not-an-email'],
+            ['HTTP_HX_REQUEST' => 'true'],
+        ));
+
+        self::assertSame(422, $response->status());
+        self::assertSame(
+            'FRAGMENT[Enter a valid email.|not-an-email:READ-SIDE]',
+            $response->body(),
+        );
+    }
+
+    public function testFailureWithFragmentStillReRendersFullPageForPlainForms(): void
+    {
+        $this->writeSubscribeActionWithFragment();
+
+        $response = $this->respond($this->formPost('/subscribe', ['email' => 'not-an-email']));
+
+        self::assertSame(422, $response->status());
+        self::assertStringContainsString('<h1>Subscribe</h1>', $response->body());
+        self::assertStringContainsString(
+            'FORM:Enter a valid email.|not-an-email',
+            $response->body(),
+        );
+    }
+
+    public function testFailureWithoutFragmentReRendersFullPageEvenForHtmx(): void
+    {
+        $this->writeSubscribeAction();
+
+        $response = $this->respond($this->formPost(
+            '/subscribe',
+            ['email' => 'not-an-email'],
+            ['HTTP_HX_REQUEST' => 'true'],
+        ));
+
+        self::assertSame(422, $response->status());
+        self::assertStringContainsString('<h1>Subscribe</h1>', $response->body());
+    }
+
+    public function testFailureWithUnknownFragmentThrows(): void
+    {
+        $this->writeSubscribeActionWithFragment('no_such_block');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('has no block "no_such_block"');
+        $this->respond($this->formPost(
+            '/subscribe',
+            ['email' => 'not-an-email'],
+            ['HTTP_HX_REQUEST' => 'true'],
+        ));
+    }
+
     public function testControllerCannotOverrideTheNullFormOnGet(): void
     {
         $this->writeSubscribeAction();
@@ -349,8 +413,29 @@ final class ActionTest extends TestCase
             "<h1>{{ page.title }}</h1>\n"
             . '{% if form is not null %}FORM:{{ form.errors.email }}|{{ form.values.email }}'
             . '{% else %}NOFORM{% endif %}'
-            . "\n{{ extra ?? '' }}",
+            . "\n{{ extra ?? '' }}\n"
+            . '{% block subscribe_form %}FRAGMENT['
+            . '{% if form is not null %}{{ form.errors.email }}|{{ form.values.email }}{% endif %}'
+            . ":{{ extra ?? '' }}]{% endblock %}",
         );
+    }
+
+    /**
+     * An action whose failure names a template fragment for htmx.
+     */
+    private function writeSubscribeActionWithFragment(string $fragment = 'subscribe_form'): void
+    {
+        $this->writeFile('routes/subscribe/+action.php', <<<PHP
+            <?php
+
+            use Garner\Core\Request;
+            use Garner\Render\ActionResult;
+
+            return static fn(Request \$request): ActionResult => ActionResult::failure([
+                'errors' => ['email' => 'Enter a valid email.'],
+                'values' => ['email' => (string) (\$request->form()['email'] ?? '')],
+            ], fragment: '{$fragment}');
+            PHP);
     }
 
     private function writeFile(string $relativePath, string $contents): void

@@ -6,6 +6,7 @@ namespace Garner\Render;
 
 use Garner\Content\Page;
 use Garner\Content\Site;
+use RuntimeException;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 use Twig\Markup;
@@ -65,6 +66,36 @@ final class TwigRenderer implements RendererInterface
             'content' => $page->content(),
             'meta' => $page->meta(),
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public function renderPageFragment(
+        Page $page,
+        Site $site,
+        string $fragment,
+        array $data = [],
+    ): string {
+        $name = $this->resolveTemplate($page);
+        $template = $this->twig->load($name);
+        $context = [
+            ...$data,
+            'page' => $page,
+            'site' => $site,
+            'content' => $page->content(),
+            'meta' => $page->meta(),
+        ];
+
+        if (!$template->hasBlock($fragment, $context)) {
+            throw new RuntimeException(sprintf(
+                'Template "%s" has no block "%s" to render as a fragment',
+                $name,
+                $fragment,
+            ));
+        }
+
+        return $template->renderBlock($fragment, $context);
     }
 
     /**

@@ -33,6 +33,13 @@ return [
         'storage' => 'storage',
         'public' => 'public',
     ],
+    'csrf' => [
+        // Reject cross-site form POSTs (mismatched Origin / Sec-Fetch-Site)
+        // with a 403. Stateless — no sessions or tokens involved. Disable only
+        // for sites that must accept form-encoded POSTs from other origins
+        // (e.g. third-party webhook deliveries that send Origin headers).
+        'check_origin' => true,
+    ],
     'markdown' => [
         'allow_unsafe_links' => false,
         'html_input' => 'strip',

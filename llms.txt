@@ -143,6 +143,10 @@ Read the current request through `$app->request()` instead of PHP
 superglobals: `method()`, `form()`, `json()`, `body()`, `cookie(name)`,
 `header(name)`, `file(name)`, and `isHtmx()`.
 
+Cross-site form POSTs are rejected with a 403 by default (origin check;
+stateless CSRF protection). Same-origin forms, JSON APIs, and non-browser
+clients are unaffected. Off-switch: `app.csrf.check_origin => false`.
+
 A directory with `+controller.php` and no page entry file is a route endpoint.
 Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
 in the page tree.

@@ -306,7 +306,10 @@ return static function (Environment $twig, Application $app): void {
 
 See `config/app.php`. Notable keys: `debug`, `url` (site base URL — see below),
 `ids.generator` (`cuid2` default, also `ulid`, `uuid_v4`, `uuid_v7`, or a custom
-generator), `index.mode`, `rendering.default_template`, and `twig.*`.
+generator), `index.mode`, `rendering.default_template`, `twig.*`, and
+`csrf.check_origin` (on by default: cross-site form POSTs — mismatched
+`Origin` / `Sec-Fetch-Site` — answer 403; JSON APIs and header-less
+non-browser clients are unaffected).
 
 Environment variables (`APP_URL`, `APP_DEBUG`, `APP_ENV`) can come from the real
 environment or from a `.env` file in the project root, loaded via `symfony/dotenv`

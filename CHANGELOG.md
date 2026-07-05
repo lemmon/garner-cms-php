@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Origin-check CSRF protection, on by default** — a POST carrying a form
+  content type (`application/x-www-form-urlencoded`, `multipart/form-data`,
+  `text/plain` — the three a cross-site HTML form can send without a CORS
+  preflight) is rejected with a plain 403 when the browser-declared origin
+  does not match the request's own origin. `Sec-Fetch-Site` is consulted
+  first (`same-origin` / `none` pass, anything else rejects) — the browser
+  computes it itself and it is scheme-independent, so it stays correct behind
+  proxies that hide the original protocol. The `Origin` header (mismatched or
+  `null` rejects) is the fallback, with one tolerance: an `https` origin
+  matches an `http` base URL on the same host, covering TLS-terminating
+  proxies that don't forward `X-Forwarded-Proto`. Stateless — no sessions or
+  tokens — and enforced in the router, so pages, endpoints, and custom routes
+  are covered alike. Requests with neither header (curl, webhook deliveries)
+  pass: they carry no victim's browser credentials, and blocking them would
+  break non-browser form posts — a softer default than SvelteKit's strict
+  origin equality. JSON APIs are unaffected. Disable with
+  `app.csrf.check_origin => false`.
+
 - **Request helpers** — the `Request` facade grows the read surface the action
   layer needs: `header()` and `cookie()` (case-insensitive names, default
   fallback), `body()` (raw), `form()` (parsed form fields), `json()` (decoded

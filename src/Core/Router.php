@@ -17,6 +17,12 @@ final class Router
         $request = $this->app->request();
         $path = $request->path();
 
+        // Before any producer runs — custom routes, pages, and endpoints are
+        // all form targets, so they share the same cross-site POST protection.
+        if ($this->originCheckEnabled() && OriginCheck::rejects($request)) {
+            $this->emit(RenderedResponse::text("Cross-site form submission rejected.\n", 403));
+        }
+
         if ($path === '/favicon.ico') {
             $this->renderFavicon();
         }
@@ -43,6 +49,11 @@ final class Router
     {
         $response->send();
         exit();
+    }
+
+    private function originCheckEnabled(): bool
+    {
+        return (bool) $this->app->config('app.csrf.check_origin', true);
     }
 
     private function renderFavicon(): never

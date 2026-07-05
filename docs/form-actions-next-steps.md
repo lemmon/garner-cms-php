@@ -240,7 +240,17 @@ Still open (the prototype decides):
    `json()`, `file()` (Garner `UploadedFile` facade), `isHtmx()`;
    `Request::create()` builds test requests with parameters, cookies, files,
    and a raw body.
-4. Add the origin-check CSRF default.
+4. ~~Add the origin-check CSRF default.~~ **Done (2026-07-04):**
+   `Core\OriginCheck`, enforced in the router for pages, endpoints, and custom
+   routes alike; `app.csrf.check_origin` config (default true). Deliberate
+   deviations from SvelteKit's strict origin equality, to re-test against the
+   real form flow in step 5: (a) a form POST with _neither_ `Origin` nor
+   `Sec-Fetch-Site` passes (curl, webhook deliveries — no browser, no ambient
+   credentials), so rejection requires positive cross-site evidence;
+   (b) `Sec-Fetch-Site` outranks the `Origin` comparison, and the `Origin`
+   fallback accepts an `https` origin against an `http` base on the same
+   host — both so TLS-terminating proxies that hide the protocol don't 403
+   legitimate same-origin forms.
 5. Prototype `+action.php` on a real flow: the splash's "notify me on
    release" email-capture form — single field, spam-exposed (exercises the
    origin check and an honest honeypot), failure re-render, 303 success. It

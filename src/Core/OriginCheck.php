@@ -43,7 +43,7 @@ final class OriginCheck
 
         if ($origin !== null) {
             // Also rejects the literal "null" origin (sandboxed iframes,
-            // data: URLs) — it never equals a real base URL.
+            // data: URLs) — it never equals a real origin.
             return !self::sameOrigin($origin, $request);
         }
 
@@ -53,7 +53,7 @@ final class OriginCheck
     private static function sameOrigin(string $origin, Request $request): bool
     {
         $origin = strtolower(trim($origin));
-        $base = strtolower($request->baseUrl());
+        $base = strtolower($request->origin());
 
         if ($origin === $base) {
             return true;

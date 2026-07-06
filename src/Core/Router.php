@@ -34,7 +34,7 @@ final class Router
 
         $this->emit($this->app->publicSite()->respond(
             $path,
-            $request->query(),
+            $request->queryString(),
             $request->basePath(),
         ));
     }

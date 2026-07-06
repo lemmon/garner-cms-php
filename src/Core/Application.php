@@ -369,7 +369,7 @@ final class Application
             return rtrim(trim($configured), '/');
         }
 
-        return $this->request()->baseUrl();
+        return $this->request()->origin();
     }
 
     public function favicon(): Favicon

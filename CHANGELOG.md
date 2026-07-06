@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Request::queryParam(name, default = null)` and `Request::queryParams()`**
+  — parsed query-parameter accessors, closing the gap that forced userland
+  into `parse_str($request->queryString(), ...)` plus hand-rolled
+  `is_string()` guards for something as routine as reading `?uuid=...`.
+  `queryParam()` returns the parameter as a string, or the default when it
+  is absent — or arrives in a non-scalar shape like `name[]=x`, which reads
+  as absent rather than throwing, the same untrusted-input policy `cookie()`
+  already established. `queryParams()` returns the whole parsed query as an
+  array (nested names like `filter[a]` arrive as arrays), the shape a schema
+  validator consumes in one call — mirroring how `form()` already serves
+  the request body. `queryString()` keeps returning the raw string verbatim;
+  that remains the right surface for URL reconstruction (canonical
+  redirects), just not for parameter reads.
+
 - **Key-value store** — `$app->store()` gives actions and controllers
   durable site-wide storage: string keys, JSON values, backed by a single
   SQLite file (`storage/store.sqlite`, `app.store.path` config) created
@@ -45,6 +59,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `store:set <key> <json>`, `store:remove <key>`. Testable via
   `Application::withStore()` (same callback-scoped shape as
   `withSession()`). See `docs/key-value-store-next-steps.md`.
+
+### Changed
+
+- **`Request::query()` renamed to `queryString()`, `Request::baseUrl()` to
+  `origin()`** — two naming traps removed while the API can still break
+  freely. `query()` returning the raw string while the new `queryParams()`
+  returns the parsed array left the two most confusable names carrying the
+  biggest semantic difference (and pointed the wrong way for anyone
+  expecting Laravel's parsed `query()`); `queryString()` says exactly what
+  it holds. `baseUrl()` sounded like `basePath()`'s full-URL sibling —
+  suggesting `https://example.test/blog` for a subdirectory install — when
+  it actually returned only `scheme://host`; `origin()` is the standard
+  web-platform term for exactly that value and can no longer be misread as
+  including the base path. Behavior of both methods is unchanged.
 
 ## [0.2.0] - 2026-07-05
 

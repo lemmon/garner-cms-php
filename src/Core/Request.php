@@ -124,12 +124,39 @@ final class Request
      * redirects re-attach it, so it must not be re-encoded or re-ordered. Empty
      * when the request has none.
      */
-    public function query(): string
+    public function queryString(): string
     {
         $uri = $this->inner->getRequestUri();
         $pos = strpos($uri, '?');
 
         return $pos === false ? '' : substr($uri, $pos + 1);
+    }
+
+    /**
+     * All query parameters, parsed the way PHP parses them — nested names
+     * like `filter[a]` arrive as arrays. The whole-payload counterpart to
+     * queryParam(), shaped to feed a schema validator in one call; values
+     * are client input, so validate rather than assume scalars.
+     *
+     * @return array<string, mixed>
+     */
+    public function queryParams(): array
+    {
+        return $this->inner->query->all();
+    }
+
+    /**
+     * The named query parameter's value, or the default when absent. A
+     * parameter sent in a non-scalar shape (e.g. `name[]=x`) also reads as
+     * absent — query strings are client input, same policy as cookie().
+     * Complements queryString(), which stays the raw string so canonical
+     * redirects can re-attach it verbatim.
+     */
+    public function queryParam(string $name, ?string $default = null): ?string
+    {
+        $value = $this->queryParams()[$name] ?? null;
+
+        return is_scalar($value) ? (string) $value : $default;
     }
 
     /**
@@ -241,11 +268,13 @@ final class Request
     }
 
     /**
-     * The request's base URL (scheme://host[:port]) without a trailing slash.
-     * Falls back to http://localhost when no Host header is available (e.g. CLI),
-     * where the origin should be pinned via the app.url config.
+     * The request's origin (scheme://host[:port]), no trailing slash — the
+     * standard web-platform sense of the word, deliberately without the
+     * basePath() prefix. Falls back to http://localhost when no Host header
+     * is available (e.g. CLI), where the origin should be pinned via the
+     * app.url config.
      */
-    public function baseUrl(): string
+    public function origin(): string
     {
         $host = trim(
             (string) (

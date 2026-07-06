@@ -11,36 +11,36 @@ use Symfony\Component\HttpFoundation\File\UploadedFile as HttpFoundationUploaded
 
 final class RequestTest extends TestCase
 {
-    public function testBaseUrlInfersSchemeAndHostFromRequest(): void
+    public function testOriginInfersSchemeAndHostFromRequest(): void
     {
         self::assertSame(
             'http://example.test:8080',
-            Request::create('http://example.test:8080/')->baseUrl(),
+            Request::create('http://example.test:8080/')->origin(),
         );
 
         self::assertSame(
             'https://example.test:8080',
-            Request::create('https://example.test:8080/')->baseUrl(),
+            Request::create('https://example.test:8080/')->origin(),
         );
     }
 
-    public function testBaseUrlHonorsForwardedProto(): void
+    public function testOriginHonorsForwardedProto(): void
     {
         $request = Request::create('http://example.test/', server: [
             'HTTP_X_FORWARDED_PROTO' => 'https',
         ]);
 
-        self::assertSame('https://example.test', $request->baseUrl());
+        self::assertSame('https://example.test', $request->origin());
     }
 
-    public function testBaseUrlFallsBackToLocalhostWithoutHost(): void
+    public function testOriginFallsBackToLocalhostWithoutHost(): void
     {
         $request = Request::create('/', server: [
             'HTTP_HOST' => '',
             'SERVER_NAME' => '',
         ]);
 
-        self::assertSame('http://localhost', $request->baseUrl());
+        self::assertSame('http://localhost', $request->origin());
     }
 
     public function testPathIsTheRoutePathWithoutQuery(): void
@@ -64,16 +64,48 @@ final class RequestTest extends TestCase
 
         self::assertSame('/blog', $request->basePath());
         self::assertSame('/about/', $request->path());
-        self::assertSame('x=1', $request->query());
+        self::assertSame('x=1', $request->queryString());
     }
 
-    public function testQueryIsVerbatimAndEmptyWhenAbsent(): void
+    public function testQueryStringIsVerbatimAndEmptyWhenAbsent(): void
     {
-        self::assertSame('', Request::create('http://example.test/about')->query());
+        self::assertSame('', Request::create('http://example.test/about')->queryString());
         self::assertSame(
             'b=2&a=1%20z',
-            Request::create('http://example.test/about?b=2&a=1%20z')->query(),
+            Request::create('http://example.test/about?b=2&a=1%20z')->queryString(),
         );
+    }
+
+    public function testQueryParamsExposesTheWholeParsedQuery(): void
+    {
+        $request = Request::create('http://example.test/confirm?uuid=abc&page=1%20z&filter[a]=x');
+
+        self::assertSame(
+            ['uuid' => 'abc', 'page' => '1 z', 'filter' => ['a' => 'x']],
+            $request->queryParams(),
+        );
+        self::assertSame([], Request::create('http://example.test/confirm')->queryParams());
+    }
+
+    public function testQueryParamReadsAValueAndFallsBackToDefault(): void
+    {
+        $request = Request::create('http://example.test/confirm?uuid=abc&token=1%20z');
+
+        self::assertSame('abc', $request->queryParam('uuid'));
+        self::assertSame('1 z', $request->queryParam('token'));
+        self::assertNull($request->queryParam('missing'));
+        self::assertSame('fallback', $request->queryParam('missing', 'fallback'));
+    }
+
+    public function testAMalformedNonScalarQueryParamReadsAsAbsent(): void
+    {
+        // A client can send `?uuid[]=x`, arriving as an array. Query strings
+        // are untrusted input; a malformed value must read as absent, not
+        // throw (same policy as cookie()).
+        $request = Request::create('http://example.test/confirm?uuid[]=x');
+
+        self::assertNull($request->queryParam('uuid'));
+        self::assertSame('fallback', $request->queryParam('uuid', 'fallback'));
     }
 
     public function testMethodIsUppercased(): void
@@ -234,10 +266,10 @@ final class RequestTest extends TestCase
 
             // Everything else reads like the original request.
             self::assertSame('/subscribe', $get->path());
-            self::assertSame('x=1', $get->query());
+            self::assertSame('x=1', $get->queryString());
             self::assertSame('1', $get->cookie('seen'));
             self::assertTrue($get->isHtmx());
-            self::assertSame('http://example.test', $get->baseUrl());
+            self::assertSame('http://example.test', $get->origin());
 
             // The original request is untouched.
             self::assertSame('POST', $post->method());

@@ -573,4 +573,4 @@ components (console, yaml, uid, error-handler, var-dumper).
 
 ## License
 
-Copyright © Jakub Pelák. All rights reserved. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

@@ -62,7 +62,7 @@ expressed through the mode:
 - **Development (`scan`)** — rescans the tree each request. Automatic.
 - **Production (`locked`)** — trusts the built index; run `php bin/garner reindex` on
   deploy. A deploy is a discrete event and reads stay O(1). It fits naturally as a
-  post-deploy build step (e.g. a php-git-deploy build hook). The compiled Twig cache
+  post-deploy build step in any deploy hook. The compiled Twig cache
   is locked the same way (`auto_reload` off outside debug), so the full refresh is
   `garner cache:clear && garner reindex`.
 - **Small sites** — set `app.index.mode = scan` in production too. The tree walk is

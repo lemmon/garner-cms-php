@@ -383,8 +383,17 @@ Not planned; recorded so the gap is a decision, not an accident.
 
 ## 2026-07-02 — Form submissions / POST handling (assumptions, untested)
 
-> Status: **brainstorm only.** Nothing below is implemented or verified — these are
-> working assumptions to be tested and discussed before any of it becomes design.
+> Status: **superseded (2026-07-05).** The assumptions below were tested and the
+> action layer shipped — see `docs/form-actions-next-steps.md` for the design
+> record. How the open questions resolved: CSRF became the stateless origin
+> check (not signed tokens or SameSite reliance); flash/PRG state became
+> sessions (`docs/sessions-next-steps.md`); the `Request` niceties shipped via
+> the HttpFoundation-backed rewrite — and `getInput()`/`getPayload()` were
+> removed rather than kept; named actions stay deferred; form-created content
+> remains future work. Assumption #1 held only partially: controller POST
+> branching still works, but the real prototype (a notify-me email-capture
+> form) motivated a dedicated `+action.php` layer in core rather than
+> controller branching alone. Kept as written below for the historical record.
 
 ### Assumption: the existing controller contract is already the form contract
 

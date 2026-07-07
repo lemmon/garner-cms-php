@@ -155,9 +155,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before the 405, the page's controllers run — a controller that answers the
   verb with a `RenderedResponse` (pre-action POST branching) still wins — and
   route endpoints keep full method freedom. The origin-check CSRF default
-  protects actions automatically. Prototyped end to end on the PHP Git Deploy
-  splash's "notify me on release" form per
-  `docs/form-actions-next-steps.md`.
+  protects actions automatically. Prototyped end to end on a real notify-me
+  email-capture form per `docs/form-actions-next-steps.md`.
 
 - **Origin-check CSRF protection, on by default** — a POST carrying a form
   content type (`application/x-www-form-urlencoded`, `multipart/form-data`,

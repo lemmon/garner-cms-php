@@ -1,10 +1,12 @@
 # Form actions and HTTP handling - initial next steps
 
-> Status: **prototyped (2026-07-05).** The action layer shipped and was
-> exercised on the splash's real notify-me form (steps 5–6 below). What the
-> prototype decided is folded into "Decided vs still open". Remaining: the
-> final cleanup pass (step 7) and the genuinely open points (partials,
-> named actions, flash, sessions).
+> Status: **shipped (2026-07-05; cleanup pass 2026-07-06).** The action layer
+> shipped and was exercised on a real notify-me email-capture form (steps 5–6
+> below). What the prototype decided is folded into "Decided vs still open".
+> Partials, flash, and sessions have since shipped too (see
+> `docs/sessions-next-steps.md`); the one genuinely open point left is named
+> actions, deferred until a real site needs multiple mutation vectors per
+> route.
 
 ## Context
 
@@ -41,7 +43,10 @@ This is the main scaling concern.
 - Validation failure can already be represented by returning extra template
   context from the controller, such as `errors` and `values`.
 
-### Current gaps
+### Gaps at the time of writing
+
+_Historical snapshot (2026-07-03) — every gap below has since been closed; see
+the status header and `CHANGELOG.md`._
 
 - `Garner\Core\Request` exists but is six static helpers over superglobals
   (scheme/host inference, path, query, raw body, JSON payload). No method,
@@ -109,7 +114,8 @@ with the request prepended (see contracts below).
   to the template as `form`.
 - The `form` template variable is **always defined** — `null` on plain GET
   renders — so templates never silently depend on lax `strict_variables`
-  (the same class of trap as the pageless-404 finding fixed in the splash).
+  (the same class of trap as the pageless-404 finding fixed in an early
+  consumer site).
 - An action redirect returns a proper redirect response, `303 See Other` by
   default for Post/Redirect/Get. (`RenderedResponse::redirect()` defaults to
   308 method-preserving — right for canonical redirects, wrong inside actions;
@@ -165,6 +171,10 @@ This probably requires two pieces:
 
 - request helpers such as `isHtmx()`;
 - response helpers such as `withHeader()`, `hxRedirect()`, and `partial()`.
+  (Of these only `withHeader()` shipped as sketched. No `hxRedirect()` or
+  `partial()` methods were needed: the htmx redirect translation lives inside
+  `ActionResult::redirect()`, and partial rendering became
+  `renderPageFragment()` — see the decision below.)
 
 **Decided (2026-07-05): the partial API is Twig named-block rendering of the
 _same_ page template** (`renderPageFragment()` on the renderer) — fragments
@@ -225,7 +235,7 @@ Decided (2026-07-03 review pass):
   already answered by `docs/index-freshness.md`: Garner owns the write, so
   the write path invalidates/rebuilds the index inline.
 
-Decided by the prototype (2026-07-05, splash notify-me form):
+Decided by the prototype (2026-07-05, a real notify-me form):
 
 - **`ActionResult` survives**, with two constructors that each carry a default
   a bare `RenderedResponse` gets wrong inside actions:
@@ -248,7 +258,7 @@ Decided by the prototype (2026-07-05, splash notify-me form):
   `json()` / `body()` / `file()` cannot react to the already-handled
   submission. `form` is reserved for the action layer — always defined,
   `null` outside a failure, and not overridable from controller data.
-- **`lemmon/validator` integrates without coupling**: the splash action uses
+- **`lemmon/validator` integrates without coupling**: the prototype action uses
   `tryValidate()` and feeds the first error message into
   `ActionResult::failure()` by hand. No framework-level bridge needed yet.
 - **The origin-check softenings from step 4 held**: the real same-origin form
@@ -261,9 +271,12 @@ Still open:
 
 - The named-action URL scheme, if and when multiple actions per route arrive
   (`?/name`, `?action=name`, a submit-button field, or route endpoints).
-- Flash state — leaning: none until sessions exist; failure-data re-render
+- ~~Flash state — leaning: none until sessions exist; failure-data re-render
   covers the common case, success messages ride the redirect target
-  (the splash uses `/?subscribed=1`).
+  (the prototype uses `/?subscribed=1`).~~ **Resolved (2026-07-05):** sessions
+  shipped with `flash()` / `consumeFlash()` (see
+  `docs/sessions-next-steps.md`), so a success message can ride a flash
+  across the PRG redirect instead of the URL.
 - ~~Confirming the `renderBlock` partial approach against a real fragment.~~
   **Done (2026-07-05):** built as `renderPageFragment()` +
   `ActionResult::failure(..., fragment:)`, driven by the htmx failure
@@ -299,13 +312,13 @@ Still open:
    fallback accepts an `https` origin against an `http` base on the same
    host — both so TLS-terminating proxies that hide the protocol don't 403
    legitimate same-origin forms.
-5. ~~Prototype `+action.php` on a real flow: the splash's "notify me on
-   release" email-capture form — single field, spam-exposed (exercises the
-   origin check and an honest honeypot), failure re-render, 303 success. It
+5. ~~Prototype `+action.php` on a real flow: a "notify me" email-capture
+   form — single field, spam-exposed (exercises the origin check and an
+   honest honeypot), failure re-render, 303 success. It
    touches every behavior above with real stakes.~~ **Done (2026-07-05):**
    action layer shipped (`+action.php` discovery, `PageActions`,
    `ActionResult`, method-aware page dispatch with 405 + `Allow`, `form`
-   always defined, HEAD routes like GET) and the splash form is live on it —
+   always defined, HEAD routes like GET) and the form is live on it —
    honeypot, `lemmon/validator` failure re-render (422), `/?subscribed=1`
    Post/Redirect/Get, verified in a real browser. Findings recorded under
    "Decided vs still open".
@@ -317,5 +330,7 @@ Still open:
    hatch, HEAD-like-GET, endpoint method freedom, controller POST-branching
    compatibility, and the invalid-return guard; origin-check rejection was
    already covered by `tests/OriginCheckTest.php` in step 4.
-7. Revisit this document after the prototype and delete anything that proved
-   too clever or too vague.
+7. ~~Revisit this document after the prototype and delete anything that proved
+   too clever or too vague.~~ **Done (2026-07-06):** stale present-tense gaps
+   marked historical, the never-shipped `hxRedirect()`/`partial()` sketches
+   annotated, and the flash item closed out against the shipped sessions.

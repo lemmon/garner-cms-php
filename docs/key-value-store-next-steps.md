@@ -15,11 +15,12 @@ rebuildable cache of the route tree, not a place for anything canonical. The
 (`config/app.php` → `paths.storage`) but has no occupant and no code behind it.
 
 The action layer changed the stakes. A `+action.php` that accepts a form
-submission usually needs to _keep_ something — the splash's notify-me form
+submission usually needs to _keep_ something — a notify-me form
 collects email addresses, and today the only answer is bring-your-own PDO
 inside the action. That works (`ext-pdo_sqlite` is already a hard
 requirement), but it is exactly the kind of boilerplate a framework should
-absorb once a real site has proven the need. The splash form is that proof.
+absorb once a real site has proven the need. The action layer's prototype
+form is that proof.
 
 This is deliberately **not** the session store. Sessions (shipped — see
 `sessions-next-steps.md`) are per-visitor, expiring state with their own
@@ -114,11 +115,11 @@ contract, not hit an edge case. Second, inspectability is load-bearing for
 the store in a way it isn't for sessions: the whole "Agent legibility"
 section below (the `store:*` commands, `sqlite3` on a TEXT column) works
 _because_ values are JSON; `serialize()` blobs would defeat the mitigation
-this doc promises. One residual caveat carries over and should be
-documented on the shipped API: whole-number floats may come back as ints
-(`2.0` → `2`, depending on `serialize_precision`). Nothing in the
-motivating use case stores floats; a site that needs exact float typing
-stores it as a string or brings its own PDO.
+this doc promises. One residual caveat was predicted here — whole-number
+floats coming back as ints (`2.0` → `2`, depending on
+`serialize_precision`) — but the implementation preempted it: values are
+encoded with `JSON_PRESERVE_ZERO_FRACTION`, so `2.0` is stored as `2.0`
+and decodes back as a float. The predicted caveat never shipped.
 
 ## Proposed shape
 
@@ -223,9 +224,9 @@ call sites disambiguate in code; the occasional prose ambiguity is livable.
 1. Confirm scope (this doc) and the open questions above. ✅
 2. Implement `Store` with the lazy SQLite backing, `Application::store()` /
    `withStore()`. ✅
-3. Migrate the splash notify-me action from its current storage to
+3. Migrate the prototype notify-me action from its current storage to
    `add("email:$hash", …)` — the real-flow proof, same as the action layer's
-   step 5. (Lives in the splash site's own repository, not here.)
+   step 5. (Lives in the consuming site's own repository, not here.)
 4. Add the `store:*` console commands. ✅
 5. Tests: add/set/get/has/remove round-trip, `add()` returning `false` on
    duplicate, prefix listing as Collection, lazy file creation, JSON round-trip

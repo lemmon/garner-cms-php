@@ -276,6 +276,9 @@ LOCK_EX)` only protected against concurrent _writers_: flock is
 - **Store configuration** mirrors `app.ids.generator` exactly: `null` (file
   default), a `SessionStore` instance, a class-string, or a callable
   returning one.
+- **The shipped surface grew two peek helpers** beyond the proposal:
+  `has(key)` and `hasFlash(key)` (check for a flash without consuming it) —
+  small read-only additions, documented in `llms.txt`.
 
 ## Near-term next steps
 
@@ -300,7 +303,7 @@ Original build sequence, now complete:
    emitters that call it end in `exit()`).
 8. ~~Document in README + `llms.txt`~~.
 
-Not yet prototyped against a real form (the splash's notify-me form still
+Not yet prototyped against a real form (the prototype notify-me form still
 answers success via `/?subscribed=1`, not flash) — a good first real
 consumer once one is needed.
 

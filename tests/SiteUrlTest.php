@@ -13,10 +13,10 @@ final class SiteUrlTest extends TestCase
     public function testSiteUrlPrefersConfigOverrideAndStripsTrailingSlash(): void
     {
         $app = new Application('/tmp', '/tmp', [
-            'app' => ['url' => 'https://www.php-git-deploy.com/'],
+            'app' => ['url' => 'https://www.example.com/'],
         ]);
 
-        self::assertSame('https://www.php-git-deploy.com', $app->siteUrl());
+        self::assertSame('https://www.example.com', $app->siteUrl());
     }
 
     public function testSiteUrlFallsBackToRequestWhenConfigAbsent(): void

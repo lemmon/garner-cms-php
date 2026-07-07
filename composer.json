@@ -1,7 +1,7 @@
 {
     "name": "lemmon/garner",
     "description": "Agent-first, flat-file PHP CMS with filesystem routing and Twig rendering",
-    "license": "proprietary",
+    "license": "MIT",
     "type": "library",
     "require": {
         "php": "^8.4",

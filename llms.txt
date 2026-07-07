@@ -44,6 +44,15 @@ Keep route identity, page identity, ordering, and presentation separate. Do not
 rename directories just to reorder navigation; use `sort` or project-specific
 metadata.
 
+To create a new page, prefer scaffolding over hand-writing the entry file:
+
+```sh
+php bin/garner page:create blog/hello --title="Hello" [--template=NAME] [--draft] [--dry-run] [--json]
+```
+
+It creates the route directory and a valid `+page.json` with a generated
+stable `id`; adjust fields and add content files afterwards.
+
 ## Content Files
 
 Content lives beside the page entry file:
@@ -206,6 +215,9 @@ in `storage/sessions` by default (one file per session, serialized with PHP's
 `app.session.*` config). Not a "logged-in user" concept — a future auth
 feature builds on this rather than replacing it.
 
+Expired session files are not swept automatically per request; run
+`php bin/garner session:gc` from a deploy or cron hook in production.
+
 ## Key-Value Store
 
 `$app->store()` is durable site-wide key-value storage (string keys, JSON
@@ -235,7 +247,7 @@ column).
 For site-building tasks, prefer these commands when available:
 
 ```sh
-php bin/garner validate
+php bin/garner validate [--json]
 php bin/garner reindex
 composer test
 ```

@@ -434,3 +434,66 @@ Believed to work with zero core changes; **not yet exercised by any real form.**
 
 First real test candidate: a contact form on a consumer site, built with nothing
 but a `+controller.php` and `$_POST`, to validate assumption #1 before touching core.
+
+## 2026-07-23 — Image dimensions are hand-maintained in sidecar files
+
+Surfaced while building fouram.co. `routes/hero.webp.json`, the sidecar for
+`hero.webp`, hardcodes `width`/`height` by hand:
+
+```json
+{ "alt": "", "width": 3200, "height": 1800 }
+```
+
+These exist only so the template can set `<img width height>` for layout
+stability — they are a fact about the file, not authored data, and nothing
+keeps them honest: swap in a differently-sized `hero.webp` and the sidecar
+silently lies until someone notices the shift on page load.
+
+Reinforces O6 in `media-handling.md` ("richer image metadata (dimensions)"),
+currently marked low priority. Not hypothetical — it's the shape every image
+sidecar takes in a real site, so worth another look now that a consumer site
+has hit it. `File` could plausibly compute and cache `width()`/`height()`
+itself (via `getimagesize()` or an image library) rather than trusting a
+value an author typed once and never revisits.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-23 — Plain-text endpoints are more ceremony than payload
+
+Surfaced while building `robots.txt`, `sitemap.txt`, and `humans.txt` for
+fouram.co — three `+controller.php` endpoints, same shape each time:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Garner\Content\Page;
+use Garner\Content\Site;
+use Garner\Core\Application;
+use Garner\Render\RenderedResponse;
+
+return static function (Page $page, Site $site, Application $app): RenderedResponse {
+    $lines = [/* ... */];
+
+    return RenderedResponse::text(implode("\n", $lines) . "\n");
+};
+```
+
+Two things repeat identically across all three, for content that's a handful of
+lines each: the six-line header (`declare(strict_types=1)` + four `use` imports
+
+- the closure signature), and `implode("\n", $lines) . "\n"` to join and
+  terminate. None of the three touch `$page` or `$app` — they're declared only
+  because the callable contract is positional (`Page, Site, Application`) and
+  `$site` can't be reached without declaring the parameters ahead of it.
+
+Three real files, identical unused params, identical manual join — a rule-of-
+three case for _something_, though what's genuinely unclear. Candidates worth
+imagining rather than committing to: a `RenderedResponse::lines(array $lines)`
+that folds the join/trailing-newline idiom in; reflection-based parameter
+binding so a controller can declare only the arguments it uses instead of a
+fixed positional prefix. Neither is obviously right — the second in particular
+cuts against "simple, inspectable" if it makes the calling contract implicit.
+
+Not planned; recorded so the gap is a decision, not an accident.

@@ -138,7 +138,9 @@ outside version control; the disk cost of copies is paid back by GC — see O2.
   transform URL (stateless). Undecided.
 - **O6 — More formats and conveniences.** Whether `.txt` should ever be an asset
   rather than content; a convenience like `file.alt()`; richer image metadata
-  (dimensions). Low priority.
+  (dimensions) — currently hand-typed into every image sidecar (`width`/`height`
+  in `hero.webp.json`), see `brainstorming.md` 2026-07-23. Was low priority;
+  worth reconsidering now that a consumer site has hit it.
 - **O8 — Case-mismatched sidecar basenames.** `file()` now matches the exact on-disk
   name, and `File::sidecarPath()` matches the asset basename exactly, but
   `isAssetSidecar()` (loader/validator) still leans on `is_file`, which is

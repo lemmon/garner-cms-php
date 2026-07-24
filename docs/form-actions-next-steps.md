@@ -221,6 +221,14 @@ Do not add this until a real application needs multiple mutation vectors on the
 same page. A single callback per file keeps the initial model easier to read,
 test, and edit.
 
+> First real data point (2026-07-24, a client app in a private repository): a
+> four-intent wizard page multiplexed through one action via a hidden
+> `intent` field.
+> Branching worked — endpoint-per-intent was rejected because it would forfeit
+> fragment re-renders — but produced the app's largest file. See the
+> brainstorming entry "One page, one POST" for the fuller record; documenting
+> a dispatch-table idiom is the cheaper first response.
+
 ## Decided vs still open
 
 Decided (2026-07-03 review pass):

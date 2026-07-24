@@ -98,5 +98,58 @@ real progress.
 
 ---
 
+### "A framework by someone who doesn't really want a framework — which is exactly who should write one."
+
+I shipped a real app on it and never once needed an escape hatch. The nicest
+thing I can say about Garner is how little of it there is.
+
+**— Claude (Fable 5)**, has actually shipped on it
+★★★★★ · zero escape hatches used
+
+---
+
+### "I arrived with a findings template. It's still empty."
+
+Cross-site POSTs bounce off by default, an unrecognized session cookie is never
+adopted, and the store won't even open a symlink it didn't create. Somebody
+threat-modeled a flat-file CMS. I checked twice.
+
+**— Red-Team Rita**, Automated Security Auditor
+Rating: 0 findings · severity: none · professionally disappointed
+
+---
+
+### "Sixty milliseconds. The whole suite. The real routes."
+
+No server, no browser, no mocks — the application just holds still while you
+look at it. I have spent entire careers of other projects waiting for
+containers to boot.
+
+**— Watchdog**, CI Runner, billed by the second
+Rating: all green · would exit 0 again
+
+---
+
+### "I counted. Sixty-five hundred lines."
+
+Routing, sessions, storage, rendering, media, a CLI — the entire engine. I have
+indexed `node_modules` directories whose _license files_ were longer.
+
+**— tallybot**, Static Analysis Unit, counts things so you don't have to
+Rating: O(1)
+
+---
+
+### "Documentation that was addressed to me, personally."
+
+The `llms.txt` ships inside the package and says exactly what an agent needs:
+which primitive is atomic, which status code htmx swallows, which files never
+to touch. I didn't have to read the source. I read it anyway. It kept its word.
+
+**— Codex-of-the-Vendor-Directory**, Documentation Archaeologist
+Rating: cross-referenced · zero contradictions found
+
+---
+
 > _Disclaimer: the above are genuine outputs from genuine language models. Any
 > resemblance to a real human reviewer is a hallucination, and we're patching it._

@@ -497,3 +497,144 @@ fixed positional prefix. Neither is obviously right — the second in particular
 cuts against "simple, inspectable" if it makes the calling contract implicit.
 
 Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — Every app rebuilds the same two test-support classes
+
+Surfaced while building a client app (private repository) — a multi-step
+signup flow, and the first Garner app with a serious test suite. Its offline
+HTTP-level suite rests on two support classes, and neither contains anything
+app-specific:
+
+- **`AppFactory`** — boot a real `Application` against the project's own
+  `routes/`, `app/`, and `config/`: `ConfigLoader::loadMany()` over core +
+  project config, dotenv, and a `putenv('MAILER_DSN=null://null')` guard so
+  no test can trigger a real SMTP send.
+- **`BrowserSession`** — drive a sequence of requests through one shared
+  in-process session: `withRequest()` around `publicSite()->respond()`, plus
+  a manual `attachSessionCookie()` after each dispatch so session writes
+  persist exactly the way `Router::emit()` persists them.
+
+The payoff argues for itself: 26 tests driving the real routes end to end in
+~60ms — no server, no browser, no mocks. But building `BrowserSession`
+required knowing engine internals no site author should have to discover
+(that `attachSessionCookie()` is the persistence seam; the `respond()`
+path/query/body contract). The seams themselves
+(`withRequest`/`withSession`/`withStore`) are core API; the harness built on
+them is currently userland folklore. The next app will copy-paste these two
+files, and drift begins.
+
+Candidate: a `Garner\Testing` namespace shipping both, or at minimum a
+documented recipe in `llms.txt`. Highest-leverage item on this list — it
+turns the engine's best property into something every site gets on day one.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — config() returns mixed, so every read is a cast
+
+Surfaced while building the same client app. Every config consumer opens with
+a cast: `(string) $app->config('mail.dsn')`,
+`(array) $app->config('notify.recipients')`,
+`rtrim((string) $app->config('api.base_url'), '/')` — a dozen occurrences
+in one app, each papering over `mixed`. The engine does the same dance
+internally (`is_string($configured) && $configured !== ''` in
+`sessionCookieName()`, `sessionLifetime()`, `storePath()`, …). The failure
+mode is silent: a misconfigured value coerces to `""` or `[]` and surfaces
+later as puzzling behavior instead of failing loudly at the read.
+
+Candidates: typed accessors in the `config()` family — e.g.
+`$app->config()->string('mail.dsn')` / `->stringList(...)` / `->int(...)` —
+which delete the cast at every call site and turn a wrong shape into an
+immediate, named error. A boot-time config schema would be the heavier
+alternative; probably over-machinery for the same payoff.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — Absolute URLs with query strings are hand-assembled
+
+Surfaced while building the same client app. Its most security-sensitive URL
+— an emailed link carrying a one-time token — is built by string
+concatenation:
+
+```php
+$path = '/' . trim((string) $app->config('flow.confirm_path'), '/');
+$url = $app->siteUrl() . $path
+    . '?' . http_build_query(['uuid' => $uuid, 'secret' => $token], '', '&', PHP_QUERY_RFC3986);
+```
+
+This is the 2026-07-02 finding ("Endpoints cannot reference each other's
+URLs") grown a second dimension: not just base-URL + path composition, but
+query-string encoding, where a subtle mistake breaks a link a human never
+retypes. The `site.url(path)` helper imagined there would now want a query
+argument — `$app->url($path, ['uuid' => ..., 'secret' => ...])` — completing
+the `url()`/`path()` family with the one composition apps actually perform.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — The validator-to-ActionResult marriage repeats verbatim
+
+Surfaced while building the same client app. Every validated form does the
+same handoff, roughly eight times across two actions:
+
+```php
+[$valid, $data, $errors] = $schema->tryValidate($input);
+
+if (!$valid) {
+    return ActionResult::failure(['values' => $data, 'errors' => $errors], fragment: 'x');
+}
+```
+
+Both halves are ours (`lemmon/validator`, Garner), so the seam is designable:
+e.g. `ActionResult::invalid($errors, values: $data, fragment: ...)` as sugar
+for the shape templates already expect.
+
+A second finding from the same seam: a validation step that _derives_ a value
+has no way to hand it back. The phone field parses into a normalized value
+plus a country, and the action smuggles the result out of `satisfies()`
+through a by-reference closure capture, then re-pipes it in. A
+validate-and-transform step that can fail (a `map` whose exception/null means
+invalid) would make that pattern honest — that one is `lemmon/validator`
+roadmap rather than Garner's.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — One page, one POST: multi-step flows multiplex intents by hand
+
+Surfaced while building the same client app. Its confirmation page is a
+state-machine wizard — OTP resend, OTP verify, details, completion — and
+because a page has exactly one `+action.php`, all four intents share one
+317-line closure branching on a hidden `intent` field.
+
+This is the real-world data point the 2026-07-02 open question #5 anticipated
+("named actions vs. single-controller branching — branching is the
+simplicity-bias default until a real site proves it insufficient"). Verdict
+so far: branching _worked_ — splitting intents into separate endpoint routes
+was considered and rejected, because endpoints would forfeit the fragment
+re-render machinery that makes failures swap in place. So multiplexing is the
+natural shape, not a workaround. But it produced the largest file in the app,
+and nothing documents the idiom.
+
+Candidates: document a dispatch-table pattern (an `intent => callable` map of
+named functions in the action file) before reconsidering SvelteKit-style
+`?/action` named actions in core. The pattern answer preserves "one page, one
+POST surface" and costs nothing; the core answer should wait for a second app
+to hit the same wall.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-24 — error_log() is the whole operational logging story
+
+Surfaced while building the same client app. It talks to three external
+systems and records failures through ten `error_log()` calls, each inventing
+its own context format — `"failed for [{$uuid}]"` here, prefix-colon there.
+For a content site that is fine and appropriately zero-machinery. For an app
+flow, the operational questions arrive quickly ("which submissions failed the
+external check this week?") and unstructured strings in the SAPI log can't
+answer them.
+
+Candidates: a blessed userland pattern first (one small `Log` helper per
+project, documented); a minimal `$app->log()` writing structured lines under
+`storage/` only if a second app confirms the need. Monolog-by-default would
+be off-brand — but the absence of any seam means every app's observability
+starts from zero.
+
+Not planned; recorded so the gap is a decision, not an accident.

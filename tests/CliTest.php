@@ -9,6 +9,7 @@ use Garner\Cli\CreatePageCommand;
 use Garner\Cli\ReindexCommand;
 use Garner\Cli\ValidateCommand;
 use Garner\Core\Application;
+use Garner\Core\Cache;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -134,12 +135,89 @@ final class CliTest extends TestCase
         self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
     }
 
+    public function testCacheClearRemovesApplicationValues(): void
+    {
+        $app = $this->app();
+        $app->cache()->set('computed', ['value' => 42]);
+
+        $tester = $this->runCommand(new CacheClearCommand($app), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Cleared application cache', $tester->getDisplay());
+        self::assertNull($app->cache()->get('computed'));
+    }
+
     public function testCacheClearSucceedsWithNothingToClear(): void
     {
         $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringContainsString('already clear', $tester->getDisplay());
+    }
+
+    public function testCacheClearUsesTheActiveOverriddenCache(): void
+    {
+        $app = $this->app();
+        $fake = new Cache($this->root . '/fake-cache.sqlite');
+        $fake->set('computed', 'value');
+
+        $tester = $app->withCache($fake, fn(): CommandTester => $this->runCommand(
+            new CacheClearCommand($app),
+            [],
+        ));
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Cleared application cache', $tester->getDisplay());
+        self::assertStringContainsString('fake-cache.sqlite', $tester->getDisplay());
+        self::assertNull($fake->get('computed'));
+    }
+
+    public function testCacheClearReportsAlreadyClearForASchemalessFile(): void
+    {
+        $this->writeFile('runtime/cache/data.sqlite', '');
+
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Application cache already clear', $tester->getDisplay());
+    }
+
+    public function testCacheClearFailsRatherThanClaimingSuccessForACorruptFile(): void
+    {
+        $this->writeFile('runtime/cache/data.sqlite', 'not a sqlite database');
+
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString(
+            'Unable to clear application cache',
+            $tester->getDisplay(),
+        );
+        self::assertStringNotContainsString(
+            'Application cache already clear',
+            $tester->getDisplay(),
+        );
+    }
+
+    public function testCacheClearStillRemovesTemplatesWhenApplicationCacheFails(): void
+    {
+        $this->writeFile('runtime/cache/target.sqlite', '');
+        symlink(
+            $this->root . '/runtime/cache/target.sqlite',
+            $this->root . '/runtime/cache/data.sqlite',
+        );
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), []);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString(
+            'Unable to clear application cache',
+            $tester->getDisplay(),
+        );
+        self::assertStringContainsString('symlink', $tester->getDisplay());
+        self::assertStringContainsString('Cleared template cache', $tester->getDisplay());
+        self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
     }
 
     /**

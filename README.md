@@ -462,6 +462,51 @@ silently decoding as plain arrays). Sweep expired sessions with
 generic primitive, not a "logged-in user" concept — a future auth feature
 would store a user id in it rather than inventing its own storage.
 
+## Application cache
+
+`$app->cache()` stores disposable computed values — remote API responses,
+expensive transformations, or other data that can be recomputed when absent.
+It is site-wide like `store()`, but its contract is the opposite: cache data
+lives under `runtime/`, may expire, is cleared during deployment, and must
+never be treated as canonical:
+
+```php
+$weather = $app->cache()->remember(
+    'weather:bardejov',
+    callback: fn() => fetchWeather(),
+    ttl: 3600,
+);
+```
+
+The surface is intentionally small: `get(key, default)`, `set(key, value,
+ttl = null)`, `has(key)`, `remove(key)`, `remember(key, callback, ttl = null)`,
+and `clear()`. A `null` TTL keeps the value until explicit clearing; a TTL at
+or below zero removes it. `remember()` may run the callback in two concurrent
+requests that miss at the same time — v1 provides safe complete writes, not a
+single-flight lock.
+
+Values use PHP serialization rather than JSON. The cache is opaque,
+process-managed runtime state, so round-trip fidelity wins over inspectability:
+empty arrays and empty objects stay distinct, floats keep their type, and
+serializable application objects retain their class. Classes are allowed when
+decoding because the cache file is trusted Garner-written state, kept
+owner-only and never populated from an encoded request or content payload.
+Closures, resources visible in arrays or ordinary object properties, recursive
+arrays, values too deep or complex to inspect safely (nested more than 64
+levels deep, or spanning more than 100,000 arrays and objects — generous
+enough for a multi-megabyte decoded API response), and serialization
+failures are rejected. Objects with opaque internal or custom serialization
+state—including internal containers such as `ArrayObject`—are responsible for
+producing resource-free state themselves: Garner does not invoke custom
+serialization once for validation and again for the actual write. Corrupt or
+class-incompatible entries behave as misses and are removed when `get()` or
+`remember()` reads them; `has()` checks a row's presence and expiry without
+decoding the payload.
+
+The SQLite backing file is `runtime/cache/data.sqlite` by default
+(`cache.path` config) and is created lazily on the first `set()`. Clear it
+together with compiled Twig templates using `php bin/garner cache:clear`.
+
 ## Key-value store
 
 `$app->store()` is durable site-wide storage — string keys, JSON values —
@@ -529,6 +574,7 @@ See `config/app.php`. Notable keys: `debug`, `url` (site base URL — see below)
 `ids.generator` (`cuid2` default, also `ulid`, `uuid_v4`, `uuid_v7`, or a custom
 generator), `index.mode`, `rendering.default_template`, `twig.*`,
 `session.*` (`cookie`, `lifetime`, `store`, `path` — see Sessions above),
+`cache.path` (where the disposable application cache keeps its SQLite file),
 `store.path` (where the key-value store keeps its SQLite file — see
 Key-value store above), and
 `csrf.check_origin` (on by default: cross-site form POSTs — mismatched

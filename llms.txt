@@ -218,6 +218,35 @@ feature builds on this rather than replacing it.
 Expired session files are not swept automatically per request; run
 `php bin/garner session:gc` from a deploy or cron hook in production.
 
+## Application Cache
+
+`$app->cache()` is disposable site-wide storage for values that can be
+recomputed, such as remote API responses or expensive transformations:
+
+```php
+$value = $app->cache()->remember(
+    'feed:homepage',
+    callback: fn() => fetchFeed(),
+    ttl: 900,
+);
+```
+
+The methods are `get(key, default)`, `set(key, value, ttl = null)`, `has(key)`,
+`remove(key)`, `remember(key, callback, ttl = null)`, and `clear()`. A null TTL
+keeps the entry until clearing; a TTL at or below zero removes it. Cache misses
+may compute concurrently — do not rely on `remember()` as a uniqueness or
+single-flight primitive.
+
+Cache values use trusted PHP serialization so arrays, objects, floats, and
+serializable application classes round-trip without JSON shape changes. Never
+copy an encoded request or content value directly into the cache database.
+Closures, resources, recursive arrays, and excessively deep or complex values
+(more than 64 nesting levels, or more than 100,000 arrays and objects in one
+value) are unsupported. An object with opaque internal or custom serialization state
+must produce resource-free serialized state itself. The backing file is
+`runtime/cache/data.sqlite` by default, is derived state, and must not be
+committed or backed up. Use `store()` instead when the data is canonical.
+
 ## Key-Value Store
 
 `$app->store()` is durable site-wide key-value storage (string keys, JSON
@@ -266,7 +295,7 @@ Use `composer start` to run the local server at `http://localhost:8040`.
 The source of truth is the file tree, not generated caches.
 
 - `runtime/index.sqlite` is a rebuildable route index.
-- Twig cache files under `runtime/cache/` are rebuildable.
+- Application and Twig cache files under `runtime/cache/` are rebuildable.
 - Published media under `public/media/` is derived from page-owned files.
 
 After content, template, or deployment changes, `php bin/garner reindex` may be

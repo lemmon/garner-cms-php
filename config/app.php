@@ -59,6 +59,12 @@ return [
         // the project root. Created lazily on first write.
         'path' => null,
     ],
+    'cache' => [
+        // Where the disposable application cache keeps its SQLite file. null
+        // defaults to runtime/cache/data.sqlite. Relative paths resolve
+        // against the project root. Created lazily on first write.
+        'path' => null,
+    ],
     'markdown' => [
         'allow_unsafe_links' => false,
         'html_input' => 'strip',

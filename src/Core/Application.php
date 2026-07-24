@@ -28,6 +28,7 @@ use Twig\Environment;
 
 final class Application
 {
+    private ?Cache $cache = null;
     private ?ContentIndex $contentIndex = null;
     private ?CustomRoutes $customRoutes = null;
     private ErrorHandler $errorHandler;
@@ -82,14 +83,14 @@ final class Application
      */
     public function withRequest(Request $request, callable $callback): mixed
     {
-        $previous = $this->request;
-        $this->request = $request;
-
-        try {
-            return $callback();
-        } finally {
-            $this->request = $previous;
-        }
+        return $this->scoped(
+            $request,
+            fn(): ?Request => $this->request,
+            function (?Request $value): void {
+                $this->request = $value;
+            },
+            $callback,
+        );
     }
 
     /**
@@ -137,14 +138,45 @@ final class Application
      */
     public function withSession(Session $session, callable $callback): mixed
     {
-        $previous = $this->session;
-        $this->session = $session;
+        return $this->scoped(
+            $session,
+            fn(): ?Session => $this->session,
+            function (?Session $value): void {
+                $this->session = $value;
+            },
+            $callback,
+        );
+    }
 
-        try {
-            return $callback();
-        } finally {
-            $this->session = $previous;
-        }
+    /**
+     * Disposable application cache for computed values. The SQLite backing
+     * file is created lazily on first set(); reads against an unused cache do
+     * not create runtime state.
+     */
+    public function cache(): Cache
+    {
+        return $this->cache ??= new Cache($this->cachePath());
+    }
+
+    /**
+     * Run $callback with cache() answering $cache, restoring the previous
+     * cache afterwards. Mirrors withSession() and withStore() for tests and
+     * scoped application work.
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    public function withCache(Cache $cache, callable $callback): mixed
+    {
+        return $this->scoped(
+            $cache,
+            fn(): ?Cache => $this->cache,
+            function (?Cache $value): void {
+                $this->cache = $value;
+            },
+            $callback,
+        );
     }
 
     public function sessionStore(): SessionStore
@@ -175,13 +207,36 @@ final class Application
      */
     public function withStore(Store $store, callable $callback): mixed
     {
-        $previous = $this->store;
-        $this->store = $store;
+        return $this->scoped(
+            $store,
+            fn(): ?Store => $this->store,
+            function (?Store $value): void {
+                $this->store = $value;
+            },
+            $callback,
+        );
+    }
+
+    /**
+     * Run $callback with a scoped property temporarily set to $value,
+     * restoring its previous value afterward — the shared shape behind
+     * withRequest(), withSession(), withStore(), and withCache().
+     *
+     * @template T
+     * @param T $value
+     * @param callable(): T $get
+     * @param callable(T): void $set
+     * @param callable(): mixed $callback
+     */
+    private function scoped(mixed $value, callable $get, callable $set, callable $callback): mixed
+    {
+        $previous = $get();
+        $set($value);
 
         try {
             return $callback();
         } finally {
-            $this->store = $previous;
+            $set($previous);
         }
     }
 
@@ -613,5 +668,23 @@ final class Application
         }
 
         return str_starts_with($cache, '/') ? $cache : $this->rootPath() . '/' . ltrim($cache, '/');
+    }
+
+    /**
+     * Where the disposable application cache keeps its SQLite file:
+     * `app.cache.path` when configured (absolute, or relative to the project
+     * root), otherwise `runtime/cache/data.sqlite`.
+     */
+    public function cachePath(): string
+    {
+        $configured = $this->config('app.cache.path');
+
+        if (!is_string($configured) || $configured === '') {
+            return $this->projectPath('runtime') . '/cache/data.sqlite';
+        }
+
+        return str_starts_with($configured, '/')
+            ? $configured
+            : $this->rootPath() . '/' . ltrim($configured, '/');
     }
 }

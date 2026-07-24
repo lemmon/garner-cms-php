@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Disposable application cache** — `$app->cache()` stores recomputable
+  site-wide values in a lazily created SQLite file under
+  `runtime/cache/data.sqlite` (`app.cache.path` config). The small API provides
+  `get()`, `set()` with optional TTL, `has()`, `remove()`, `remember()`, and
+  `clear()`, plus callback-scoped `Application::withCache()` for tests. Values
+  use trusted PHP serialization rather than JSON so empty arrays and objects,
+  floats, and serializable application classes round-trip without shape loss.
+  Closures, inspectable resources, recursive arrays, and values beyond bounded
+  inspection limits (64 nesting levels, 100,000 arrays and objects) are
+  rejected; objects with opaque custom serialization
+  state remain responsible for making that state resource-free. Expired,
+  corrupt, or class-incompatible rows behave as misses and are removed with
+  cursor-safe conditional cleanup, so a concurrent refresh is not deleted;
+  `has()` answers from a row's presence and expiry alone, without decoding
+  the payload. Deprecations and notices raised by a value's own serialization
+  hooks are tolerated, not treated as failures or corruption. The database is
+  owner-only from the moment it is created, hardened before it is opened for
+  reads or writes, symlink-resistant runtime state, and safe for concurrent
+  complete writes; `remember()` deliberately does not add a single-flight
+  lock.
+
+### Changed
+
+- **`cache:clear` now clears application values as well as compiled Twig
+  templates**, making it the single deployment command for disposable caches.
+  Each layer is attempted independently; a failure is reported with a nonzero
+  exit status without preventing the other layer from being cleared. This is a
+  breaking change for scripts invoking `cache:clear`: previously the command
+  had no way to fail and always exited 0, so a caller that doesn't check the
+  exit code should start doing so.
+
 ## [0.3.0] - 2026-07-07
 
 ### Added

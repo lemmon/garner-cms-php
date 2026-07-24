@@ -28,6 +28,8 @@ use RuntimeException;
  */
 final class FileSessionStore implements SessionStore
 {
+    use MutesWarnings;
+
     private const string EXTENSION = '.session';
 
     private const string TEMP_EXTENSION = '.tmp';
@@ -208,31 +210,6 @@ final class FileSessionStore implements SessionStore
         return $this->muted(static fn(): mixed => unserialize($contents, [
             'allowed_classes' => false,
         ]));
-    }
-
-    /**
-     * Run $callback with a warning-swallowing handler swapped in for its
-     * duration, rather than the `@` operator: Garner's registered error
-     * handler promotes warnings to ErrorException, and `@` only works if
-     * every installed handler checks error_reporting() — swapping the
-     * handler makes no such assumption. Session files are touched by
-     * concurrent requests and gc without coordination, so "the file
-     * vanished / was truncated under me" is an expected outcome every
-     * caller here already handles via the return value.
-     *
-     * @template T
-     * @param callable(): T $callback
-     * @return T
-     */
-    private function muted(callable $callback): mixed
-    {
-        set_error_handler(static fn(): bool => true);
-
-        try {
-            return $callback();
-        } finally {
-            restore_error_handler();
-        }
     }
 
     /**

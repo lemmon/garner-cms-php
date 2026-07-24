@@ -8,7 +8,6 @@ use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use JsonException;
 use PDO;
-use RuntimeException;
 
 /**
  * Durable site-wide key-value storage — string keys, JSON values — obtained
@@ -50,6 +49,8 @@ use RuntimeException;
  */
 final class Store
 {
+    use HardensSqliteFile;
+
     private ?PDO $pdo = null;
 
     /**
@@ -353,101 +354,16 @@ final class Store
      */
     private function harden(): void
     {
-        // Muted: chmod warns on failure, and the app's error handler
-        // would promote that to an exception before the permission
-        // check below could decide the failure is actually fine.
-        if ($this->muted(fn(): bool => chmod($this->path, 0o600))) {
-            return;
-        }
-
-        clearstatcache(false, $this->path);
-        $permissions = $this->muted(fn(): int|false => fileperms($this->path));
-
-        if ($permissions === false || ($permissions & 0o077) !== 0) {
-            throw new RuntimeException(sprintf(
-                'Unable to make store file "%s" owner-only; refusing to write site data to it',
-                $this->path,
-            ));
-        }
+        $this->hardenFile($this->path, 'store', 'refusing to write site data to it');
     }
 
     private function connect(): PDO
     {
-        // Refuse to open through a symlink: on a shared host with a
-        // world-writable storage directory, another local user could
-        // pre-create store.sqlite as a link and have Garner write site
-        // data (possibly personal) to a path they chose — with the
-        // owner-only chmod below hardening the wrong file. A store file
-        // Garner created is never a symlink, so a link here is always
-        // someone else's doing.
-        if (is_link($this->path)) {
-            throw new RuntimeException(sprintf(
-                'Store file "%s" is a symlink; refusing to open it',
-                $this->path,
-            ));
-        }
-
-        return new PDO('sqlite:' . $this->path, options: [
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            // Wait out a concurrent writer's lock instead of failing
-            // immediately — overlapping form POSTs are the normal case.
-            PDO::ATTR_TIMEOUT => 5,
-        ]);
+        return $this->connectSqlite($this->path, 'Store');
     }
 
     private function ensureDirectory(): void
     {
-        $directory = dirname($this->path);
-
-        if (is_dir($directory)) {
-            return;
-        }
-
-        // Muted: two simultaneous first writes can both pass the is_dir()
-        // check above, and the loser's mkdir() then warns "File exists" —
-        // which the app's error handler would promote to an exception
-        // before the is_dir() recheck below could conclude that losing
-        // the race is fine.
-        $created = $this->muted(static fn(): bool => mkdir($directory, 0o700, true));
-
-        if (!$created && !is_dir($directory)) {
-            throw new RuntimeException(sprintf(
-                'Unable to create storage directory "%s"',
-                $directory,
-            ));
-        }
-
-        // mkdir's mode is filtered through the umask; chmod isn't.
-        // Owner-only, same stance as the sessions directory: a
-        // world-writable storage directory would let another local user
-        // pre-create or replace the store file out from under Garner.
-        // Only on creation (the race winner does it): a pre-existing
-        // directory keeps whatever permissions the operator chose.
-        if ($created) {
-            chmod($directory, 0o700);
-        }
-    }
-
-    /**
-     * Run $callback with a warning-swallowing handler swapped in for its
-     * duration, rather than the `@` operator: Garner's registered error
-     * handler promotes warnings to ErrorException, and `@` only works if
-     * every installed handler checks error_reporting() — swapping the
-     * handler makes no such assumption. Same helper as FileSessionStore.
-     *
-     * @template T
-     * @param callable(): T $callback
-     * @return T
-     */
-    private function muted(callable $callback): mixed
-    {
-        set_error_handler(static fn(): bool => true);
-
-        try {
-            return $callback();
-        } finally {
-            restore_error_handler();
-        }
+        $this->ensureFileDirectory($this->path, 'storage directory');
     }
 }

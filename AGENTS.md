@@ -35,3 +35,17 @@ different choices. Keep that comparison respectful:
 
 This applies to everything in the repository — code comments, commit messages, docs,
 and any public-facing text.
+
+## Don't name client projects
+
+Real-world findings recorded in `docs/` (most often `brainstorming.md`) come from
+actual sites built on Garner. Many are client work or under NDA, so never write the
+exact site name, domain, or client/business name into the repository:
+
+- Describe it by shape instead: "a client site," "a consumer site," "a client app,"
+  adding whatever detail actually matters ("a multi-step form flow," "an
+  image-heavy site") without naming it.
+- Applies everywhere in the repo — docs, code comments, commit messages — the same
+  scope as "Be respectful of other people's work" above.
+- If the user explicitly names a project and says it's fine to reference (e.g. their
+  own public site), that's an exception to make on request, not a default to assume.

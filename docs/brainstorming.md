@@ -638,3 +638,38 @@ be off-brand — but the absence of any seam means every app's observability
 starts from zero.
 
 Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-26 — Static asset cache busting is a recurring, forgotten need
+
+Surfaced while building a client site, but not new there either: its own
+`ROADMAP.md` already had "asset URL cache busting … prefer a Garner helper
+when available" written down from an earlier pass, forgotten until it
+resurfaced in review. The underlying need — compiled CSS/JS need a versioned
+URL so browsers don't serve stale bytes after a redeploy — predates Garner:
+every Kirby site the same author built solved this the same way, ad hoc, per
+site, because Kirby doesn't ship it by default either.
+
+The workaround this time: a site-level `asset()` Twig helper (`app/twig.php`)
+appending `?v=<filemtime>` to `/assets/main.css|js`, plus extending the
+`/media/` immutable `Cache-Control` block in `.htaccess` to also cover
+`/assets/`. Four lines, no core change.
+
+Adjacent to O3 in `media-handling.md`, but not the same problem: O3 is about
+addressing loose, non-page-owned _content_ files (a logo, a shared graphic)
+published at request time through `MediaPublisher`. Compiled CSS/JS is
+deploy-time build output that already lives inside `public/` and is
+referenced on every single page — routing it through the same
+publish-on-first-render mechanism would import O1's "cache skips PHP" risk
+site-wide instead of scoped to one image. If this becomes a Garner concern,
+it's likely its own small mechanism (an `asset()` helper reading a runtime
+hash/mtime, or a bundler-emitted manifest for sites that have one), not an
+extension of O3.
+
+Not hypothetical, and not a first occurrence: this is at least the second or
+third Garner site to need it, and the author expects every public-facing
+(non-API) Garner site to need it going forward. Worth weighing against the
+"wait for a second site" default this log otherwise uses — the recurrence
+evidence already exists, just scattered across per-site ad hoc workarounds
+instead of one place.
+
+Not planned; recorded so the gap is a decision, not an accident.

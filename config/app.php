@@ -12,10 +12,7 @@ $debug = (static function (): bool {
         return filter_var($configured, FILTER_VALIDATE_BOOL);
     }
 
-    $host = (string) ($_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? '');
-    $normalizedHost = strtolower(trim(explode(':', $host)[0]));
-
-    return in_array($normalizedHost, ['localhost', '127.0.0.1', '::1'], true);
+    return Env::isLocalhost();
 })();
 
 return [

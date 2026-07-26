@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `.env` file with no `APP_ENV` set could silently flip a non-localhost deploy
+  to `environment: "development"`.** Symfony Dotenv's `loadEnv()` always writes
+  *some* value into `$_ENV['APP_ENV']` when the file doesn't define it — its own
+  cascade-file-selection default — and `boot/app.php` hardcoded that default to
+  `'development'`. Since `config/app.php` only falls back to its host-based
+  default ("production" unless `localhost`/`127.0.0.1`/`::1`) when `APP_ENV` is
+  genuinely unset, Dotenv's injected value silently won instead, regardless of
+  host or `.env` content — while `app.debug` (computed independently) stayed
+  correctly `false`, a split-brain state. A production deploy with a `.env` that
+  only sets `APP_URL` (as scaffolded) would run with `is_production === false`.
+  `boot/app.php` now passes Dotenv's default based on the same host check
+  `config/app.php` uses (extracted to `Env::isLocalhost()`), so both agree
+  regardless of whether a `.env` file exists or what it contains, as long as it
+  doesn't itself set `APP_ENV`.
+
 ## [0.4.0] - 2026-07-24
 
 ### Added

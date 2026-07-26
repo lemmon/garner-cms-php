@@ -33,4 +33,18 @@ final class Env
 
         return is_string($value) ? $value : null;
     }
+
+    /**
+     * Whether the current request host is a local development address. Shared by
+     * `boot/app.php` (to pick Dotenv's cascade default) and `config/app.php` (to
+     * default `app.debug`) so both agree on "local" without either one able to
+     * silently drift from the other.
+     */
+    public static function isLocalhost(): bool
+    {
+        $host = (string) ($_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? '');
+        $normalizedHost = strtolower(trim(explode(':', $host)[0]));
+
+        return in_array($normalizedHost, ['localhost', '127.0.0.1', '::1'], true);
+    }
 }

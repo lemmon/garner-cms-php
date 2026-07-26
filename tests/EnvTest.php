@@ -123,6 +123,52 @@ final class EnvTest extends TestCase
         }
     }
 
+    public function testDotenvPresenceAloneDoesNotFlipANonLocalhostDeployToDevelopment(): void
+    {
+        // Regression: Dotenv::loadEnv() always writes *some* value into
+        // $_ENV['APP_ENV'] when the file doesn't set it — its own cascade-selection
+        // default. If that default were hardcoded to 'development', the mere
+        // presence of a .env file (with no APP_ENV in it) would silently override
+        // the host-based "production unless localhost" default on a real deploy.
+        unset($_ENV['APP_URL'], $_ENV['APP_ENV'], $_SERVER['APP_ENV']);
+        $_SERVER['SERVER_NAME'] = 'staging.example.com';
+        unset($_SERVER['HTTP_HOST']);
+        file_put_contents($this->root . '/.env', "APP_URL=https://staging.example.com\n");
+
+        $app = $this->bootApp();
+
+        self::assertSame('production', $app->config('app.environment'));
+        self::assertFalse($app->config('app.debug'));
+    }
+
+    public function testDotenvPresenceAloneKeepsLocalhostOnDevelopment(): void
+    {
+        unset($_ENV['APP_URL'], $_ENV['APP_ENV'], $_SERVER['APP_ENV']);
+        $_SERVER['SERVER_NAME'] = 'localhost';
+        unset($_SERVER['HTTP_HOST']);
+        file_put_contents($this->root . '/.env', "APP_URL=https://localhost\n");
+
+        $app = $this->bootApp();
+
+        self::assertSame('development', $app->config('app.environment'));
+        self::assertTrue($app->config('app.debug'));
+    }
+
+    public function testExplicitAppEnvInDotenvStillWinsOnANonLocalhostHost(): void
+    {
+        unset($_ENV['APP_URL'], $_ENV['APP_ENV'], $_SERVER['APP_ENV']);
+        $_SERVER['SERVER_NAME'] = 'staging.example.com';
+        unset($_SERVER['HTTP_HOST']);
+        file_put_contents(
+            $this->root . '/.env',
+            "APP_URL=https://staging.example.com\nAPP_ENV=staging\n",
+        );
+
+        $app = $this->bootApp();
+
+        self::assertSame('staging', $app->config('app.environment'));
+    }
+
     public function testHttpPrefixedNamesAreNeverTreatedAsEnvironment(): void
     {
         // $_SERVER HTTP_* entries are request headers under attacker control.

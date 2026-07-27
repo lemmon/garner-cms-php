@@ -673,3 +673,67 @@ evidence already exists, just scattered across per-site ad hoc workarounds
 instead of one place.
 
 Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-26 — No way to resolve an arbitrary path or ancestor page from templates
+
+Surfaced while building a case-study subpage on the author's own portfolio
+site. The page needed a breadcrumb trail (home / section / current),
+including the case where an intermediate path segment (e.g. `/work`) groups
+pages but is not itself a page — no `+page.json` there, so it should render
+as plain label text instead of a dead link.
+
+`Page` exposes `children()` and `index()` but no `parent()` or `ancestors()`.
+`Site` exposes `findById()` for stable-id lookups but nothing to resolve an
+arbitrary route path to a `Page` — that capability exists only on
+`Pages::find()`, and templates never receive `Pages` itself, only `Page` and
+`Site`.
+
+The workaround: a one-line Twig function in `app/twig.php`
+(`find_page(path) => $app->pages()->find($path)`, i.e. hand-exposing
+`Pages::find()` to templates) plus a hand-rolled Twig macro that splits
+`page.path()` into segments, walks each cumulative prefix through
+`find_page()`, and falls back to a humanized slug when a segment resolves to
+nothing. Four lines in `twig.php`, about thirty in the macro — but every site
+that wants breadcrumbs, a "next/previous in section" link, or any other
+structural navigation will reinvent this same walk.
+
+Candidates: `Page::parent(): ?Page` and `Page::ancestors(): PageCollection`
+(mirroring the existing `children()`/`index()` shape), backed by the
+`parent_path` column `ContentIndex` already stores internally but never
+surfaces. A generic `Site::find(path): ?Page` (or exposing `Pages` itself to
+templates) would additionally cover cases `ancestors()` doesn't, like
+resolving a sibling or an unrelated reference path.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-07-26 — Drafts have no preview path, not even for the author
+
+Surfaced while building a case-study subpage intentionally not ready to link
+or index yet. `draft: true` looked like the right fit, until previewing it
+meant editing `+page.json` to `false`, running `reindex`, loading the page,
+then reverting and reindexing again to hide it — every time.
+
+The reason: `ContentIndex::dirForPath()` runs
+`WHERE path = :path AND draft = 0` unconditionally, and it is the one code
+path `Pages::find()` uses to resolve a single page, which is in turn the one
+code path `PublicSite::respond()` uses for every request. There is no
+bypass — no query param, no session flag, no config toggle — so a draft page
+404s for everyone, including whoever wrote it. `children(drafts: true)` and
+`index(drafts: true)` exist for listings, but the single-page lookup a real
+preview link would need has no equivalent parameter.
+
+This is the concrete case behind the open question already sitting in this
+doc's first entry ("How are validation, previews, drafts, approvals, and
+publishing handled?"). The answer so far, in practice: don't use `draft` for
+anything you need to look at before launch. That's a bigger gap than it
+sounds — "write it, preview it, then decide when to make it public" is close
+to the default authoring loop for a one-person or agent-assisted site, and
+today it's unsupported.
+
+Candidates: a signed preview token or a `?preview=1` query param gated by a
+config secret, honored only inside `Pages::find()`'s draft check; or a
+`preview: true` request-scoped flag threaded through from a dedicated
+`+preview` route or CLI command. Either restores "draft = hidden from the
+public, visible to the author" without weakening the public-facing 404.
+
+Not planned; recorded so the gap is a decision, not an accident.

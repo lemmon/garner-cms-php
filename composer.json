@@ -9,7 +9,7 @@
         "ext-pdo_sqlite": "*",
         "illuminate/collections": "^13",
         "league/commonmark": "^2",
-        "lemmon/validator": "^0.15",
+        "lemmon/validator": "^0.17",
         "symfony/console": "^8",
         "symfony/dotenv": "^8",
         "symfony/error-handler": "^8",

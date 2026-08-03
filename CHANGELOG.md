@@ -20,6 +20,28 @@ $data, fragment: 'x');`. `form.errors` in the template is the tuple's
   reshaping layer; `form.values` is whatever the schema produced. Defaults to
   422, matching `failure()`.
 
+### Changed
+
+- **`lemmon/validator` bumped to `^0.17` (was `^0.15`).** Garner's own use of the
+  library — `PageMeta`'s internal field checks — only reads `tryValidate()`'s
+  first tuple element and needed no changes, but `lemmon/validator` is not an
+  implementation detail Garner hides: it's the documented pattern for
+  validating `+action.php` input directly (`docs/form-actions-next-steps.md`),
+  and `ActionResult::invalid()` (above) now builds on its structured error
+  model. **This is a breaking change for any action that talks to the
+  validator directly**, not for Garner itself: `tryValidate()`'s third tuple
+  element is now a flat `list<ValidationError>` (`getPath()` / `getCode()` /
+  `getMessage()` / `getParams()`, `JsonSerializable`) instead of a nested array
+  of message strings, and is `[]` rather than `null` on success;
+  `ValidationException::getErrors()` returns the same flat list and its
+  `getFlattenedErrors()` / static `flattenErrors()` are gone; and
+  `FloatValidator`, `IntValidator`, `AssociativeValidator`, and
+  `ObjectValidator` all changed coercion semantics (numeric strings, zero-padded
+  integers, and empty-string-to-container rules). Before upgrading, check any
+  action that indexes into `$errors` by field name, calls the removed
+  flattening methods, or coerces form input through those four validator
+  types.
+
 ### Fixed
 
 - **Development mode disabled Twig's compiled-template cache outright instead of

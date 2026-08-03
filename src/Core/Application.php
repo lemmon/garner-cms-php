@@ -628,7 +628,7 @@ final class Application
         $autoReload = is_bool($config['auto_reload'] ?? null) ? $config['auto_reload'] : $debug;
         $options = [
             'auto_reload' => $autoReload,
-            'cache' => $this->resolveTwigCache($config['cache'] ?? null, $debug),
+            'cache' => $this->resolveTwigCache($config['cache'] ?? null),
             'debug' => $debug,
             'strict_variables' => (bool) ($config['strict_variables'] ?? false),
         ];
@@ -640,13 +640,19 @@ final class Application
         return $options;
     }
 
-    private function resolveTwigCache(mixed $cache, bool $debug): string|false
+    /**
+     * Whether Twig's compiled-template cache is on, mirroring the routing
+     * index's scan-vs-locked model: the cache stays enabled in every
+     * environment, and `auto_reload` (recompile on source-mtime change in
+     * debug, trust the cache in production) is what supplies freshness —
+     * not disabling the cache outright. `app.twig.cache` is a pure on/off
+     * switch here; `false` or `''` opts out entirely, `null` (default) and
+     * any other non-empty string enable it, with `twigCachePath()` deciding
+     * where the cache lives.
+     */
+    private function resolveTwigCache(mixed $cache): string|false
     {
-        if ($cache === null) {
-            return $debug ? false : $this->twigCachePath();
-        }
-
-        if (!is_string($cache) || $cache === '') {
+        if ($cache !== null && (!is_string($cache) || $cache === '')) {
             return false;
         }
 
@@ -655,9 +661,11 @@ final class Application
 
     /**
      * Where compiled Twig templates accumulate: the `app.twig.cache` path when
-     * configured, otherwise the default runtime location. Debug mode only decides
-     * whether rendering uses the cache, not where it lives — so clearing (e.g.
-     * `garner cache:clear` on deploy) targets the same path in every mode.
+     * configured, otherwise the default runtime location. The cache is enabled
+     * at this same path in every environment (see resolveTwigCache()) — debug
+     * mode only affects `auto_reload`, not whether or where caching happens —
+     * so clearing (e.g. `garner cache:clear` on deploy) targets the same path
+     * in every mode.
      */
     public function twigCachePath(): string
     {

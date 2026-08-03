@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Development mode disabled Twig's compiled-template cache outright instead of
+  only gating its freshness.** `Application::resolveTwigCache()` returned `false`
+  whenever `app.twig.cache` was left at its default and `app.debug` was `true`, so
+  every render fully re-lexed, re-parsed, and re-compiled every template (and
+  everything it `extends`/`includes`) from scratch — `auto_reload` had nothing to
+  reload from, since no compiled cache ever existed to check freshness against.
+  This contradicted Garner's own documented model: `ContentIndex`'s docblock
+  already described the routing index's freshness policy as mirroring "Twig's
+  `auto_reload`" (rebuild-if-stale in development, trust-as-is in production —
+  not "no index at all" in development), and the README described compiled
+  templates as "cached the same way," never recompiled in production, implying
+  *selective* recompilation in development rather than always-recompile-everything.
+  The compiled cache now stays enabled by default in every environment, and
+  `auto_reload` (already correctly `true` in debug) does the recompile-on-change
+  work it exists for. `app.twig.cache` remains a pure on/off switch — set it to
+  `false` or `''` to opt out of compiled caching entirely, in any environment.
+
 ## [0.4.1] - 2026-08-03
 
 ### Fixed

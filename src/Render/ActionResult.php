@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Garner\Render;
 
+use Lemmon\Validator\ValidationError;
+
 /**
- * The outcome of a page action (+action.php) short of a full response. Two
+ * The outcome of a page action (+action.php) short of a full response. Three
  * constructors, each carrying a default a bare RenderedResponse gets wrong for
  * actions: failure() re-renders the page with its data exposed to the template
  * as `form` (422, the validation-failure status), optionally answering htmx
- * with a named template fragment instead of the whole page, and redirect()
- * answers Post/Redirect/Get with 303 See Other (RenderedResponse::redirect()
- * defaults to a method-preserving 308 — right for canonical redirects, wrong
- * here). Anything else — JSON, custom fragments, custom headers — is the
- * escape hatch: return a RenderedResponse from the action instead.
+ * with a named template fragment instead of the whole page; invalid() is
+ * failure() sugar for the lemmon/validator handoff every validated action
+ * repeats; and redirect() answers Post/Redirect/Get with 303 See Other
+ * (RenderedResponse::redirect() defaults to a method-preserving 308 — right
+ * for canonical redirects, wrong here). Anything else — JSON, custom
+ * fragments, custom headers — is the escape hatch: return a RenderedResponse
+ * from the action instead.
  */
 final class ActionResult
 {
@@ -46,6 +50,32 @@ final class ActionResult
     public static function failure(array $data, int $status = 422, ?string $fragment = null): self
     {
         return new self($data, $status, fragment: $fragment);
+    }
+
+    /**
+     * failure() sugar for a lemmon/validator `tryValidate()` result: builds
+     * `form.errors` (the tuple's `list<ValidationError>`, unchanged — a
+     * template reads `error.path` / `error.message` / `error.code` /
+     * `error.params` off each) and `form.values` (the tuple's validated
+     * value, whatever shape the schema produced) instead of every action
+     * assembling that array by hand.
+     *
+     * ```php
+     * [$valid, $data, $errors] = $schema->tryValidate($input);
+     * if (!$valid) {
+     *     return ActionResult::invalid($errors, values: $data, fragment: 'x');
+     * }
+     * ```
+     *
+     * @param list<ValidationError> $errors
+     */
+    public static function invalid(
+        array $errors,
+        mixed $values,
+        int $status = 422,
+        ?string $fragment = null,
+    ): self {
+        return new self(['errors' => $errors, 'values' => $values], $status, fragment: $fragment);
     }
 
     /**

@@ -93,6 +93,54 @@ final class ActionTest extends TestCase
         self::assertStringContainsString('READ-SIDE', $response->body());
     }
 
+    public function testInvalidSugarBuildsFormFromLemmonValidatorResult(): void
+    {
+        $this->writeEntry('newsletter', [
+            'template' => 'default',
+            'created' => '2026-07-05',
+            'title' => 'Newsletter',
+        ]);
+        $this->writeFile(
+            'routes/newsletter/+template.twig',
+            '{% if form is not null %}'
+            . 'CODE:{{ form.errors[0].code }}|'
+            . 'MESSAGE:{{ form.errors[0].message }}|'
+            . 'VALUE:{{ form.values.email }}'
+            . '{% else %}NOFORM{% endif %}',
+        );
+        $this->writeFile('routes/newsletter/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Core\Request;
+            use Garner\Render\ActionResult;
+            use Lemmon\Validator\Validator;
+
+            return static function (Request $request): ActionResult {
+                $email = trim((string) ($request->form()['email'] ?? ''));
+                [$valid, $data, $errors] = Validator::isString()
+                    ->required()
+                    ->email()
+                    ->tryValidate($email);
+
+                if (!$valid) {
+                    return ActionResult::invalid($errors, values: ['email' => $email]);
+                }
+
+                return ActionResult::redirect('/newsletter/thanks');
+            };
+            PHP);
+
+        $response = $this->respond($this->formPost('/newsletter', ['email' => 'not-an-email']));
+
+        self::assertSame(422, $response->status());
+        self::assertStringContainsString('CODE:EMAIL', $response->body());
+        self::assertStringContainsString(
+            'MESSAGE:Value must be a valid email address',
+            $response->body(),
+        );
+        self::assertStringContainsString('VALUE:not-an-email', $response->body());
+    }
+
     public function testFailureReRenderPresentsGetToMethodBranchingControllers(): void
     {
         $this->writeSubscribeAction();

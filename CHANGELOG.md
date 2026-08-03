@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ActionResult::invalid($errors, values:, fragment:)`** — sugar for the
+  `lemmon/validator` `tryValidate()` handoff every validated action repeated by
+  hand: `[$valid, $data, $errors] = $schema->tryValidate($input); if (!$valid)
+{ return ActionResult::failure(['errors' => $errors, 'values' => $data],
+fragment: 'x'); }` becomes `return ActionResult::invalid($errors, values:
+$data, fragment: 'x');`. `form.errors` in the template is the tuple's
+  `list<ValidationError>` unchanged — `error.path` / `error.message` /
+  `error.code` / `error.params` — so this is a thin constructor, not a
+  reshaping layer; `form.values` is whatever the schema produced. Defaults to
+  422, matching `failure()`.
+
 ### Fixed
 
 - **Development mode disabled Twig's compiled-template cache outright instead of
@@ -20,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `auto_reload`" (rebuild-if-stale in development, trust-as-is in production —
   not "no index at all" in development), and the README described compiled
   templates as "cached the same way," never recompiled in production, implying
-  *selective* recompilation in development rather than always-recompile-everything.
+  _selective_ recompilation in development rather than always-recompile-everything.
   The compiled cache now stays enabled by default in every environment, and
   `auto_reload` (already correctly `true` in debug) does the recompile-on-change
   work it exists for. `app.twig.cache` remains a pure on/off switch — set it to
@@ -32,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A `.env` file with no `APP_ENV` set could silently flip a non-localhost deploy
   to `environment: "development"`.** Symfony Dotenv's `loadEnv()` always writes
-  *some* value into `$_ENV['APP_ENV']` when the file doesn't define it — its own
+  _some_ value into `$_ENV['APP_ENV']` when the file doesn't define it — its own
   cascade-file-selection default — and `boot/app.php` hardcoded that default to
   `'development'`. Since `config/app.php` only falls back to its host-based
   default ("production" unless `localhost`/`127.0.0.1`/`::1`) when `APP_ENV` is

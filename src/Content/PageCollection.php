@@ -16,18 +16,21 @@ use Illuminate\Support\Collection;
 final class PageCollection extends Collection
 {
     /**
-     * Pages that are not drafts.
+     * Pages that are routable and listed — not hidden, meaning neither this page
+     * nor any ancestor of it is a draft. Uses the cascaded isHidden() flag, not
+     * isDraft(), so a page nested under a draft ancestor is excluded here too,
+     * even when its own `draft` is false.
      */
     public function published(): self
     {
-        return $this->reject(static fn(Page $page): bool => $page->isDraft())->values();
+        return $this->reject(static fn(Page $page): bool => $page->isHidden())->values();
     }
 
     /**
-     * Only draft pages.
+     * Pages that are hidden — this page is a draft, or an ancestor of it is.
      */
     public function drafts(): self
     {
-        return $this->filter(static fn(Page $page): bool => $page->isDraft())->values();
+        return $this->filter(static fn(Page $page): bool => $page->isHidden())->values();
     }
 }

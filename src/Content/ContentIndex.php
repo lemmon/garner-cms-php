@@ -40,9 +40,43 @@ final class ContentIndex
      * rebuilt regardless of the content fingerprint, so engine upgrades self-heal
      * instead of surfacing as a "no such column" 500. See docs/index-freshness.md.
      */
-    private const SCHEMA_VERSION = 1;
+    private const SCHEMA_VERSION = 2;
+
+    /**
+     * Upper bound on how many levels ancestors() will walk up parent_path before
+     * giving up. Real trees never come close; this exists solely so a hand-edited
+     * or corrupted index with a parent_path cycle can't hang a request in an
+     * unbounded recursive query.
+     */
+    private const MAX_ANCESTOR_DEPTH = 1000;
 
     private bool $fresh = false;
+
+    /**
+     * Reused across every read within one instance's lifetime (normally one
+     * request) instead of opening a fresh SQLite connection per call — safe
+     * because write() clears it whenever it swaps in a new index file, so a
+     * post-rebuild read never sees a connection still pinned to the old file.
+     *
+     * Known limitation: this pinning and $generation below are in-process,
+     * per-instance state. A rebuild by *another* process (e.g. `garner reindex`
+     * against a running "locked" site) swaps the file on disk, but an existing
+     * instance keeps reading the old, now-unlinked inode until discarded. The
+     * shipped boot constructs a fresh Application per request, bounding that to
+     * the request already in flight (deliberate — one request never sees two
+     * index states); a long-lived embedder must likewise construct a fresh
+     * instance per unit of work. See docs/index-freshness.md.
+     */
+    private ?PDO $readerConnection = null;
+
+    /**
+     * Bumped every time write() successfully swaps in a new index file — via an
+     * automatic freshness check or an explicit rebuild() call. Pages compares
+     * this against the generation it last saw to know when its own hydrated-page
+     * cache needs to be dropped, since it otherwise gets no notification when a
+     * ContentIndex it holds a reference to rewrites itself out from under it.
+     */
+    private int $generation = 0;
 
     public function __construct(
         private readonly string $contentPath,
@@ -50,6 +84,12 @@ final class ContentIndex
         private readonly string $mode = 'scan',
     ) {}
 
+    /**
+     * Resolve a route path to its page directory. `hidden` covers both a page's
+     * own `draft` flag and inheriting one from an ancestor (see write()), so a
+     * published page nested under a draft directory resolves to null here too,
+     * not just the draft directory itself.
+     */
     public function dirForPath(string $path): ?string
     {
         $this->ensureFresh();
@@ -61,17 +101,18 @@ final class ContentIndex
         }
 
         $statement = $pdo->prepare(
-            'SELECT dir FROM pages WHERE path = :path AND draft = 0 LIMIT 1',
+            'SELECT dir FROM pages WHERE path = :path AND hidden = 0 LIMIT 1',
         );
         $statement->execute([':path' => RoutePath::normalize($path)]);
         $row = $statement->fetch();
 
-        return is_array($row) && is_string($row['dir'] ?? null) ? $row['dir'] : null;
+        return $this->hasStringFields($row, 'dir') ? $row['dir'] : null;
     }
 
     /**
-     * Resolve a page id to its current route path. Published pages only, so a
-     * reference to a draft or missing page resolves to null.
+     * Resolve a page id to its current route path. Visible pages only, so a
+     * reference to a hidden (draft, or beneath a draft ancestor) or missing page
+     * resolves to null.
      */
     public function pathForId(string $id): ?string
     {
@@ -84,26 +125,26 @@ final class ContentIndex
         }
 
         $statement = $pdo->prepare(
-            'SELECT path FROM pages WHERE id = :id AND draft = 0 AND endpoint = 0 LIMIT 1',
+            'SELECT path FROM pages WHERE id = :id AND hidden = 0 AND endpoint = 0 LIMIT 1',
         );
         $statement->execute([':id' => $id]);
         $row = $statement->fetch();
 
-        return is_array($row) && is_string($row['path'] ?? null) ? $row['path'] : null;
+        return $this->hasStringFields($row, 'path') ? $row['path'] : null;
     }
 
     /**
-     * Direct child pages of a route, ordered by sort then route path. Drafts are
-     * excluded unless $drafts is true.
+     * Direct child pages of a route, ordered by sort then route path. Hidden pages
+     * — drafts, and pages nested under a draft ancestor — are excluded unless
+     * $drafts is true.
      *
-     * @return list<array{path: string, dir: string}>
+     * @return list<array{path: string, dir: string, hidden: bool}>
      */
     public function children(string $path, bool $drafts = false): array
     {
-        $draftClause = $drafts ? '' : ' AND draft = 0';
-
         return $this->select(
-            "SELECT path, dir FROM pages WHERE parent_path = :path AND endpoint = 0{$draftClause}"
+            'SELECT path, dir, hidden FROM pages WHERE parent_path = :path AND endpoint = 0'
+            . $this->hiddenClause($drafts)
             . ' ORDER BY sort, path',
             [':path' => RoutePath::normalize($path)],
         );
@@ -111,28 +152,151 @@ final class ContentIndex
 
     /**
      * All descendant pages of a route (excluding the route itself), ordered by
-     * sort then path. Drafts are excluded unless $drafts is true.
+     * sort then path. Hidden pages — drafts, and pages nested under a draft
+     * ancestor — are excluded unless $drafts is true.
      *
-     * @return list<array{path: string, dir: string}>
+     * @return list<array{path: string, dir: string, hidden: bool}>
      */
     public function descendants(string $path, bool $drafts = false): array
     {
         $normalized = RoutePath::normalize($path);
-        $draftClause = $drafts ? '' : ' AND draft = 0';
 
         if ($normalized === '/') {
             return $this->select(
-                "SELECT path, dir FROM pages WHERE path != :root AND endpoint = 0{$draftClause}"
+                'SELECT path, dir, hidden FROM pages WHERE path != :root AND endpoint = 0'
+                . $this->hiddenClause($drafts)
                 . ' ORDER BY sort, path',
                 [':root' => '/'],
             );
         }
 
         return $this->select(
-            "SELECT path, dir FROM pages WHERE path LIKE :prefix ESCAPE '\\' AND endpoint = 0"
-            . "{$draftClause} ORDER BY sort, path",
+            "SELECT path, dir, hidden FROM pages WHERE path LIKE :prefix ESCAPE '\\' AND endpoint = 0"
+            . $this->hiddenClause($drafts)
+            . ' ORDER BY sort, path',
             [':prefix' => $this->escapeLike($normalized) . '/%'],
         );
+    }
+
+    /**
+     * SQL fragment excluding hidden pages, unless $drafts opts back in. Shared by
+     * children() and descendants() so the two conditions can't drift apart.
+     */
+    private function hiddenClause(bool $drafts): string
+    {
+        return $drafts ? '' : ' AND hidden = 0';
+    }
+
+    /**
+     * The nearest ancestor page of a route (home for top-level pages), or null
+     * for home itself, an endpoint, or an unresolvable route — the stored
+     * `parent_path` already skips non-page directories (see parentPath()), so
+     * this never needs to walk the filesystem tree itself. Hidden state is not
+     * filtered: the parent relationship is structural, independent of
+     * visibility, so an ancestor that happens to be hidden is still returned,
+     * with the hydrated page's own draft/hidden state left for the caller to
+     * act on (e.g. deciding whether to render it as a link).
+     *
+     * @return array{path: string, dir: string, hidden: bool}|null
+     */
+    public function parent(string $path): ?array
+    {
+        $this->ensureFresh();
+
+        $pdo = $this->reader();
+
+        if ($pdo === null) {
+            return null;
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT p.path AS path, p.dir AS dir, p.hidden AS hidden FROM pages c'
+            . ' JOIN pages p ON p.path = c.parent_path'
+            . ' WHERE c.path = :path AND c.endpoint = 0 AND p.endpoint = 0',
+        );
+        $statement->execute([':path' => RoutePath::normalize($path)]);
+
+        return $this->normalizeRow($statement->fetch());
+    }
+
+    /**
+     * The full ancestor chain of a route, root first (home ... nearest
+     * parent) — the order a breadcrumb reads left to right. Empty for home, an
+     * endpoint, or an unresolvable route. Hidden state is not filtered, for the
+     * same reason as parent(). Walks parent_path in a single bounded recursive
+     * query rather than calling parent() in a loop, so the whole chain is read
+     * from one connection (immune to a concurrent index rebuild swapping the
+     * file out mid-walk) instead of one connection and one query per level.
+     * Guards against a corrupted `parent_path` cycle two ways: `visited` tracks
+     * every path already walked so the recursive step can refuse to revisit one
+     * (the real fix — a cycle simply stops where it closes, no duplicates), and
+     * MAX_ANCESTOR_DEPTH remains as a hard backstop.
+     *
+     * @return list<array{path: string, dir: string, hidden: bool}>
+     */
+    public function ancestors(string $path): array
+    {
+        $this->ensureFresh();
+
+        $pdo = $this->reader();
+
+        if ($pdo === null) {
+            return [];
+        }
+
+        // self::MAX_ANCESTOR_DEPTH is inlined as a literal rather than bound: PDO's
+        // array-based execute() binds every value as PDO::PARAM_STR, and SQLite's
+        // cross-type comparison rules mean an INTEGER chain.depth compared against
+        // a TEXT-bound parameter never becomes false — the guard would silently
+        // never fire, turning a cyclic parent_path into a genuine infinite loop
+        // instead of a bounded one. It's a private int constant, never derived
+        // from request input, so inlining it carries no injection risk.
+        //
+        // Visited entries are recorded as '|' || hex(path) || '|'. Route paths come
+        // from directory names, which the filesystem places no restriction on —
+        // unlike RoutePath's own CLI-facing validation — so a path can contain a
+        // literal '|', and escaping it (e.g. as '\|') is not enough: the escaped
+        // form still contains a '|' byte, so instr() can find a marker spanning an
+        // entry boundary ('...q\|/p|' contains '|/p|', misreading a real, never-
+        // visited '/p' ancestor as already seen). hex() output is pure [0-9A-F],
+        // so the delimiter can never occur inside an entry and a marker can only
+        // ever match a whole one.
+        $statement = $pdo->prepare(
+            'WITH RECURSIVE chain(path, dir, hidden, parent_path, depth, visited) AS ('
+            . " SELECT path, dir, hidden, parent_path, 0, '|' || hex(path) || '|' FROM pages"
+            . ' WHERE path = :start AND endpoint = 0'
+            . ' UNION ALL'
+            . ' SELECT p.path, p.dir, p.hidden, p.parent_path, chain.depth + 1,'
+            . " chain.visited || hex(p.path) || '|'"
+            . ' FROM pages p JOIN chain ON p.path = chain.parent_path'
+            . ' WHERE p.endpoint = 0 AND chain.depth < '
+            . self::MAX_ANCESTOR_DEPTH
+            . " AND instr(chain.visited, '|' || hex(p.path) || '|') = 0"
+            . ') SELECT path, dir, hidden FROM chain WHERE path != :self ORDER BY depth DESC',
+        );
+        $normalized = RoutePath::normalize($path);
+        $statement->execute([':start' => $normalized, ':self' => $normalized]);
+
+        $rows = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $normalizedRow = $this->normalizeRow($row);
+
+            if ($normalizedRow !== null) {
+                $rows[] = $normalizedRow;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Monotonic counter bumped every time the index is (re)written. See the
+     * $generation property for why Pages needs this.
+     */
+    public function generation(): int
+    {
+        return $this->generation;
     }
 
     /**
@@ -358,13 +522,36 @@ final class ContentIndex
                 $pathSet[$page['path']] = true;
             }
 
+            $parentPaths = [];
+
+            foreach ($pages as $page) {
+                $parentPaths[$page['path']] = $this->parentPath($page['path'], $pathSet);
+            }
+
+            // Draft visibility cascades down the tree: a page nested under a draft
+            // ancestor is just as unpublished as the ancestor, even when its own
+            // `draft` is false. Resolved shallowest-first by depth — not by scan
+            // order — so every ancestor's hidden state is guaranteed already known
+            // by the time a descendant needs it: an ancestor's route path is always
+            // a strict prefix of its descendant's, so it always has a smaller depth,
+            // regardless of how collect() happened to enumerate directories.
+            $hiddenByPath = [];
+            $byDepth = $pages;
+            usort($byDepth, static fn(array $a, array $b): int => $a['depth'] <=> $b['depth']);
+
+            foreach ($byDepth as $page) {
+                $parentPath = $parentPaths[$page['path']];
+                $hiddenByPath[$page['path']] =
+                    $page['draft'] || $parentPath !== null && $hiddenByPath[$parentPath];
+            }
+
             $insert = $pdo->prepare(
                 'INSERT INTO pages'
-                . ' (path, dir, id, template, title, created, depth, parent_path, draft, sort,'
-                . ' endpoint)'
+                . ' (path, dir, id, template, title, created, depth, parent_path, draft, hidden,'
+                . ' sort, endpoint)'
                 . ' VALUES'
                 . ' (:path, :dir, :id, :template, :title, :created, :depth, :parent_path, :draft,'
-                . ' :sort, :endpoint)',
+                . ' :hidden, :sort, :endpoint)',
             );
 
             foreach ($pages as $page) {
@@ -376,8 +563,9 @@ final class ContentIndex
                     ':title' => $page['title'],
                     ':created' => $page['created'],
                     ':depth' => $page['depth'],
-                    ':parent_path' => $this->parentPath($page['path'], $pathSet),
+                    ':parent_path' => $parentPaths[$page['path']],
                     ':draft' => $page['draft'] ? 1 : 0,
+                    ':hidden' => $hiddenByPath[$page['path']] ? 1 : 0,
                     ':sort' => $page['sort'],
                     ':endpoint' => $page['endpoint'] ? 1 : 0,
                 ]);
@@ -404,7 +592,15 @@ final class ContentIndex
         }
 
         unset($pdo);
+
+        // Drop any connection cached by an earlier readMeta()/reader() call in this
+        // same request (e.g. the freshness check that decided to rebuild) before
+        // swapping the file it's pinned to: on Windows, SQLite's file locking
+        // would otherwise make the rename() inside swap() fail while that handle
+        // is still open on the destination path.
+        $this->readerConnection = null;
         $this->swap($tmp);
+        ++$this->generation;
     }
 
     /**
@@ -436,8 +632,8 @@ final class ContentIndex
             'CREATE TABLE pages ('
             . 'path TEXT PRIMARY KEY, dir TEXT NOT NULL, id TEXT NOT NULL, template TEXT NULL,'
             . ' title TEXT NULL, created TEXT NULL, depth INTEGER NOT NULL, parent_path TEXT NULL,'
-            . ' draft INTEGER NOT NULL DEFAULT 0, sort INTEGER NOT NULL DEFAULT 0,'
-            . ' endpoint INTEGER NOT NULL DEFAULT 0)',
+            . ' draft INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0,'
+            . ' sort INTEGER NOT NULL DEFAULT 0, endpoint INTEGER NOT NULL DEFAULT 0)',
         );
         $pdo->exec('CREATE UNIQUE INDEX pages_id ON pages (id)');
         $pdo->exec('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
@@ -471,7 +667,7 @@ final class ContentIndex
 
     /**
      * @param array<string, string> $params
-     * @return list<array{path: string, dir: string}>
+     * @return list<array{path: string, dir: string, hidden: bool}>
      */
     private function select(string $sql, array $params): array
     {
@@ -489,22 +685,62 @@ final class ContentIndex
         $rows = [];
 
         foreach ($statement->fetchAll() as $row) {
-            if (
-                !is_array($row)
-                || !is_string($row['path'] ?? null)
-                || !is_string($row['dir'] ?? null)
-            ) {
-                continue;
-            }
+            $normalized = $this->normalizeRow($row);
 
-            $rows[] = ['path' => $row['path'], 'dir' => $row['dir']];
+            if ($normalized !== null) {
+                $rows[] = $normalized;
+            }
         }
 
         return $rows;
     }
 
+    /**
+     * Validate and narrow a fetched row to the {path, dir, hidden} shape every
+     * read method returns, shared by select(), parent(), and ancestors().
+     *
+     * @return array{path: string, dir: string, hidden: bool}|null
+     */
+    private function normalizeRow(mixed $row): ?array
+    {
+        if (!$this->hasStringFields($row, 'path', 'dir')) {
+            return null;
+        }
+
+        return [
+            'path' => $row['path'],
+            'dir' => $row['dir'],
+            'hidden' => (bool) ($row['hidden'] ?? false),
+        ];
+    }
+
+    /**
+     * Whether a fetched row is an array with a string value for every given key
+     * — shared by every fetched-row consumer (dirForPath(), pathForId(),
+     * normalizeRow(), readMeta()) so all reads apply the same "trust nothing
+     * from a hand-edited or corrupted index" rule in one place.
+     */
+    private function hasStringFields(mixed $row, string ...$keys): bool
+    {
+        if (!is_array($row)) {
+            return false;
+        }
+
+        foreach ($keys as $key) {
+            if (!is_string($row[$key] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private function reader(): ?PDO
     {
+        if ($this->readerConnection !== null) {
+            return $this->readerConnection;
+        }
+
         if (!is_file($this->sqlitePath)) {
             return null;
         }
@@ -512,7 +748,7 @@ final class ContentIndex
         $pdo = new PDO('sqlite:' . $this->sqlitePath);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-        return $pdo;
+        return $this->readerConnection = $pdo;
     }
 
     /**
@@ -542,11 +778,7 @@ final class ContentIndex
             $values = [];
 
             foreach ($statement->fetchAll() as $row) {
-                if (
-                    !is_array($row)
-                    || !is_string($row['key'] ?? null)
-                    || !is_string($row['value'] ?? null)
-                ) {
+                if (!$this->hasStringFields($row, 'key', 'value')) {
                     continue;
                 }
 

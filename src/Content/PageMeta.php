@@ -15,8 +15,9 @@ use Lemmon\Validator\Validator;
  *   default template. When present it must be a non-empty string.
  * - `id` is optional; when absent it is inherited from the directory name (an
  *   explicit `id` always wins). Global id uniqueness is enforced by ContentIndex.
- * - `draft` is optional (default false); when true the page 404s publicly and is
- *   excluded from listings. When present it must be a boolean.
+ * - `draft` is optional (default false); when true the page — and every page
+ *   nested beneath it, regardless of their own `draft` value — 404s publicly and
+ *   is excluded from listings. When present it must be a boolean.
  * - All other keys are preserved as freeform metadata.
  */
 final class PageMeta

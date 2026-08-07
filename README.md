@@ -212,6 +212,9 @@ Available in templates and via the `Garner\Content\Pages` repository:
 - `site.index` — home plus all descendants
 - `page.children` — direct children
 - `page.index` — all descendants
+- `page.parent` — the nearest ancestor page, or `null` for home
+- `page.ancestors` — the full ancestor chain, root first (home ... nearest
+  parent) — the order a breadcrumb reads left to right
 
 Listings exclude drafts and are ordered by `sort` then path. Each returns a
 `Garner\Content\PageCollection` (a [Laravel collection](https://laravel.com/docs/collections)
@@ -222,8 +225,15 @@ of `Page`), so the full query API is available — `filter`, `reject`, `where`,
 {% for post in page.children.sortBy('created').reverse.take(5) %}
 ```
 
+```twig
+{% for ancestor in page.ancestors %}{{ ancestor.title }} / {% endfor %}{{ page.title }}
+```
+
 To include drafts (e.g. a preview build), pass `drafts: true`:
-`page.children(drafts=true)`.
+`page.children(drafts=true)`. `parent()`/`ancestors()` are not filtered this
+way — a directory with no `+page.json` of its own is skipped rather than
+breaking the chain, but a real ancestor page is returned even when it is
+itself a draft, since the relationship is structural rather than a listing.
 
 ## References
 

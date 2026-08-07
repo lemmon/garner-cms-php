@@ -8,3 +8,6 @@ Garner is an agent-first, flat-file CMS. This page is just a directory with a
   becomes a named value (`main.md` → `content.main`) for the template.
 - **Only `+page.json` has rules** — just `created` is required; `template` falls
   back to the default and `id` is inherited from the directory name when omitted.
+- **Tree traversal** — nested pages can walk upward with `page.parent` and
+  `page.ancestors`; see the [case study](/work/case-study), reached through a
+  directory that carries no `+page.json` of its own.

@@ -537,6 +537,184 @@ final class RenderTest extends TestCase
         self::assertSame(['/blog/post'], $this->paths($app->pages()->find('/blog')?->children()));
     }
 
+    public function testHomeHasNoParentOrAncestors(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+
+        $home = $this->app()->pages()->home();
+
+        self::assertNull($home?->parent());
+        self::assertSame([], $this->paths($home?->ancestors()));
+    }
+
+    public function testParentReturnsTheImmediateAncestorPage(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('blog', ['created' => '2026-06-19', 'title' => 'Blog']);
+        $this->writeEntry('blog/post', ['created' => '2026-06-19', 'title' => 'Post']);
+
+        $post = $this->app()->pages()->find('/blog/post');
+
+        self::assertSame('/blog', $post?->parent()?->path());
+    }
+
+    public function testAncestorsListsTheFullChainRootFirst(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('blog', ['created' => '2026-06-19', 'title' => 'Blog']);
+        $this->writeEntry('blog/post', ['created' => '2026-06-19', 'title' => 'Post']);
+
+        $post = $this->app()->pages()->find('/blog/post');
+
+        self::assertSame(['/', '/blog'], $this->paths($post?->ancestors()));
+    }
+
+    public function testParentSkipsNonPageIntermediateDirectories(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        // "work" is a plain grouping directory: no +page.json of its own.
+        $this->writeEntry('work/case-study', ['created' => '2026-06-19', 'title' => 'Case Study']);
+
+        $caseStudy = $this->app()->pages()->find('/work/case-study');
+
+        self::assertSame('/', $caseStudy?->parent()?->path());
+        self::assertSame(['/'], $this->paths($caseStudy->ancestors()));
+    }
+
+    public function testAncestorsDegradesInsteadOfFailingOnAStaleLockedIndex(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('blog', ['created' => '2026-06-19', 'title' => 'Blog']);
+        $this->writeFile(
+            'app/templates/breadcrumb.twig',
+            '{% for ancestor in page.ancestors %}{{ ancestor.title }} / {% endfor %}{{ page.title }}',
+        );
+        $this->writeEntry('blog/post', [
+            'template' => 'breadcrumb',
+            'created' => '2026-06-19',
+            'title' => 'Post',
+        ]);
+
+        $locked = fn(): Application => new Application($this->root, $this->root, [
+            'app' => ['debug' => true, 'name' => 'Test Site', 'index' => ['mode' => 'locked']],
+        ]);
+
+        // Build the index once while /blog is still valid.
+        $locked()->contentIndex()->rebuild();
+
+        // Delete /blog's entry file without triggering a reindex — the exact
+        // "trust the existing index" drift 'locked' mode (production) allows,
+        // since it never rescans the filesystem on its own.
+        unlink($this->root . '/routes/blog/+page.json');
+
+        // A fresh Application/Pages per call, matching a fresh request hitting
+        // the now-stale index.
+        $post = $locked()->pages()->find('/blog/post');
+        self::assertNotNull($post);
+
+        // /blog/post's own content is completely valid; a corrupted ancestor
+        // must degrade the chain, not 500 the whole render.
+        self::assertSame(['/'], $this->paths($post->ancestors()));
+        self::assertNull($post->parent());
+
+        $response = $locked()->publicSite()->respond('/blog/post');
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('Post', $response->body());
+    }
+
+    public function testAncestorsExcludesAnAncestorThatBecameAnEndpointOnAStaleLockedIndex(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('blog', ['created' => '2026-06-19', 'title' => 'Blog']);
+        $this->writeEntry('blog/post', [
+            'template' => 'default',
+            'created' => '2026-06-19',
+            'title' => 'Post',
+        ]);
+
+        $locked = fn(): Application => new Application($this->root, $this->root, [
+            'app' => ['debug' => true, 'name' => 'Test Site', 'index' => ['mode' => 'locked']],
+        ]);
+
+        // Build the index once while /blog is still a normal page.
+        $locked()->contentIndex()->rebuild();
+
+        // Turn /blog into a route endpoint on disk, without a reindex: the
+        // stale index still has it recorded as endpoint = 0.
+        unlink($this->root . '/routes/blog/+page.json');
+        $this->writeFile(
+            'routes/blog/+controller.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return static fn(\$page, \$site, \$app) => RenderedResponse::text('ok');\n",
+        );
+
+        $post = $locked()->pages()->find('/blog/post');
+        self::assertNotNull($post);
+
+        // /blog hydrates successfully now — as an endpoint, not a hydration
+        // failure — but an endpoint is never a valid tree ancestor, matching
+        // children()/descendants(). It must still be excluded, not exposed.
+        self::assertSame(['/'], $this->paths($post->ancestors()));
+        self::assertNull($post->parent());
+    }
+
+    public function testPagesCacheIsInvalidatedAfterAnExplicitReindex(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'Original']);
+
+        $app = $this->app();
+        $pages = $app->pages();
+
+        $about = $pages->find('/about');
+        self::assertNotNull($about);
+        self::assertSame('Original', $about->title());
+
+        // Edit content on disk, then rebuild the SAME ContentIndex instance
+        // explicitly — the way the `reindex` CLI command does — rather than
+        // relying on the automatic scan-mode freshness check, which only runs
+        // once per instance. Pages must not keep serving what it hydrated and
+        // cached before that rebuild.
+        $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'Updated']);
+        $app->contentIndex()->rebuild();
+
+        $updated = $pages->find('/about');
+        self::assertNotNull($updated);
+        self::assertSame('Updated', $updated->title());
+    }
+
+    public function testParentIsReturnedEvenWhenItIsADraft(): void
+    {
+        $this->writeDraftCascadeFixture();
+
+        // case-study is itself unrouted now (hidden cascades down from its draft
+        // parent — see testDraftParentCascadesHiddenStatusToPublishedChild), so
+        // fetch it the way an admin/preview listing would: explicitly bypassing
+        // the hidden filter rather than through find().
+        $caseStudy = $this->app()->pages()->children('/projects', drafts: true)->first();
+        $parent = $caseStudy?->parent();
+
+        self::assertSame('/projects', $parent?->path());
+        self::assertTrue($parent->isDraft());
+    }
+
+    public function testEndpointHasNoExposedParent(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeFile(
+            'routes/api/+controller.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return static fn(\$page, \$site, \$app) => RenderedResponse::text('ok');\n",
+        );
+
+        $endpoint = $this->app()->pages()->find('/api');
+
+        self::assertNotNull($endpoint);
+        self::assertTrue($endpoint->isEndpoint());
+        self::assertNull($endpoint->parent());
+        self::assertSame([], $this->paths($endpoint->ancestors()));
+    }
+
     public function testDraftPageIsNotRoutable(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
@@ -547,6 +725,87 @@ final class RenderTest extends TestCase
         ]);
 
         self::assertSame(404, $this->app()->publicSite()->respond('/wip')->status());
+    }
+
+    public function testDraftParentCascadesHiddenStatusToPublishedChild(): void
+    {
+        $this->writeDraftCascadeFixture();
+
+        // /projects/case-study never declares draft itself, but its parent does —
+        // it must be just as unpublished, not independently routable or listed.
+        self::assertSame(
+            404,
+            $this->app()->publicSite()->respond('/projects/case-study')->status(),
+        );
+
+        $home = $this->app()->pages()->home();
+        self::assertNotNull($home);
+        self::assertSame([], $this->paths($home->index()));
+    }
+
+    public function testCascadedHiddenDescendantsAreIncludedWithDraftsFlag(): void
+    {
+        $this->writeDraftCascadeFixture();
+
+        $home = $this->app()->pages()->home();
+        self::assertNotNull($home);
+
+        self::assertSame(
+            ['/projects', '/projects/case-study'],
+            $this->paths($home->index(drafts: true)),
+        );
+    }
+
+    public function testAncestorsAndParentStayStructuralForACascadedHiddenPage(): void
+    {
+        $this->writeDraftCascadeFixture();
+
+        $caseStudy = $this->app()->pages()->children('/projects', drafts: true)->first();
+        self::assertNotNull($caseStudy);
+
+        self::assertSame('/projects', $caseStudy->parent()?->path());
+        self::assertSame(['/', '/projects'], $this->paths($caseStudy->ancestors()));
+    }
+
+    public function testEndpointNestedUnderADraftDirectoryIsAlsoHidden(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('projects', [
+            'created' => '2026-06-19',
+            'title' => 'Projects',
+            'draft' => true,
+        ]);
+        $this->writeFile(
+            'routes/projects/api/+controller.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return static fn(\$page, \$site, \$app) => RenderedResponse::text('ok');\n",
+        );
+
+        self::assertSame(404, $this->app()->publicSite()->respond('/projects/api')->status());
+    }
+
+    public function testPublishedExcludesACascadedHiddenGrandchildEvenWithDraftsFlag(): void
+    {
+        $this->writeDraftCascadeFixture();
+
+        // The exact idiom the README pairs together: bypass the hidden filter to
+        // see everything, then use the collection API to separate published from
+        // hidden. case-study never declares draft itself — it's only hidden
+        // because its parent "projects" is — so published() must still exclude
+        // it, and drafts() must still include it.
+        $descendants = $this->app()->pages()->index('/', drafts: true);
+
+        $caseStudy = $descendants->first(
+            static fn(Page $page): bool => $page->path() === '/projects/case-study',
+        );
+        self::assertNotNull($caseStudy);
+        self::assertFalse($caseStudy->isDraft());
+
+        self::assertSame(
+            ['/projects', '/projects/case-study'],
+            $this->paths($descendants->drafts()),
+        );
+        self::assertSame([], $this->paths($descendants->published()));
     }
 
     public function testPublishedChildrenCanBeFilteredByUserField(): void
@@ -824,6 +1083,25 @@ final class RenderTest extends TestCase
         $directory = $route === '' ? 'routes' : 'routes/' . $route;
         $json = json_encode($meta, JSON_PRETTY_PRINT);
         $this->writeFile($directory . '/+page.json', $json !== false ? $json : '{}');
+    }
+
+    /**
+     * Home, a draft "projects" directory, and a "case-study" child nested under
+     * it that never declares draft itself — shared by every test asserting how
+     * a draft ancestor's hidden state cascades to a non-draft descendant.
+     */
+    private function writeDraftCascadeFixture(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('projects', [
+            'created' => '2026-06-19',
+            'title' => 'Projects',
+            'draft' => true,
+        ]);
+        $this->writeEntry('projects/case-study', [
+            'created' => '2026-06-19',
+            'title' => 'Case Study',
+        ]);
     }
 
     private function writeTemplates(): void

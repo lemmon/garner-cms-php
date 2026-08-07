@@ -37,6 +37,9 @@ final class Page
      * @param MediaPublisher|null  $publisher      Publishes owned files and resolves their public URLs.
      * @param string               $baseUrl        Site base URL (no trailing slash) used to compose url().
      * @param bool                 $endpoint       Route endpoint (controller-only directory), not a tree page.
+     * @param bool                 $hidden         Cascaded visibility: this page's own `draft`, OR a hidden/draft
+     *                                              ancestor's — the flag `PageCollection::published()`/`drafts()`
+     *                                              filter on. Independent of `$draft`, which is never cascaded.
      */
     public function __construct(
         private readonly string $id,
@@ -54,6 +57,7 @@ final class Page
         private readonly ?MediaPublisher $publisher = null,
         private readonly string $baseUrl = '',
         private readonly bool $endpoint = false,
+        private readonly bool $hidden = false,
     ) {}
 
     public function id(): string
@@ -87,6 +91,21 @@ final class Page
     public function isDraft(): bool
     {
         return $this->draft;
+    }
+
+    /**
+     * Whether this page is unpublished — its own `draft` flag, OR a hidden/draft
+     * ancestor's, cascaded down the tree (see ContentIndex). Unlike isDraft(),
+     * true here means "not routable, not listed" regardless of which page in the
+     * chain actually declared `draft`. This is what PageCollection::published()/
+     * drafts() filter on. OR-ing in $draft here (rather than trusting every
+     * caller to have already folded it into $hidden) keeps the invariant true
+     * by construction: a page can never report itself as visible when its own
+     * entry says otherwise, even if a future caller passes $hidden without it.
+     */
+    public function isHidden(): bool
+    {
+        return $this->hidden || $this->draft;
     }
 
     /**
@@ -132,6 +151,25 @@ final class Page
     public function index(bool $drafts = false): PageCollection
     {
         return $this->pages?->index($this->path, $drafts) ?? new PageCollection();
+    }
+
+    /**
+     * The nearest ancestor page (home for top-level pages), or null for home
+     * itself, an orphaned route, or a page with no repository attached.
+     */
+    public function parent(): ?Page
+    {
+        return $this->pages?->parent($this->path);
+    }
+
+    /**
+     * The full ancestor chain, root first (home ... nearest parent) — the
+     * order a breadcrumb reads left to right. Empty for home, an orphaned
+     * route, or a page with no repository attached.
+     */
+    public function ancestors(): PageCollection
+    {
+        return $this->pages?->ancestors($this->path) ?? new PageCollection();
     }
 
     public function title(): ?string

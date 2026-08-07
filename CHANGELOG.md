@@ -20,6 +20,21 @@ $data, fragment: 'x');`. `form.errors` in the template is the tuple's
   reshaping layer; `form.values` is whatever the schema produced. Defaults to
   422, matching `failure()`.
 
+- **`Page::parent()` and `Page::ancestors()`** — resolve the page tree upward,
+  mirroring the existing `children()`/`index()` shape. `parent()` returns the
+  nearest ancestor page (`null` for home, an orphaned route, or a page with no
+  repository attached); `ancestors()` returns the full chain as a
+  `PageCollection`, root first (home ... nearest parent) — the order a
+  breadcrumb reads left to right. Both are backed by the `parent_path` column
+  `ContentIndex` already stored internally but never surfaced, so a directory
+  with no `+page.json` of its own (a plain grouping folder) is skipped rather
+  than breaking the chain. Neither filters drafts: the parent relationship is
+  structural, independent of visibility — an ancestor that happens to be a
+  draft is still returned, with `isDraft()` reflecting that, and it's on the
+  caller to decide whether to render it as a link. (Once draft visibility
+  cascades — see Fixed, below — this is moot for public rendering: a page
+  that renders at all can never have a hidden ancestor.)
+
 ### Changed
 
 - **`lemmon/validator` bumped to `^0.17` (was `^0.15`).** Garner's own use of the
@@ -43,6 +58,77 @@ $data, fragment: 'x');`. `form.errors` in the template is the tuple's
   types.
 
 ### Fixed
+
+- **Draft visibility didn't cascade to descendants.** `ContentIndex::dirForPath()`,
+  `children()`, and `descendants()` all filtered `draft = 0` on the matched row
+  alone, never on its ancestors, so a page nested under a draft directory could
+  still resolve, render (`200`, not `404`), and appear in `index()`/`children()`
+  listings as long as its own `+page.json` didn't itself declare `draft`. Beyond
+  the inconsistency, this broke the shipped breadcrumb example
+  (`routes/work/case-study/+template.twig`): it could link _to_ a draft ancestor
+  whose own route 404s. The index now computes a `hidden` column at build time —
+  a page's own `draft` OR its nearest page-ancestor's `hidden` state, cascaded
+  top-down as the tree is scanned — and every lookup/listing path filters on
+  `hidden` instead of raw `draft`; `drafts: true` still means "include
+  everything," now including cascaded-hidden descendants too. Route endpoints
+  (`+controller.php`-only directories) inherit the same cascade from their
+  containing page. `Page::isDraft()` is unchanged: it still reflects only a
+  page's own declared flag, not the cascade. `Page::parent()`/`ancestors()`
+  stay intentionally unfiltered (see Added, above) — with `hidden` now
+  cascading, a publicly-rendered page can never have a hidden ancestor, so
+  there's nothing left for them to filter. The same gap this fix targets in
+  the index had resurfaced one layer up, in `PageCollection`:
+  `published()`/`drafts()` filtered on `Page::isDraft()` — a page's own flag
+  only — so `$app->pages()->children('/projects', drafts:
+true)->published()` still returned a page that was hidden solely because
+  its _parent_ was a draft. Loaded pages now carry the index's cascaded state
+  as `Page::isHidden()`, and `published()`/`drafts()` filter on that instead.
+
+- **`ContentIndex::ancestors()` had no cycle guard and reopened a new SQLite
+  connection per tree level.** It built the ancestor chain by calling `parent()`
+  in a loop, so a page six levels deep opened six separate connections and ran
+  six separate queries per request, and a corrupted or hand-edited index with a
+  `parent_path` cycle would hang the request indefinitely. It's now a single
+  bounded `WITH RECURSIVE` query over `parent_path`, run on one connection —
+  immune to a concurrent reindex swapping the index file out mid-walk, and
+  capped at 1000 levels so a cycle can't loop forever. The depth cap alone
+  wasn't a full fix, though: a genuine cycle (a hand-edited index with A's
+  parent set to B and B's parent set to A) doesn't hang, but did return
+  hundreds of duplicate rows instead of the one meaningful ancestor. The
+  recursive query now also tracks every path already visited and refuses to
+  revisit one, so a cycle terminates cleanly right where it closes. Also:
+  `parent()` didn't exclude endpoint rows on the input side, so
+  `Pages::find('/some-endpoint')?->parent()` could silently resolve a
+  "parent" for a route documented elsewhere as outside the page tree; both
+  `parent()` and `ancestors()` now return `null`/`[]` for an endpoint's own
+  path, matching `children()`/`descendants()`. Separately, hydrating an
+  ancestor's `+page.json` for `parent()`/`ancestors()` could throw uncaught
+  when a "locked" (production) index still referenced a directory whose entry
+  file was since deleted or edited into an invalid shape — index freshness is
+  a deploy-time contract in that mode, not something a normal request
+  re-checks — so an otherwise perfectly valid page's render would 500 over
+  unrelated ancestor corruption. Both methods now treat a hydration failure
+  the same way they already treat a plain grouping directory: skip it and
+  degrade the chain rather than fail the whole render — including the
+  narrower case where a stale index still has an ancestor recorded as
+  `endpoint = 0` but its directory has since become a real endpoint on disk
+  (entry file replaced by a controller): hydration succeeds there rather than
+  throwing, so it's now rejected by its own `isEndpoint()` afterward instead
+  of being exposed as a tree page. `Pages` also now caches hydrated pages by
+  directory and memoizes `parent()`/`ancestors()` index lookups by path, and
+  `ContentIndex` reuses one SQLite connection per instance (all cleared
+  whenever the instance rebuilds its index, from the automatic freshness
+  check or an in-process `ContentIndex::rebuild()` call, so a `Pages`
+  instance built before a rebuild can't keep serving what it hydrated before
+  it) — so a template reading `page.parent` three times and `page.ancestors`
+  once, like the shipped breadcrumb, runs one parent query and one chain
+  query and parses each ancestor's entry file once. All of this is
+  per-instance, in-process state: a rebuild by _another_ process (e.g.
+  `garner reindex` against a running `locked` site) is only picked up by
+  instances created after it — moot under the shipped per-request boot,
+  where every request constructs a fresh `Application`, but a long-lived
+  embedder must likewise construct a fresh one per unit of work (see
+  `docs/index-freshness.md`).
 
 - **Development mode disabled Twig's compiled-template cache outright instead of
   only gating its freshness.** `Application::resolveTwigCache()` returned `false`

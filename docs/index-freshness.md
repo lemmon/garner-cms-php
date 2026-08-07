@@ -18,7 +18,7 @@ answers:
 
 1. **Content changed** — files added / edited / removed (at deploy time, or at
    runtime if Garner writes content).
-2. **The engine changed** — a Garner upgrade alters the index *structure* (e.g. the
+2. **The engine changed** — a Garner upgrade alters the index _structure_ (e.g. the
    `endpoint` column added on 2026-07-01 for route endpoints).
 
 Guiding principle: **auto-heal where Garner has a cheap signal; require an explicit
@@ -54,7 +54,7 @@ warming the index ahead of the first request (e.g. a deploy hook).
 
 ## Content staleness — by environment
 
-There is no cheap, universal way to auto-detect arbitrary *external* file edits:
+There is no cheap, universal way to auto-detect arbitrary _external_ file edits:
 directory mtimes do not reflect edits to nested files or file contents, so detection
 means walking the tree. This is a deliberate performance / correctness tradeoff,
 expressed through the mode:
@@ -73,11 +73,25 @@ expressed through the mode:
   index inline, since Garner owns the write and therefore has the signal. Not needed
   until those features land.
 
+## Read caching is per-process — known limitation
+
+`ContentIndex` pins one SQLite reader connection per instance and signals its
+rebuilds to `Pages` (hydrated-page cache, `parent()`/`ancestors()` memos)
+through an in-memory generation counter. Both are per-instance, in-process
+state: a rebuild by _another_ process — `garner reindex` against a running
+`locked` site — swaps the index file on disk, but an already-constructed
+instance keeps reading the old, now-unlinked inode until it is discarded. The
+shipped boot constructs a fresh `Application` per request, which bounds any
+staleness to the request already in flight; that much is deliberate (one
+request never sees two different index states mid-render). A long-lived
+embedder (worker runtime, queue consumer) must do the same per unit of work
+rather than holding one `Application` across deploys/reindexes.
+
 ## Summary
 
-| Staleness cause | Cheap signal? | Today |
-| --- | --- | --- |
-| Content edit, dev (`scan`) | yes (rescans) | auto |
-| Content edit, prod (`locked`) | no (needs a scan) | reindex on deploy — or `scan` for small sites |
-| Runtime content write | yes (owns the write) | n/a yet (future: inline invalidate) |
-| Engine / schema change | yes (version) | auto-heal via `schema_version`, either mode |
+| Staleness cause               | Cheap signal?        | Today                                         |
+| ----------------------------- | -------------------- | --------------------------------------------- |
+| Content edit, dev (`scan`)    | yes (rescans)        | auto                                          |
+| Content edit, prod (`locked`) | no (needs a scan)    | reindex on deploy — or `scan` for small sites |
+| Runtime content write         | yes (owns the write) | n/a yet (future: inline invalidate)           |
+| Engine / schema change        | yes (version)        | auto-heal via `schema_version`, either mode   |

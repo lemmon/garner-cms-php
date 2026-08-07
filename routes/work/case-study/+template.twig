@@ -1,0 +1,14 @@
+{% extends "base.twig" %}
+
+{% block content %}
+    <article class="case-study">
+        <nav aria-label="breadcrumb">
+            {% for ancestor in page.ancestors %}<a href="{{ ancestor.url }}">{{ ancestor.title ?? ancestor.id }}</a> / {% endfor %}{{ page.title }}
+        </nav>
+        <h1>{{ page.title }}</h1>
+        {{ content.main|markdown }}
+        {% if page.parent %}
+            <p><a href="{{ page.parent.url }}">&larr; {{ page.parent.title }}</a></p>
+        {% endif %}
+    </article>
+{% endblock %}

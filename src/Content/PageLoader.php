@@ -17,8 +17,12 @@ final class PageLoader
         private readonly string $baseUrl = '',
     ) {}
 
-    public function load(string $dir, string $path, ?Pages $pages = null): Page
-    {
+    public function load(
+        string $dir,
+        string $path,
+        ?Pages $pages = null,
+        bool $hidden = false,
+    ): Page {
         $entry = EntryFile::find($dir);
         $controllerFile = $this->siblingFile($dir, self::CONTROLLER_FILE);
 
@@ -62,6 +66,7 @@ final class PageLoader
             publisher: $this->publisher,
             baseUrl: $this->baseUrl,
             endpoint: $entry === null,
+            hidden: $hidden,
         );
     }
 

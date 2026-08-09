@@ -110,6 +110,33 @@ final class ContentIndex
     }
 
     /**
+     * Resolve a route path to its {path, dir, hidden} row regardless of hidden
+     * state. dirForPath() deliberately excludes hidden pages for the lookup
+     * every public request takes; this is the preview flow's primitive
+     * instead — it lets a caller that has already verified a page-specific
+     * credential (see Page::draftPreview()) still resolve and load a draft.
+     *
+     * @return array{path: string, dir: string, hidden: bool}|null
+     */
+    public function rowForPath(string $path): ?array
+    {
+        $this->ensureFresh();
+
+        $pdo = $this->reader();
+
+        if ($pdo === null) {
+            return null;
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT path, dir, hidden FROM pages WHERE path = :path LIMIT 1',
+        );
+        $statement->execute([':path' => RoutePath::normalize($path)]);
+
+        return $this->normalizeRow($statement->fetch());
+    }
+
+    /**
      * Resolve a page id to its current route path. Visible pages only, so a
      * reference to a hidden (draft, or beneath a draft ancestor) or missing page
      * resolves to null.

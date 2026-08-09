@@ -99,13 +99,14 @@ page tree — it never appears in `site.index`, `children`, or `findById`. Use i
 directory with a `+page.json` (even `{}`) is a page. Any keys are kept as freeform
 metadata.
 
-| Field      | Default            | Notes                                      |
-| ---------- | ------------------ | ------------------------------------------ |
-| `id`       | the directory name | Any unique string; explicit value wins.    |
-| `template` | `default`          | Twig template / controller name.           |
-| `draft`    | `false`            | Hides the page and its route descendants.  |
-| `sort`     | `0`                | Integer; lower comes first in listings.    |
-| `created`  | none               | Non-empty string (timestamp) when present. |
+| Field           | Default            | Notes                                      |
+| --------------- | ------------------ | ------------------------------------------ |
+| `id`            | the directory name | Any unique string; explicit value wins.    |
+| `template`      | `default`          | Twig template / controller name.           |
+| `draft`         | `false`            | Hides the page and its route descendants.  |
+| `draft_preview` | none               | Unlisted preview link secret; see below.   |
+| `sort`          | `0`                | Integer; lower comes first in listings.    |
+| `created`       | none               | Non-empty string (timestamp) when present. |
 
 YAML is accepted as an alternative entry file (`+page.yaml` / `+page.yml`).
 
@@ -191,6 +192,55 @@ beneath it in the route tree 404 publicly and are excluded from listings.
 
 `page.isDraft` reports the page's own flag; `page.isHidden` reports the
 effective state after inheriting visibility from its ancestors.
+
+### Draft preview links
+
+Set `draft_preview` on a draft page to hand it to a client for review before it
+publishes:
+
+```json
+{ "draft": true, "draft_preview": "letmein" }
+```
+
+The page then answers at `/path?preview=letmein` — still a 404 without the
+matching value, still absent from listings, and served with
+`X-Robots-Tag: noindex`. It's a soft, unlisted-link gate for showing someone an
+unpublished page, not a mechanism for protecting sensitive data: the value is a
+plain string, reuse across pages is fine, and each page's own value only
+unlocks that page.
+
+Manage it with the CLI rather than hand-editing when convenient:
+
+```shell
+garner page:preview blog/hello --generate   # random token, shown once
+garner page:preview blog/hello --set "letmein"
+garner page:preview blog/hello              # show the current state
+garner page:preview blog/hello --clear      # turn the link off
+```
+
+For a quick local look rather than a link handed to someone else, `--open`
+issues a one-time token that never touches `+page.json` at all — it lives only
+in the disposable application cache, so it can't be redeemed anywhere but the
+machine that generated it, and it stops working the moment it's used:
+
+```shell
+garner page:preview blog/hello --open --base-url http://localhost:8040
+```
+
+`--base-url` defaults to `app.url`/`APP_URL` when set. Unused, the token is
+discarded after `app.preview.open_ttl` seconds (default `1800`, i.e. 30
+minutes) — pure housekeeping, not a security boundary, since it's already
+single-use and redeemable only on the machine that generated it.
+
+**Known limitation:** the token must be on the request's own query string —
+it does not survive a redirect that doesn't explicitly carry it forward. A
+form submitted on a previewed draft page (`+action.php`'s Post/Redirect/Get
+success redirect) or a controller-returned redirect lands on a follow-up
+request with no `?preview=`, so it 404s even though the submission itself
+succeeded. Preview links are meant for reviewing content, not exercising
+interactive flows on an unpublished page; re-append `?preview=` by hand (or
+mint a fresh `--open` link, since one-time tokens are spent after the first
+view regardless) if you need to keep going.
 
 Finer visibility — "in the footer but not the header", "featured", "archived" — is
 a listing decision, not a global page property, so it lives in your own freeform

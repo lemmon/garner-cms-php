@@ -718,6 +718,17 @@ until a concrete use beyond structural traversal justifies it.
 
 ## 2026-07-26 — Drafts have no preview path, not even for the author
 
+> Status: **implemented (2026-08-09).** A page can set `draft_preview` in
+> `+page.json`; a request supplying the same value as `?preview=` is served
+> the page (with `X-Robots-Tag: noindex`) instead of the public 404. See
+> `README.md` ("Draft preview links") and the `page:preview` CLI command. The
+> mechanism deliberately stayed simple — a plain, reusable string compared
+> with `hash_equals()`, no hashing, no session/cookie exchange — because the
+> real requirement turned out to be "keep it out of casual reach and search
+> engines," not protecting sensitive data. In scope: a page that is itself
+> `draft: true`. Out of scope, as originally written below: a page hidden only
+> by cascade from a draft ancestor has no `draft_preview` of its own to check.
+
 Surfaced while building a case-study subpage intentionally not ready to link
 or index yet. `draft: true` looked like the right fit, until previewing it
 meant editing `+page.json` to `false`, running `reindex`, loading the page,
@@ -760,3 +771,111 @@ but avoid expanding every implementation detail into a long-form section.
 `llms.txt` should remain the short, practical guide for agents building with
 Garner. Once the site is complete, the README can be reduced to orientation,
 quick start, and links to the canonical documentation.
+
+## 2026-08-09 — Browsing drafts locally still means per-page setup
+
+`children(drafts: true)`/`index(drafts: true)` (see the cascade entry above)
+let a template list draft pages, but clicking through any of them still 404s
+unless that specific page has `draft_preview` set (README, "Draft preview
+links") or a one-time `garner page:preview --open` link is live for it. Both
+now exist and cover "hand a link to a client" and "pop one specific page open
+for myself," but neither answers the plainer local-dev complaint: browsing an
+entire WIP subtree by clicking around a `drafts: true` listing, the way you'd
+browse the published site, without touching `+page.json` or minting a token
+per page first.
+
+The instinct to reach for `debug` here is understandable but wrong, for a
+sharper reason than "it's a different concern": `debug`'s only "default on"
+path is `Env::isLocalhost()` (`src/Support/Env.php`), which reads
+`SERVER_NAME`/`HTTP_HOST` — both client-supplied. A request claiming
+`Host: localhost` against a real, non-loopback deployment would satisfy that
+check. Low stakes for `debug` (it only changes error verbosity), but content
+visibility is exactly the kind of thing that must never ride on a
+request-controllable or environment-inherited signal — `CHANGELOG.md`'s 0.4.1
+entry is this project's own precedent: a `.env` without `APP_ENV` set already
+once let a config default silently cross from local into a real deploy.
+
+Direction: a config flag in the same family as `app.debug`/`app.url` —
+`app.preview.drafts`, read from `APP_PREVIEW_DRAFTS` via `Env::get()` — but
+unlike `debug`, defaulting to off with **no host-based fallback at all**.
+Explicit opt-in only. When true, the single-page lookup that already backs
+`draft_preview` and `--open` (`PublicSite::resolvePreview()`) would treat
+every draft as viewable with no token check, still tagged
+`X-Robots-Tag: noindex`. That also happens to make an existing
+`children(drafts: true)` listing fully clickable for free — the fix for the
+single-page gate turns out to be the fix for the listing friction too, no
+separate mechanism needed.
+
+`garner serve --preview-drafts` is the proposed ergonomic entry point: a CLI
+command that starts the built-in dev server with that flag set for the
+process's lifetime. But the flag is the actual mechanism, not the command —
+it's already usable today, without `garner serve` existing, as
+`APP_PREVIEW_DRAFTS=1 composer start` (composer.json's existing `start`
+script just runs `php -S localhost:8040 -t public boot/server.php`; the env
+var rides along into that process the same way `APP_DEBUG` already does).
+`garner serve` would only add discoverability and a memorable flag over that.
+
+Open questions:
+
+- Does `garner serve` replace `composer start` as the documented way to run
+  the dev server, or coexist alongside it? Two ways to start the same server
+  risks drift.
+- Should `garner serve` pass through port/host/other `php -S` options, or
+  stay a thin, opinionated wrapper?
+- Exact config key/env var naming — `app.preview.drafts` / `APP_PREVIEW_DRAFTS`
+  used above are working names, not settled, though `app.preview.*` is now a
+  real namespace (`app.preview.open_ttl` backs `--open`'s token lifetime), so
+  nesting this alongside it is likely the right call.
+
+Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-08-09 — Preview tokens don't survive redirects
+
+Flagged by automated review on the `draft_preview`/`--open` PR: `?preview=`
+only ever reaches `PublicSite::resolvePreview()` on the exact request that
+carries it. The one place a redirect re-attaches it is the canonical-path
+redirect inside `respond()`, which re-appends `$query` verbatim by
+construction. A PRG redirect from `respondWithAction()` (`$result->location()`,
+the action's own success target) or a controller-returned redirect carries no
+such guarantee — neither knows or cares about the preview mechanism, so
+`?preview=` is simply absent from the next request. Concretely: submit a form
+on a previewed draft page and the success redirect 404s, even though the POST
+itself succeeded.
+
+Considered and rejected for now: threading the token through every
+redirect-producing path (actions, controllers) so it rides along
+automatically. That's real surface area — both are userland-facing contracts
+(`ActionResult`, controller returns) that would need to either special-case
+"was this request a preview" or have Garner rewrite their `Location` header
+after the fact — for a feature whose whole premise is deliberately low-stakes
+(see the 2026-07-26 entry above: reused, human-typed phrases are fine,
+`hash_equals()` is the only real defense in depth). A cookie- or
+session-backed "preview mode" would sidestep the redirect problem entirely,
+but that's the same added machinery (session store engagement, a second
+credential lifecycle) already weighed and deliberately left out when this
+shipped — the token-on-the-URL design was chosen knowing it's a fit for
+_reviewing_ an unpublished page, not for exercising interactive flows on one.
+
+Accepted as a known boundary, not a bug: re-appending `?preview=` by hand (or
+minting a fresh `--open` link) covers the rare case of needing to keep
+navigating a previewed draft after a redirect drops the token.
+
+A related but distinct issue _was_ fixed in the same pass: the canonical-path
+redirect (trailing slash) inside `respond()` is the one redirect that
+deliberately does carry `?preview=` forward — but `resolvePreview()` was
+consuming a `--open` token during the pass that merely decides whether to
+redirect, so the token was already spent by the time the redirected request
+(the one actually meant to use it) arrived. Fixed by threading whether the
+current request is already canonical through to the ephemeral-token check, so
+consumption only happens on the request that's actually served.
+
+Not fixed, and not planned: `get()` then `remove()` in that same check isn't
+atomic, so two concurrent requests for the same `--open` link (e.g. a
+double-click, or a browser prefetch) could both pass the check before either
+removes the row, both getting served. `Cache` has no atomic take/consume
+primitive to fix this properly, and building one is real new surface for a
+race whose worst outcome is the token's own holder seeing the same local page
+twice instead of once — no cross-user exposure, no privilege gained. Revisit
+only if `Cache` grows an atomic primitive for an unrelated reason.
+
+Not planned; recorded so the gap is a decision, not an accident.

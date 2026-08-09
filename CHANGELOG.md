@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`draft_preview` links** — a draft page carrying `"draft_preview": "<value>"`
+  in `+page.json` answers at `/path?preview=<value>` instead of 404ing, with
+  `X-Robots-Tag: noindex` on the response. A soft, unlisted-link gate for
+  handing an unpublished page to a client for review — not a mechanism for
+  protecting sensitive data; the value is a plain string and reuse across
+  pages is expected. `Pages::find($path, drafts: true)` and
+  `ContentIndex::rowForPath()` back the lookup; `Page::draftPreview()` exposes
+  the stored value. Manage it with the new `page:preview` CLI command
+  (`--set`, `--generate`, `--clear`, or no flag to report the current state).
+
+- **`page:preview --open`** — a lighter-weight preview path alongside
+  `draft_preview`: issues a one-time token for a draft page, stored only in
+  the disposable application cache (never written to `+page.json`), and
+  best-effort opens it in the local default browser (always printing the
+  link too). The token is consumed on first use — `PublicSite` checks it via
+  a new `PublicSite::EPHEMERAL_PREVIEW_CACHE_PREFIX`-keyed lookup alongside
+  the `draft_preview` check, and it can only ever be redeemed on the machine
+  that generated it, since the cache file isn't shared across environments.
+  `--base-url` (or `app.url`) supplies the origin to build the link from.
+  Unused tokens are discarded after `app.preview.open_ttl` seconds (default
+  `1800`) — deliberately generous, since the TTL is housekeeping rather than
+  a security boundary here.
+
 - **`ActionResult::invalid($errors, values:, fragment:)`** — sugar for the
   `lemmon/validator` `tryValidate()` handoff: it passes the tuple's
   `list<ValidationError>` through as `form.errors` and the supplied validated

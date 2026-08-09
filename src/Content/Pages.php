@@ -53,12 +53,24 @@ final class Pages
         private readonly PageLoader $loader,
     ) {}
 
-    public function find(string $path): ?Page
+    /**
+     * Resolve a route path to its page (published only; pass drafts: true to
+     * resolve a hidden page too — the preview flow's primitive, not meant for
+     * ordinary routing).
+     */
+    public function find(string $path, bool $drafts = false): ?Page
     {
         $normalized = RoutePath::normalize($path);
-        $dir = $this->index->dirForPath($normalized);
 
-        return $dir === null ? null : $this->load($dir, $normalized);
+        if (!$drafts) {
+            $dir = $this->index->dirForPath($normalized);
+
+            return $dir === null ? null : $this->load($dir, $normalized);
+        }
+
+        $row = $this->index->rowForPath($normalized);
+
+        return $row === null ? null : $this->load($row['dir'], $normalized, $row['hidden']);
     }
 
     /**

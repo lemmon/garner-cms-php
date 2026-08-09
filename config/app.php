@@ -83,6 +83,15 @@ return [
         // "locked" cached index in production. Override with "scan" or "locked".
         'mode' => null,
     ],
+    'preview' => [
+        // How long (seconds) a `garner page:preview --open` one-time token
+        // stays valid before it's discarded unused. It's already single-use
+        // and can only ever be redeemed on the machine that generated it
+        // (the token lives in the local disposable cache, never
+        // `+page.json`), so this is housekeeping, not a security boundary —
+        // no reason to keep it tight.
+        'open_ttl' => 1800,
+    ],
     'twig' => [
         'cache' => null,
         'debug' => null,

@@ -18,6 +18,11 @@ use Lemmon\Validator\Validator;
  * - `draft` is optional (default false); when true the page — and every page
  *   nested beneath it, regardless of their own `draft` value — 404s publicly and
  *   is excluded from listings. When present it must be a boolean.
+ * - `draft_preview` is optional; when present (a non-empty string) it lets a
+ *   request that supplies the same value as a `?preview=` query parameter view
+ *   the page despite `draft`. A soft, unlisted-link gate for handing an
+ *   unpublished page to a client for review — not a mechanism for protecting
+ *   sensitive data. Reuse across pages is expected.
  * - All other keys are preserved as freeform metadata.
  */
 final class PageMeta
@@ -57,6 +62,13 @@ final class PageMeta
 
         if (array_key_exists('draft', $data) && !is_bool($data['draft'])) {
             $errors[] = "'draft' must be a boolean when present";
+        }
+
+        if (
+            array_key_exists('draft_preview', $data)
+            && !$nonEmptyString->tryValidate($data['draft_preview'])[0]
+        ) {
+            $errors[] = "'draft_preview' must be a non-empty string when present";
         }
 
         if ($errors !== []) {

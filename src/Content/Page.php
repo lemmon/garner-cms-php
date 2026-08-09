@@ -183,6 +183,18 @@ final class Page
     }
 
     /**
+     * The page's `draft_preview` secret, or null when absent — PublicSite
+     * compares it against a request's `?preview=` value to grant access to an
+     * otherwise-404ing draft page. See PageMeta.
+     */
+    public function draftPreview(): ?string
+    {
+        $value = $this->meta['draft_preview'] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function meta(): array

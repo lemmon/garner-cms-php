@@ -7,7 +7,9 @@ namespace Garner\Tests;
 use Garner\Content\InvalidEntryException;
 use Garner\Content\Page;
 use Garner\Content\PageCollection;
+use Garner\Content\PublicSite;
 use Garner\Core\Application;
+use Garner\Core\Request;
 use PHPUnit\Framework\TestCase;
 
 final class RenderTest extends TestCase
@@ -727,6 +729,166 @@ final class RenderTest extends TestCase
         self::assertSame(404, $this->app()->publicSite()->respond('/wip')->status());
     }
 
+    public function testPreviewMergesRatherThanReplacesExistingResponseHeaders(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', [
+            'created' => '2026-06-19',
+            'title' => 'WIP',
+            'draft' => true,
+            'draft_preview' => 'letmein',
+        ]);
+        $this->writeFile(
+            'routes/wip/+controller.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return static fn(\$page, \$site, \$app) => RenderedResponse::html('wip')\n"
+            . "    ->withHeader('X-Robots-Tag', 'nofollow, noarchive')\n"
+            . "    ->withHeader('Cache-Control', 'no-transform');\n",
+        );
+
+        $response = $this->appWithQuery('/wip?preview=letmein')->publicSite()->respond('/wip');
+
+        self::assertSame(200, $response->status());
+        self::assertSame('nofollow, noarchive, noindex', $response->header('X-Robots-Tag'));
+        self::assertSame('no-transform, private, no-store', $response->header('Cache-Control'));
+    }
+
+    public function testDraftPreviewGrantsAccessWithMatchingToken(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', [
+            'created' => '2026-06-19',
+            'title' => 'WIP',
+            'draft' => true,
+            'draft_preview' => 'letmein',
+        ]);
+
+        $response = $this->appWithQuery('/wip?preview=letmein')->publicSite()->respond('/wip');
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('WIP', $response->body());
+        self::assertSame('noindex', $response->header('X-Robots-Tag'));
+        self::assertSame('private, no-store', $response->header('Cache-Control'));
+    }
+
+    public function testDraftPreviewRejectsWrongToken(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', [
+            'created' => '2026-06-19',
+            'title' => 'WIP',
+            'draft' => true,
+            'draft_preview' => 'letmein',
+        ]);
+
+        $response = $this->appWithQuery('/wip?preview=nope')->publicSite()->respond('/wip');
+
+        self::assertSame(404, $response->status());
+    }
+
+    public function testDraftPreviewWithNoTokenStill404s(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', [
+            'created' => '2026-06-19',
+            'title' => 'WIP',
+            'draft' => true,
+            'draft_preview' => 'letmein',
+        ]);
+
+        self::assertSame(404, $this->app()->publicSite()->respond('/wip')->status());
+    }
+
+    public function testDraftPreviewDoesNotUnlockAnUnrelatedDraftPage(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip-a', [
+            'created' => '2026-06-19',
+            'title' => 'WIP A',
+            'draft' => true,
+            'draft_preview' => 'secret-a',
+        ]);
+        $this->writeEntry('wip-b', [
+            'created' => '2026-06-19',
+            'title' => 'WIP B',
+            'draft' => true,
+            'draft_preview' => 'secret-b',
+        ]);
+
+        $response = $this->appWithQuery('/wip-b?preview=secret-a')->publicSite()->respond('/wip-b');
+
+        self::assertSame(404, $response->status());
+    }
+
+    public function testOrdinaryPageResponseHasNoNoindexHeader(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+
+        $response = $this->app()->publicSite()->respond('/');
+
+        self::assertSame(200, $response->status());
+        self::assertNull($response->header('X-Robots-Tag'));
+        self::assertNull($response->header('Cache-Control'));
+    }
+
+    public function testDraftPreviewMustBeANonEmptyString(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('bad', ['created' => '2026-06-19', 'draft_preview' => '']);
+
+        $this->expectException(InvalidEntryException::class);
+        $this->app()->publicSite()->respond('/');
+    }
+
+    public function testEphemeralPreviewTokenGrantsOneTimeAccess(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', ['created' => '2026-06-19', 'title' => 'WIP', 'draft' => true]);
+
+        $app = $this->appWithQuery('/wip?preview=onetime');
+        $app->cache()->set(PublicSite::EPHEMERAL_PREVIEW_CACHE_PREFIX . '/wip', 'onetime', 300);
+
+        $first = $app->publicSite()->respond('/wip');
+        self::assertSame(200, $first->status());
+        self::assertSame('noindex', $first->header('X-Robots-Tag'));
+
+        // One-time: the same token is consumed on first use.
+        $second = $app->publicSite()->respond('/wip');
+        self::assertSame(404, $second->status());
+    }
+
+    public function testEphemeralPreviewRejectsAWrongToken(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', ['created' => '2026-06-19', 'title' => 'WIP', 'draft' => true]);
+
+        $app = $this->appWithQuery('/wip?preview=wrong-guess');
+        $app->cache()->set(PublicSite::EPHEMERAL_PREVIEW_CACHE_PREFIX . '/wip', 'onetime', 300);
+
+        self::assertSame(404, $app->publicSite()->respond('/wip')->status());
+    }
+
+    public function testEphemeralPreviewTokenSurvivesTheCanonicalRedirect(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('wip', ['created' => '2026-06-19', 'title' => 'WIP', 'draft' => true]);
+
+        $app = $this->appWithQuery('/wip/?preview=onetime');
+        $app->cache()->set(PublicSite::EPHEMERAL_PREVIEW_CACHE_PREFIX . '/wip', 'onetime', 300);
+
+        // Non-canonical (trailing slash): must redirect, not consume the token.
+        $redirect = $app->publicSite()->respond('/wip/', 'preview=onetime');
+        self::assertSame(308, $redirect->status());
+        self::assertSame('/wip?preview=onetime', $redirect->location());
+
+        // The redirect's own destination must still be able to redeem it.
+        $second = $app->publicSite()->respond('/wip');
+        self::assertSame(200, $second->status());
+
+        // And now it really is spent.
+        self::assertSame(404, $app->publicSite()->respond('/wip')->status());
+    }
+
     public function testDraftParentCascadesHiddenStatusToPublishedChild(): void
     {
         $this->writeDraftCascadeFixture();
@@ -1043,6 +1205,24 @@ final class RenderTest extends TestCase
         return new Application($this->root, $this->root, [
             'app' => ['debug' => true, 'name' => 'Test Site'],
         ]);
+    }
+
+    /**
+     * An Application whose request() carries the given URI's query string —
+     * respond() itself takes path/query as plain arguments (mirroring how
+     * Router assembles them), but the preview check reads the query through
+     * Application::request(), the same way the rest of PublicSite does.
+     */
+    private function appWithQuery(string $uri): Application
+    {
+        return new Application(
+            $this->root,
+            $this->root,
+            [
+                'app' => ['debug' => true, 'name' => 'Test Site'],
+            ],
+            Request::create($uri),
+        );
     }
 
     /**

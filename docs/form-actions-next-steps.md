@@ -266,9 +266,11 @@ Decided by the prototype (2026-07-05, a real notify-me form):
   `json()` / `body()` / `file()` cannot react to the already-handled
   submission. `form` is reserved for the action layer — always defined,
   `null` outside a failure, and not overridable from controller data.
-- **`lemmon/validator` integrates without coupling**: the prototype action uses
-  `tryValidate()` and feeds the first error message into
-  `ActionResult::failure()` by hand. No framework-level bridge needed yet.
+- **`lemmon/validator` integrates through a thin bridge**: the prototype
+  originally assembled `ActionResult::failure()` data by hand;
+  `ActionResult::invalid()` now packages the validator's structured errors and
+  validated value without reshaping either or coupling the action dispatcher to
+  the validator.
 - **The origin-check softenings from step 4 held**: the real same-origin form
   passed cleanly, cross-origin POST answered 403, and the honest honeypot
   (visibly-labeled, `display: none`, action answers it with the normal

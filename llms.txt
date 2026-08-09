@@ -36,7 +36,8 @@ Canonical route paths do not use a trailing slash, except for `/`.
 - `id`: stable page identifier. Use this for references between pages.
 - `title`: human-readable page title.
 - `template`: shared Twig template name from `app/templates/`.
-- `draft`: when `true`, the page 404s publicly and is hidden from listings.
+- `draft`: when `true`, the page and everything beneath it 404 publicly and
+  are hidden from listings.
 - `sort`: integer ordering value. Lower values sort first.
 - `created`: non-empty timestamp string when useful for ordering or display.
 
@@ -86,9 +87,11 @@ Useful values in templates:
 - `content`: parsed content files for the current page.
 - `page.url`: absolute URL.
 - `page.path`: route path only.
-- `site.children`: home plus direct children, excluding drafts.
-- `site.index`: home plus all descendants, excluding drafts.
-- `page.children`: direct child pages, excluding drafts.
+- `site.children`: home plus direct children, excluding hidden pages.
+- `site.index`: home plus all descendants, excluding hidden pages.
+- `page.children`: direct child pages, excluding hidden pages.
+- `page.parent`: nearest ancestor page, or `null` for home.
+- `page.ancestors`: ancestor pages root first, suitable for breadcrumbs.
 - `site.findById(id)`: resolve a stable page id.
 
 Use `|markdown` when rendering Markdown content. Prefer escaping/default Twig
@@ -96,9 +99,10 @@ behavior for ordinary values.
 
 ## Navigation And Listings
 
-Garner listings exclude drafts and sort by `sort`, then route path. Filter
-project-specific visibility with freeform metadata instead of inventing global
-publication states.
+Garner listings exclude explicit drafts and descendants hidden by a draft
+ancestor, then sort by `sort` and route path. Pass `drafts: true` to traversal
+methods when a listing needs both. Filter project-specific visibility with
+freeform metadata instead of inventing global publication states.
 
 Example:
 
@@ -179,6 +183,10 @@ must produce one of:
   controller or inside the block. htmx ignores `4xx` responses by default —
   include the `htmx-config` meta tag that allows `422` to swap (see README,
   "Form actions") whenever a site uses fragment failures;
+- `Garner\Render\ActionResult::invalid(errors, values:, status = 422, fragment = null)`
+  — shortcut for a `lemmon/validator` `tryValidate()` failure; exposes the
+  structured errors unchanged as `form.errors` and the supplied value as
+  `form.values`;
 - `Garner\Render\ActionResult::redirect(location, status = 303)` — the
   Post/Redirect/Get success path. htmx-aware: an htmx POST (`HX-Request`)
   is answered with `204` + `HX-Redirect` instead of a `3xx`, so htmx

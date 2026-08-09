@@ -103,7 +103,7 @@ metadata.
 | ---------- | ------------------ | ------------------------------------------ |
 | `id`       | the directory name | Any unique string; explicit value wins.    |
 | `template` | `default`          | Twig template / controller name.           |
-| `draft`    | `false`            | When `true`, the page 404s and is hidden.  |
+| `draft`    | `false`            | Hides the page and its route descendants.  |
 | `sort`     | `0`                | Integer; lower comes first in listings.    |
 | `created`  | none               | Non-empty string (timestamp) when present. |
 
@@ -181,13 +181,16 @@ return static fn($page, $site, $app) => RenderedResponse::json(['ok' => true])
 
 ## Drafts and visibility
 
-Garner has exactly one publication state in core: `draft`. A draft (`"draft": true`)
-404s publicly and is excluded from listings; everything else is published.
+Garner has exactly one publication flag in core: `draft`. A draft and everything
+beneath it in the route tree 404 publicly and are excluded from listings.
 
-| State     | Resolves at URL | In listings |
-| --------- | --------------- | ----------- |
-| published | yes             | yes         |
-| `draft`   | no (404)        | no          |
+| Effective state          | Resolves at URL | In listings |
+| ------------------------ | --------------- | ----------- |
+| published                | yes             | yes         |
+| draft or beneath a draft | no (404)        | no          |
+
+`page.isDraft` reports the page's own flag; `page.isHidden` reports the
+effective state after inheriting visibility from its ancestors.
 
 Finer visibility — "in the footer but not the header", "featured", "archived" — is
 a listing decision, not a global page property, so it lives in your own freeform
@@ -216,7 +219,7 @@ Available in templates and via the `Garner\Content\Pages` repository:
 - `page.ancestors` — the full ancestor chain, root first (home ... nearest
   parent) — the order a breadcrumb reads left to right
 
-Listings exclude drafts and are ordered by `sort` then path. Each returns a
+Listings exclude hidden pages and are ordered by `sort` then path. Each returns a
 `Garner\Content\PageCollection` (a [Laravel collection](https://laravel.com/docs/collections)
 of `Page`), so the full query API is available — `filter`, `reject`, `where`,
 `sortBy`, `first`, `take`, plus `published()` and `drafts()`:
@@ -229,11 +232,10 @@ of `Page`), so the full query API is available — `filter`, `reject`, `where`,
 {% for ancestor in page.ancestors %}{{ ancestor.title }} / {% endfor %}{{ page.title }}
 ```
 
-To include drafts (e.g. a preview build), pass `drafts: true`:
-`page.children(drafts=true)`. `parent()`/`ancestors()` are not filtered this
-way — a directory with no `+page.json` of its own is skipped rather than
-breaking the chain, but a real ancestor page is returned even when it is
-itself a draft, since the relationship is structural rather than a listing.
+To include explicit drafts and descendants hidden by them in a listing, pass
+`drafts: true`: `page.children(drafts=true)`. `parent()`/`ancestors()` are not
+visibility-filtered: grouping directories are skipped, but real ancestor pages
+are returned even when they are drafts because the relationship is structural.
 
 ## References
 
@@ -339,6 +341,10 @@ return static function ($request, $page, $site, $app): ActionResult {
   already handled. `$fragment` names a Twig block in the page template: an
   htmx POST is then answered with just that block (same context, same status)
   so the form swaps in place instead of receiving a whole page — see below.
+- **Validator failure** — `ActionResult::invalid($errors, values: $values,
+status: 422, fragment: null)` is the corresponding shortcut for a
+  `lemmon/validator` `tryValidate()` result. It exposes the structured errors
+  unchanged as `form.errors` and the supplied value as `form.values`.
 - **Success** — `ActionResult::redirect($location, $status = 303)` answers
   Post/Redirect/Get (303 makes the client re-request the target with GET;
   `RenderedResponse::redirect()` keeps its method-preserving 308 default for

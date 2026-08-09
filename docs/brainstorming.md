@@ -437,7 +437,7 @@ but a `+controller.php` and `$_POST`, to validate assumption #1 before touching 
 
 ## 2026-07-23 — Image dimensions are hand-maintained in sidecar files
 
-Surfaced while building fouram.co. `routes/hero.webp.json`, the sidecar for
+Surfaced while building a consumer site. `routes/hero.webp.json`, the sidecar for
 `hero.webp`, hardcodes `width`/`height` by hand:
 
 ```json
@@ -460,8 +460,8 @@ Not planned; recorded so the gap is a decision, not an accident.
 
 ## 2026-07-23 — Plain-text endpoints are more ceremony than payload
 
-Surfaced while building `robots.txt`, `sitemap.txt`, and `humans.txt` for
-fouram.co — three `+controller.php` endpoints, same shape each time:
+Surfaced while building `robots.txt`, `sitemap.txt`, and `humans.txt` for the
+same consumer site — three `+controller.php` endpoints, same shape each time:
 
 ```php
 <?php
@@ -572,6 +572,10 @@ Not planned; recorded so the gap is a decision, not an accident.
 
 ## 2026-07-24 — The validator-to-ActionResult marriage repeats verbatim
 
+> Status: **implemented (2026-08-03).** `ActionResult::invalid()` now supplies
+> the Garner-side handoff described below. Validate-and-transform remains a
+> separate `lemmon/validator` concern.
+
 Surfaced while building the same client app. Every validated form does the
 same handoff, roughly eight times across two actions:
 
@@ -595,7 +599,8 @@ validate-and-transform step that can fail (a `map` whose exception/null means
 invalid) would make that pattern honest — that one is `lemmon/validator`
 roadmap rather than Garner's.
 
-Not planned; recorded so the gap is a decision, not an accident.
+The Garner-side handoff is implemented; the validator transformation question
+remains open on its own roadmap.
 
 ## 2026-07-24 — One page, one POST: multi-step flows multiplex intents by hand
 
@@ -676,6 +681,10 @@ Not planned; recorded so the gap is a decision, not an accident.
 
 ## 2026-07-26 — No way to resolve an arbitrary path or ancestor page from templates
 
+> Status: **partially implemented (2026-08-07).** `Page::parent()` and
+> `Page::ancestors()` now cover structural upward traversal. Generic resolution
+> of an unrelated route path from templates remains open.
+
 Surfaced while building a case-study subpage on the author's own portfolio
 site. The page needed a breadcrumb trail (home / section / current),
 including the case where an intermediate path segment (e.g. `/work`) groups
@@ -704,7 +713,8 @@ surfaces. A generic `Site::find(path): ?Page` (or exposing `Pages` itself to
 templates) would additionally cover cases `ancestors()` doesn't, like
 resolving a sibling or an unrelated reference path.
 
-Not planned; recorded so the gap is a decision, not an accident.
+The ancestor half is implemented. A generic `Site::find(path)` remains deferred
+until a concrete use beyond structural traversal justifies it.
 
 ## 2026-07-26 — Drafts have no preview path, not even for the author
 
@@ -737,3 +747,16 @@ config secret, honored only inside `Pages::find()`'s draft check; or a
 public, visible to the author" without weakening the public-facing 404.
 
 Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-08-09 — Comprehensive documentation belongs on Garner's site
+
+The README currently carries installation, concepts, API orientation, and usage
+examples because no fuller documentation home exists yet. It is already larger
+than the eventual repository front door should be.
+
+The direction is to publish the complete Garner API and concept documentation on
+`garnerphp.com`. Until that site is ready, keep necessary guidance in the README
+but avoid expanding every implementation detail into a long-form section.
+`llms.txt` should remain the short, practical guide for agents building with
+Garner. Once the site is complete, the README can be reduced to orientation,
+quick start, and links to the canonical documentation.

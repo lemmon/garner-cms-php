@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-17
+
 ### Added
 
 - **`draft_preview` links** — a draft page carrying `"draft_preview": "<value>"`
@@ -446,7 +448,8 @@ Initial implementation of the agent-first, flat-file CMS.
 - **Tooling** — a single `composer check` gate running Mago (format + lint),
   PHPStan (level 7), and PHPUnit.
 
-[Unreleased]: https://github.com/lemmon/garner-cms-php/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/lemmon/garner-cms-php/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/lemmon/garner-cms-php/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/lemmon/garner-cms-php/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lemmon/garner-cms-php/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/lemmon/garner-cms-php/compare/v0.2.0...v0.3.0

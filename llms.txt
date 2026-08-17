@@ -54,6 +54,10 @@ php bin/garner page:create blog/hello --title="Hello" [--template=NAME] [--draft
 It creates the route directory and a valid `+page.json` with a generated
 stable `id`; adjust fields and add content files afterwards.
 
+Pages are not the only things that want a stable id in this convention — see
+`id:generate` under Content Files below for freeform entities defined inside
+a project's own content files.
+
 ## Content Files
 
 Content lives beside the page entry file:
@@ -68,6 +72,24 @@ unless they are reserved files or media sidecars.
 
 Files beginning with `+` or `.` are reserved. Do not create arbitrary public
 content files with those prefixes.
+
+The content model is open-ended beyond pages: a `data.json` or
+`settings.yaml` can define its own list of entities (team members, products,
+FAQ items) that want the same stable-`id` convention pages use, for the same
+reasons — stable cross-references that survive edits and reordering. Generate
+those ids with:
+
+```sh
+php bin/garner id:generate [--count=N] [--json]
+```
+
+instead of inventing one by hand. This matters more than it sounds: a
+project can configure a custom `ids.generator` (see Configuration in
+README), so a hand-rolled id (a random string, an incrementing number) may
+not conform to the format the project actually expects — `id:generate` is
+the one place that always produces a correctly-shaped id, for both a human
+and an agent, regardless of which generator is configured. `--count=N`
+batches many ids in one call, e.g. seeding a new entity list.
 
 ## Templates
 

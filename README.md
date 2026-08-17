@@ -647,6 +647,12 @@ Key-value store above), and
 `Origin` / `Sec-Fetch-Site` — answer 403; JSON APIs and header-less
 non-browser clients are unaffected).
 
+`php bin/garner id:generate [--count=N] [--json]` prints one or more fresh ids
+from the project's configured `ids.generator` — the same primitive `page:create`
+calls internally, useful from the shell or a script that needs an id (e.g.
+seeding a `store:set` key) without hand-rolling one in a format the project
+isn't actually configured for. `--count` accepts 1–10000.
+
 Environment variables (`APP_URL`, `APP_DEBUG`, `APP_ENV`) can come from the real
 environment or from a `.env` file in the project root, loaded via `symfony/dotenv`
 before config is read. The Symfony cascade applies — `.env`, `.env.local`,

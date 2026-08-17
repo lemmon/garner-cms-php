@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`id:generate [--count=N] [--json]` CLI command** — prints one or more
+  fresh ids from the project's configured `ids.generator`, the same
+  primitive `page:create` calls internally. Useful from the shell or a
+  script that needs an id without hand-rolling one in a format the project
+  may not actually be configured for. `--count` accepts 1–10000.
+
 ## [0.5.0] - 2026-08-17
 
 ### Added

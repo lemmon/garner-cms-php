@@ -137,6 +137,10 @@ print what would go.
 
 ### `id:generate [--count=N] [--json]`
 
+> Status: **implemented.** Ships as proposed below: `--count` batches,
+> `--json` prints an array, a non-positive or non-numeric `--count` fails
+> without generating anything.
+
 Emit one or more fresh ids from the project's configured `app.ids.generator`
 (Cuid2 by default; may be a Uuid, Ulid, custom class, or callable). This is
 the exact primitive `page:create` already calls internally

@@ -37,7 +37,8 @@ Canonical route paths do not use a trailing slash, except for `/`.
 - `title`: human-readable page title.
 - `template`: shared Twig template name from `app/templates/`.
 - `draft`: when `true`, the page and everything beneath it 404 publicly and
-  are hidden from listings.
+  are hidden from listings. Toggle it with `page:draft`/`page:publish`
+  instead of hand-editing — see Draft Previews below.
 - `sort`: integer ordering value. Lower values sort first.
 - `created`: non-empty timestamp string when useful for ordering or display.
 
@@ -152,6 +153,21 @@ different page's id, it fails and asks for `--route`/`--id` rather than
 guessing.
 
 ## Draft Previews
+
+Toggle a page's own `draft` flag from the shell rather than hand-editing
+`+page.json`:
+
+```sh
+php bin/garner page:draft blog/hello     # sets "draft": true
+php bin/garner page:publish blog/hello   # removes the "draft" key entirely
+```
+
+Both are no-ops (report the current state, not an error) when the page is
+already there, and only edit a `+page.json` entry — a `+page.yaml`/`+page.yml`
+page fails naming the command instead. Each successful write rebuilds
+`runtime/index.sqlite` immediately, in both "scan" and "locked" mode, so no
+follow-up `reindex` is needed either way. Neither command reports which
+descendants a cascade now hides.
 
 A draft page (`"draft": true`) 404s publicly, including for its own author.
 To let someone view it before it publishes, set `draft_preview` in

@@ -104,6 +104,20 @@ Open Question 2 below, same as `page:move`.
 
 ### `page:draft <route>` / `page:publish <route>`
 
+> Status: **implemented.** Ships as proposed below, JSON-entry-only (same
+> restriction `page:preview` already applies to its own mutations — a
+> `+page.yaml`/`+page.yml` entry fails naming the command). `page:draft`
+> writes `"draft": true`; `page:publish` removes the key entirely rather
+> than writing `false`, matching the absent-means-published convention
+> `page:create` already uses. Both report the current state instead of
+> erroring when the page is already there. Each successful write rebuilds
+> the index inline, synchronously — a fingerprint keyed only on
+> `dir:mtime` (see `ContentIndex::fingerprint()`) can't always tell two
+> same-second edits apart, so leaving it to the freshness check risked a
+> stale hidden state that never self-corrected. That resolves Open Question
+> 2 for these two commands specifically, not for the rest of the mutation
+> family. Neither command reports descendants affected by the cascade.
+
 Toggle the `draft` flag without hand-editing JSON. Borderline: editing one
 boolean in `+page.json` is exactly the "straightforward local edit" the CLI
 promised not to absorb. It earns a slot only as part of scripted workflows

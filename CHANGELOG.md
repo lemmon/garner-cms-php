@@ -48,6 +48,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   indistinguishable depending on whether any metadata happens to be
   present.
 
+- **`page:draft <route> [--json]` / `page:publish <route> [--json]` CLI
+  commands** — toggle a page's own `draft` flag without hand-editing
+  `+page.json`. `page:draft` sets `"draft": true`; `page:publish` removes
+  the key entirely (absence is what `PageMeta::isDraft()` and `page:create`
+  already treat as published) rather than writing `false`. Both are no-ops
+  that report the current state, not an error, when the page is already in
+  the target state. Only edit a `+page.json` entry — a page backed by
+  `+page.yaml`/`+page.yml` fails with a message naming the command, the
+  same restriction `page:preview` already applies to its own mutations. The
+  entry is decoded and re-encoded in JSON object mode rather than through
+  the usual associative-array parse, so unrelated freeform metadata survives
+  untouched — an empty `{}`/`[]`, a whole-number float, or an integer too
+  large for a native int no longer change shape or lose precision on the way
+  back to disk. Each successful write rebuilds `runtime/index.sqlite`
+  immediately (rather than leaving it to the next request's freshness check),
+  since two edits to the same page within one wall-clock second can otherwise
+  hash to the same index fingerprint and leave a stale, wrong hidden state on
+  disk. Neither command reports the pages a cascade hides underneath — see
+  Open Question 2 in `docs/cli-next-steps.md`, resolved for these two
+  commands specifically (inline) but still open for the rest of the family.
+
 ### Fixed
 
 - **Descendant traversal's subtree match was ASCII case-insensitive.**

@@ -193,6 +193,17 @@ beneath it in the route tree 404 publicly and are excluded from listings.
 `page.isDraft` reports the page's own flag; `page.isHidden` reports the
 effective state after inheriting visibility from its ancestors.
 
+Toggle the flag from the shell rather than hand-editing `+page.json`:
+
+```shell
+garner page:draft blog/hello     # sets "draft": true
+garner page:publish blog/hello   # removes the "draft" key entirely
+```
+
+Both are no-ops (not errors) when the page is already in the target state,
+and only edit a `+page.json` entry — a `+page.yaml`/`+page.yml` page fails
+naming the command instead.
+
 ### Draft preview links
 
 Set `draft_preview` on a draft page to hand it to a client for review before it

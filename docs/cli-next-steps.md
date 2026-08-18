@@ -38,6 +38,12 @@ drift when a rule changes.
 
 ### `page:list [path] [--drafts] [--json]`
 
+> Status: **implemented.** Ships as proposed below: `[path]` scopes to a
+> subtree (root, i.e. the whole tree, when omitted), `--drafts` includes
+> explicit drafts and cascade-hidden descendants, route endpoints are
+> excluded from the listing the same way `site.index`/`children()` exclude
+> them elsewhere.
+
 Read-only listing of the page tree (route path, id, title, draft state),
 optionally scoped to a subtree. The data already exists in the route index;
 this surfaces it without SQL, the same way `store:list` made `store.sqlite`
@@ -45,6 +51,15 @@ inspectable. For an agent this is the cheap orientation pass before editing —
 today it walks directories and opens entry files one by one.
 
 ### `page:show <route-or-id> [--json]`
+
+> Status: **implemented.** Ships as proposed below. One asymmetry not
+> anticipated in the original proposal: a route lookup resolves drafts (it
+> reuses `Pages::find(..., drafts: true)`), but the id-lookup fallback does
+> not, since it goes through the existing `findById()` — visible pages
+> only, the same contract `Site::findById()` already gives templates. A
+> hidden page must be addressed by route until/unless `findById()` itself
+> grows a `$drafts` parameter. A route resolving to a controller-only
+> endpoint reports it as an endpoint rather than page detail.
 
 Inspect one page: resolved metadata, content files and the `content.*` names
 they map to, assets and sidecars, the template that would render it. Accepting

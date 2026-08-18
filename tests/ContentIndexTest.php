@@ -116,6 +116,51 @@ final class ContentIndexTest extends TestCase
     }
 
     /**
+     * SQLite's LIKE is ASCII case-insensitive by default, so a naive
+     * "path LIKE '/blog/%'" prefix match would also pull in an unrelated
+     * '/Blog/...' subtree. Most filesystems can never produce two routes
+     * differing only by case in the same parent (hence the hand-crafted
+     * rows rather than a real scan — see this class's own docblock), but
+     * one that does, or a caller passing a differently-cased scope path,
+     * must not leak across the case boundary.
+     */
+    public function testDescendantsPrefixMatchIsCaseSensitive(): void
+    {
+        $index = $this->indexWithHandCraftedRows([
+            '/blog' => null,
+            '/blog/hello' => '/blog',
+            '/Blog' => null,
+            '/Blog/other' => '/Blog',
+        ]);
+
+        $descendants = $index->descendants('/blog');
+
+        self::assertSame(
+            [['path' => '/blog/hello', 'dir' => $this->routeDir('/blog/hello'), 'hidden' => false]],
+            $descendants,
+        );
+    }
+
+    /**
+     * Same case-sensitivity requirement as descendants() (see above), for
+     * the lightweight listing() projection page:list uses.
+     */
+    public function testListingDescendantsPrefixMatchIsCaseSensitive(): void
+    {
+        $index = $this->indexWithHandCraftedRows([
+            '/blog' => null,
+            '/blog/hello' => '/blog',
+            '/Blog' => null,
+            '/Blog/other' => '/Blog',
+        ]);
+
+        $rows = $index->listingDescendants('/blog');
+
+        self::assertCount(1, $rows);
+        self::assertSame('/blog/hello', $rows[0]['path']);
+    }
+
+    /**
      * Build a 'locked'-mode ContentIndex over a hand-crafted index file. Each
      * entry maps a route path to its stored parent_path; the row's dir mirrors
      * the path under routes/ (see routeDir()) and its id is the path itself.

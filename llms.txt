@@ -137,6 +137,20 @@ Example:
 Use stable page ids for cross-page references. Avoid hard-coding URLs when a
 relationship should survive a page move.
 
+Orient in an unfamiliar tree from the shell rather than opening every entry
+file by hand:
+
+```sh
+php bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
+php bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
+```
+
+`page:show` accepts either a route path or a stable id — useful when you
+already hold a reference (e.g. from `+page.json` metadata) and want to know
+what it resolves to. If the argument happens to match both a route and a
+different page's id, it fails and asks for `--route`/`--id` rather than
+guessing.
+
 ## Draft Previews
 
 A draft page (`"draft": true`) 404s publicly, including for its own author.

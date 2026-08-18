@@ -287,6 +287,21 @@ To include explicit drafts and descendants hidden by them in a listing, pass
 visibility-filtered: grouping directories are skipped, but real ancestor pages
 are returned even when they are drafts because the relationship is structural.
 
+The same tree is inspectable from the shell without SQL or template code:
+
+```sh
+php bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
+php bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
+```
+
+`page:show` accepts either a route path or a stable id; a route lookup
+includes drafts, but the id-lookup fallback only resolves visible pages
+(`findById()`'s existing contract), so a hidden page must be addressed by
+route. If the argument matches both a route and a _different_ page's id —
+a nested page's id happening to equal another page's route text — it
+fails rather than guessing; pass `--route` or `--id` to say which one you
+mean.
+
 ## References
 
 Reference another page by its **stable id** and resolve it at render time, so

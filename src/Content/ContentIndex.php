@@ -182,6 +182,14 @@ final class ContentIndex
      * sort then path. Hidden pages — drafts, and pages nested under a draft
      * ancestor — are excluded unless $drafts is true.
      *
+     * substr() equality rather than LIKE for the prefix match, the same
+     * reason as Store::prefixClause(): SQLite's LIKE is ASCII
+     * case-insensitive by default, which on a case-sensitive filesystem
+     * (distinct "/blog" and "/Blog" routes) or a caller passing a
+     * differently-cased path would pull in an unrelated subtree. substr()
+     * uses the column's binary collation — case-sensitive — and has no
+     * wildcards to escape.
+     *
      * @return list<array{path: string, dir: string, hidden: bool}>
      */
     public function descendants(string $path, bool $drafts = false): array
@@ -198,10 +206,72 @@ final class ContentIndex
         }
 
         return $this->select(
-            "SELECT path, dir, hidden FROM pages WHERE path LIKE :prefix ESCAPE '\\' AND endpoint = 0"
+            'SELECT path, dir, hidden FROM pages'
+            . ' WHERE substr(path, 1, length(:prefix)) = :prefix AND endpoint = 0'
             . $this->hiddenClause($drafts)
             . ' ORDER BY sort, path',
-            [':prefix' => $this->escapeLike($normalized) . '/%'],
+            [':prefix' => $normalized . '/'],
+        );
+    }
+
+    /**
+     * Lightweight single-row projection for `page:list`'s root row: path, id,
+     * title, and draft/hidden state read directly from index columns, with no
+     * directory hydration or content-file parsing — a listing never needs a
+     * page's content, only what's already a column here. Endpoints are
+     * excluded, matching the page tree everywhere else.
+     *
+     * @return array{path: string, id: string, title: string|null, draft: bool, hidden: bool}|null
+     */
+    public function listingRowForPath(string $path, bool $drafts = false): ?array
+    {
+        $this->ensureFresh();
+
+        $pdo = $this->reader();
+
+        if ($pdo === null) {
+            return null;
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT path, id, title, draft, hidden FROM pages WHERE path = :path AND endpoint = 0'
+            . $this->hiddenClause($drafts)
+            . ' LIMIT 1',
+        );
+        $statement->execute([':path' => RoutePath::normalize($path)]);
+
+        return $this->normalizeListingRow($statement->fetch());
+    }
+
+    /**
+     * Lightweight descendant rows for `page:list` — same filtering,
+     * ordering, and case-sensitive substr() prefix match as descendants()
+     * (see its docblock), but selecting id/title/draft directly from the
+     * index instead of {dir}, so a listing never triggers PageLoader
+     * hydration (and the content-file parsing that comes with it) for pages
+     * whose content is never displayed.
+     *
+     * @return list<array{path: string, id: string, title: string|null, draft: bool, hidden: bool}>
+     */
+    public function listingDescendants(string $path, bool $drafts = false): array
+    {
+        $normalized = RoutePath::normalize($path);
+
+        if ($normalized === '/') {
+            return $this->selectListing(
+                'SELECT path, id, title, draft, hidden FROM pages WHERE path != :root AND endpoint = 0'
+                . $this->hiddenClause($drafts)
+                . ' ORDER BY sort, path',
+                [':root' => '/'],
+            );
+        }
+
+        return $this->selectListing(
+            'SELECT path, id, title, draft, hidden FROM pages'
+            . ' WHERE substr(path, 1, length(:prefix)) = :prefix AND endpoint = 0'
+            . $this->hiddenClause($drafts)
+            . ' ORDER BY sort, path',
+            [':prefix' => $normalized . '/'],
         );
     }
 
@@ -742,6 +812,61 @@ final class ContentIndex
     }
 
     /**
+     * @param array<string, string> $params
+     * @return list<array{path: string, id: string, title: string|null, draft: bool, hidden: bool}>
+     */
+    private function selectListing(string $sql, array $params): array
+    {
+        $this->ensureFresh();
+
+        $pdo = $this->reader();
+
+        if ($pdo === null) {
+            return [];
+        }
+
+        $statement = $pdo->prepare($sql);
+        $statement->execute($params);
+
+        $rows = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $normalized = $this->normalizeListingRow($row);
+
+            if ($normalized !== null) {
+                $rows[] = $normalized;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Validate and narrow a fetched row to the {path, id, title, draft,
+     * hidden} shape listingRowForPath()/listingDescendants() return. `title`
+     * is nullable in the schema (see pageRow()), so unlike hasStringFields()'s
+     * other callers it is read directly rather than required.
+     *
+     * @return array{path: string, id: string, title: string|null, draft: bool, hidden: bool}|null
+     */
+    private function normalizeListingRow(mixed $row): ?array
+    {
+        if (!$this->hasStringFields($row, 'path', 'id')) {
+            return null;
+        }
+
+        $title = $row['title'] ?? null;
+
+        return [
+            'path' => $row['path'],
+            'id' => $row['id'],
+            'title' => is_string($title) ? $title : null,
+            'draft' => (bool) ($row['draft'] ?? false),
+            'hidden' => (bool) ($row['hidden'] ?? false),
+        ];
+    }
+
+    /**
      * Whether a fetched row is an array with a string value for every given key
      * — shared by every fetched-row consumer (dirForPath(), pathForId(),
      * normalizeRow(), readMeta()) so all reads apply the same "trust nothing
@@ -821,15 +946,5 @@ final class ContentIndex
         } catch (Throwable) {
             return $empty;
         }
-    }
-
-    /**
-     * Escape SQL LIKE wildcards so a route path is matched literally. The backslash
-     * is added first so the escapes we introduce are not themselves re-escaped, and
-     * it is paired with an `ESCAPE '\'` clause on the query.
-     */
-    private function escapeLike(string $value): string
-    {
-        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 }

@@ -15,6 +15,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   script that needs an id without hand-rolling one in a format the project
   may not actually be configured for. `--count` accepts 1–10000.
 
+- **`page:list [path] [--drafts] [--json]` CLI command** — read-only listing
+  of the page tree (route path, id, title, draft/hidden state), optionally
+  scoped to a subtree. Excludes route endpoints, the same way `site.index`
+  and `children()` do. `--drafts` includes explicit drafts and pages hidden
+  only by cascade from a draft ancestor, tagged `[draft]`/`[hidden]`
+  respectively in the human-readable output. Reads the derived index
+  directly (new `ContentIndex::listingRowForPath()`/`listingDescendants()`)
+  rather than hydrating full `Page` objects, so listing cost scales with the
+  index read, not with total site content — and a malformed sibling content
+  file anywhere in the tree can't abort an unrelated listing.
+
+- **`page:show <route-or-id> [--route] [--id] [--json]` CLI command** —
+  inspects one page: resolved metadata (shown in full in both text and
+  JSON output), content files paired with the key and Twig accessor each
+  parses into (bracket notation for a key that isn't a valid Twig
+  identifier — e.g. a double-extension file like `main.md.json`, which keys
+  as the literal `main.md`, not the nested `content.main.md` dot-access it
+  would otherwise look like), page-owned file assets with size/MIME
+  type/sidecar metadata, and the template that would render it (a
+  co-located `+template.twig`, the resolved named/default template, or the
+  error if neither resolves). The bare argument tries both a route path and
+  a stable id — a route lookup includes drafts, but the id fallback only
+  resolves visible pages, matching `findById()`'s existing contract (the
+  same one `Site::findById()` gives templates) — and fails asking for
+  `--route`/`--id` when both interpretations resolve to _different_ pages
+  (a nested page's id happening to equal another page's route text) rather
+  than silently guessing one. A route resolving to a controller-only
+  endpoint reports it as such instead of page detail. Map-shaped values
+  (page metadata, a file's sidecar metadata) serialize as a JSON object
+  even when empty, rather than an empty object and an empty array being
+  indistinguishable depending on whether any metadata happens to be
+  present.
+
+### Fixed
+
+- **Descendant traversal's subtree match was ASCII case-insensitive.**
+  `page.index()`, `site.index()`, and `page:list [path]` all resolve
+  descendants through `ContentIndex::descendants()`, which matched the
+  route prefix with SQL `LIKE` — case-insensitive by default in SQLite. A
+  scope path differing in case from an indexed route, or two routes on a
+  case-sensitive filesystem differing only by case (`/blog` vs. `/Blog`),
+  could pull an unrelated subtree into the results. Switched to a
+  case-sensitive `substr()` comparison, the same technique `Store`'s own
+  prefix queries already use for the same reason.
+
 ## [0.5.0] - 2026-08-17
 
 ### Added

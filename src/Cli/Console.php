@@ -41,6 +41,8 @@ final class Console
         $cli->addCommand(new ValidateCommand($this->app));
         $cli->addCommand(new CreatePageCommand($this->app));
         $cli->addCommand(new PagePreviewCommand($this->app));
+        $cli->addCommand(new PageListCommand($this->app));
+        $cli->addCommand(new PageShowCommand($this->app));
         $cli->addCommand(new IdGenerateCommand($this->app));
 
         return $cli->run(null, $output);

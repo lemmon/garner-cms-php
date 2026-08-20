@@ -17,6 +17,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'page:list', description: 'List the page tree, optionally scoped to a subtree')]
 final class PageListCommand extends Command
 {
+    use WritesCliError;
+
     public function __construct(
         private readonly Application $app,
     ) {
@@ -133,7 +135,7 @@ final class PageListCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln('<error>' . OutputFormatter::escape($message) . '</error>');
+        $this->writeCliError($output, $message);
 
         return Command::FAILURE;
     }

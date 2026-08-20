@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Garner\Tests;
 
+use Garner\Cli\StoreAddCommand;
+use Garner\Cli\StoreCountCommand;
 use Garner\Cli\StoreGetCommand;
 use Garner\Cli\StoreListCommand;
 use Garner\Cli\StoreRemoveCommand;
@@ -57,6 +59,21 @@ final class StoreCommandsTest extends TestCase
         self::assertFalse($this->app->store()->has('bad'));
     }
 
+    public function testSetFailsGracefullyWhenTheValueIsNotJsonEncodable(): void
+    {
+        // "1e400" is syntactically valid JSON that decodes to float(INF),
+        // which then can't be round-tripped through json_encode() — the
+        // store write must fail gracefully, not throw.
+        $tester = $this->runCommand(new StoreSetCommand($this->app), [
+            'key' => 'overflow',
+            'value' => '1e400',
+        ]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('JSON-encodable', $tester->getDisplay());
+        self::assertFalse($this->app->store()->has('overflow'));
+    }
+
     public function testSetAcceptsAJsonNullValue(): void
     {
         $tester = $this->runCommand(new StoreSetCommand($this->app), [
@@ -68,12 +85,34 @@ final class StoreCommandsTest extends TestCase
         self::assertTrue($this->app->store()->has('nothing'));
     }
 
+    public function testSetEscapesAConsoleMarkupShapedKeyInTheSuccessMessage(): void
+    {
+        $tester = $this->runCommand(new StoreSetCommand($this->app), [
+            'key' => '<info>k</info>',
+            'value' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Stored "<info>k</info>"', $tester->getDisplay());
+    }
+
     public function testGetFailsForAMissingKey(): void
     {
         $tester = $this->runCommand(new StoreGetCommand($this->app), ['key' => 'missing']);
 
         self::assertSame(Command::FAILURE, $tester->getStatusCode());
         self::assertStringContainsString('No value stored under "missing"', $tester->getDisplay());
+    }
+
+    public function testGetEscapesAConsoleMarkupShapedKeyInTheMissingKeyError(): void
+    {
+        $tester = $this->runCommand(new StoreGetCommand($this->app), ['key' => '<info>k</info>']);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString(
+            'No value stored under "<info>k</info>"',
+            $tester->getDisplay(),
+        );
     }
 
     public function testListFiltersByPrefix(): void
@@ -203,6 +242,131 @@ final class StoreCommandsTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode());
         self::assertStringContainsString('Nothing stored under "missing"', $tester->getDisplay());
+    }
+
+    public function testRemoveEscapesConsoleMarkupShapedKeysInBothOutcomes(): void
+    {
+        $key = '<info>k</info>';
+
+        $missing = $this->runCommand(new StoreRemoveCommand($this->app), ['key' => $key]);
+
+        self::assertSame(Command::SUCCESS, $missing->getStatusCode());
+        self::assertStringContainsString(
+            'Nothing stored under "<info>k</info>"',
+            $missing->getDisplay(),
+        );
+
+        $this->app->store()->set($key, 'value');
+        $removed = $this->runCommand(new StoreRemoveCommand($this->app), ['key' => $key]);
+
+        self::assertSame(Command::SUCCESS, $removed->getStatusCode());
+        self::assertStringContainsString('Removed "<info>k</info>"', $removed->getDisplay());
+    }
+
+    public function testAddInsertsWhenAbsent(): void
+    {
+        $tester = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => 'email:a',
+            'value' => '{"email":"a@example.test"}',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Added "email:a"', $tester->getDisplay());
+        self::assertSame(['email' => 'a@example.test'], $this->app->store()->get('email:a'));
+    }
+
+    public function testAddFailsAndKeepsTheOriginalWhenTheKeyExists(): void
+    {
+        $this->app->store()->set('email:a', ['email' => 'first@example.test']);
+
+        $tester = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => 'email:a',
+            'value' => '{"email":"second@example.test"}',
+        ]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('"email:a" already exists', $tester->getDisplay());
+        self::assertSame(['email' => 'first@example.test'], $this->app->store()->get('email:a'));
+    }
+
+    public function testAddEscapesConsoleMarkupShapedKeysInBothOutcomes(): void
+    {
+        $key = '<info>k</info>';
+
+        $added = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => $key,
+            'value' => '1',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $added->getStatusCode());
+        self::assertStringContainsString('Added "<info>k</info>"', $added->getDisplay());
+
+        $duplicate = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => $key,
+            'value' => '2',
+        ]);
+
+        self::assertSame(Command::FAILURE, $duplicate->getStatusCode());
+        self::assertStringContainsString(
+            '"<info>k</info>" already exists',
+            $duplicate->getDisplay(),
+        );
+    }
+
+    public function testAddRejectsInvalidJson(): void
+    {
+        $tester = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => 'bad',
+            'value' => '{not json',
+        ]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertFalse($this->app->store()->has('bad'));
+    }
+
+    public function testAddFailsGracefullyWhenTheValueIsNotJsonEncodable(): void
+    {
+        // Same INF overflow case as store:set: syntactically valid JSON
+        // that decodes to a value json_encode() then refuses.
+        $tester = $this->runCommand(new StoreAddCommand($this->app), [
+            'key' => 'overflow',
+            'value' => '1e400',
+        ]);
+
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString('JSON-encodable', $tester->getDisplay());
+        self::assertFalse($this->app->store()->has('overflow'));
+    }
+
+    public function testCountWithoutAPrefixCountsEverything(): void
+    {
+        $this->app->store()->set('email:a', 'a');
+        $this->app->store()->set('settings:theme', 'dark');
+
+        $tester = $this->runCommand(new StoreCountCommand($this->app), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame('2', trim($tester->getDisplay()));
+    }
+
+    public function testCountFiltersByPrefix(): void
+    {
+        $this->app->store()->set('email:a', 'a');
+        $this->app->store()->set('email:b', 'b');
+        $this->app->store()->set('settings:theme', 'dark');
+
+        $tester = $this->runCommand(new StoreCountCommand($this->app), ['prefix' => 'email:']);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame('2', trim($tester->getDisplay()));
+    }
+
+    public function testCountOnAnEmptyStoreIsZero(): void
+    {
+        $tester = $this->runCommand(new StoreCountCommand($this->app), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame('0', trim($tester->getDisplay()));
     }
 
     /**

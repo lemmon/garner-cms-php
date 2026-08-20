@@ -359,9 +359,12 @@ Values must be JSON-encodable: scalars, lists, and maps round-trip; objects
 come back as plain arrays. Data lives in `storage/store.sqlite` (created on
 first write; canonical — back it up, unlike `runtime/`). Inspect it without
 SQL via `php bin/garner store:list [prefix] [--json]`, `store:get <key>`,
-`store:set <key> <json>`, and `store:remove <key>`, or read the file
-directly with the `sqlite3` CLI (table `store`, JSON in the `value`
-column).
+`store:set <key> <json>`, `store:add <key> <json>` (insert-if-absent — fails
+with a nonzero exit when the key already exists, so a script gets the
+uniqueness answer from the exit code alone, no separate `store:get` race),
+`store:count [prefix]` (cheaper than `store:list --json | jq length`, which
+loads every value), and `store:remove <key>`, or read the file directly with
+the `sqlite3` CLI (table `store`, JSON in the `value` column).
 
 ## Validation And Local Checks
 

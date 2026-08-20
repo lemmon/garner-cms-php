@@ -73,6 +73,11 @@ final class Store
      */
     public function set(string $key, mixed $value): void
     {
+        // Encode before writer(): a value that fails to encode must not
+        // create the store file — writer() is what creates it on first
+        // write, and a rejected write is not a write.
+        $encoded = $this->encode($key, $value);
+
         $statement = $this->writer()->prepare(
             'INSERT INTO store (key, value, created, updated)'
             . ' VALUES (:key, :value, :now, :now)'
@@ -80,7 +85,7 @@ final class Store
         );
         $statement->execute([
             ':key' => $key,
-            ':value' => $this->encode($key, $value),
+            ':value' => $encoded,
             ':now' => gmdate('c'),
         ]);
     }
@@ -93,6 +98,10 @@ final class Store
      */
     public function add(string $key, mixed $value): bool
     {
+        // Encode before writer(), same as set(): a rejected write must not
+        // create the store file.
+        $encoded = $this->encode($key, $value);
+
         $statement = $this->writer()->prepare(
             'INSERT INTO store (key, value, created, updated)'
             . ' VALUES (:key, :value, :now, :now)'
@@ -100,7 +109,7 @@ final class Store
         );
         $statement->execute([
             ':key' => $key,
-            ':value' => $this->encode($key, $value),
+            ':value' => $encoded,
             ':now' => gmdate('c'),
         ]);
 

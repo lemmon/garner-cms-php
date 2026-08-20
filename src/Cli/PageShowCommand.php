@@ -22,6 +22,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'page:show', description: 'Inspect one page by route or stable id')]
 final class PageShowCommand extends Command
 {
+    use WritesCliError;
+
     public function __construct(
         private readonly Application $app,
     ) {
@@ -488,7 +490,7 @@ final class PageShowCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln('<error>' . OutputFormatter::escape($message) . '</error>');
+        $this->writeCliError($output, $message);
 
         return Command::FAILURE;
     }

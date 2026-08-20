@@ -133,12 +133,21 @@ and lifecycle, not new capability:
 
 ### `store:add <key> <json>`
 
+> Status: **implemented.** Ships as proposed below: `Command::SUCCESS` on
+> insert, `Command::FAILURE` (with a message, but no extra read) when the
+> key already exists — a script gets the uniqueness answer from the exit
+> code alone, the same atomicity `Store::add()` itself provides.
+
 CLI twin of `Store::add()` — atomic insert-if-absent, exit code distinguishing
 "added" from "already present." Today a script that wants uniqueness semantics
 has to shell out to `store:get` first and race itself; the whole point of
 `add()` was removing that dance, and the CLI should not reintroduce it.
 
 ### `store:count [prefix]`
+
+> Status: **implemented.** Ships as proposed below: a bare undecorated
+> integer (no `--json`, since a JSON-encoded integer is the same characters)
+> so `$(php bin/garner store:count prefix)` is the whole shell idiom.
 
 Twin of `Store::count()`. `store:list --json | jq length` answers it today by
 loading every value; `count` is the documented nudge for large namespaces and

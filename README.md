@@ -657,6 +657,8 @@ with the `sqlite3` CLI or the console commands:
 php bin/garner store:list [prefix] [--json]   # list items, optionally by prefix
 php bin/garner store:get <key>                # print one value as JSON
 php bin/garner store:set <key> <json>         # upsert a value ('"text"', '42', '{"a":1}')
+php bin/garner store:add <key> <json>         # insert only if absent; fails (nonzero exit) if the key exists
+php bin/garner store:count [prefix]           # count items, optionally by prefix
 php bin/garner store:remove <key>             # delete a key
 ```
 

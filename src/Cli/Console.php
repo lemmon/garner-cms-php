@@ -34,6 +34,8 @@ final class Console
         $cli->addCommand(new CacheClearCommand($this->app));
         $cli->addCommand(new ReindexCommand($this->app));
         $cli->addCommand(new SessionGcCommand($this->app));
+        $cli->addCommand(new StoreAddCommand($this->app));
+        $cli->addCommand(new StoreCountCommand($this->app));
         $cli->addCommand(new StoreGetCommand($this->app));
         $cli->addCommand(new StoreListCommand($this->app));
         $cli->addCommand(new StoreRemoveCommand($this->app));

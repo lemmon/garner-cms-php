@@ -14,6 +14,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'store:get', description: 'Print a key-value store item as JSON')]
 final class StoreGetCommand extends Command
 {
+    use ParsesStoreArguments;
+
     public function __construct(
         private readonly Application $app,
     ) {
@@ -27,11 +29,9 @@ final class StoreGetCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $key = $input->getArgument('key');
+        $key = $this->requireStoreKey($input, $output);
 
-        if (!is_string($key) || $key === '') {
-            $output->writeln('<error>Provide a key.</error>');
-
+        if ($key === null) {
             return Command::FAILURE;
         }
 
@@ -40,7 +40,10 @@ final class StoreGetCommand extends Command
         // A stored null and a missing key both get() as null; only one of
         // them should print "null" and succeed.
         if (!$store->has($key)) {
-            $output->writeln(sprintf('<error>No value stored under "%s".</error>', $key));
+            $output->writeln(sprintf(
+                '<error>No value stored under "%s".</error>',
+                $this->escapeStoreKey($key),
+            ));
 
             return Command::FAILURE;
         }

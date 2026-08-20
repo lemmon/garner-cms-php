@@ -16,6 +16,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'store:list', description: 'List key-value store items, optionally by prefix')]
 final class StoreListCommand extends Command
 {
+    use ParsesStoreArguments;
+
     public function __construct(
         private readonly Application $app,
     ) {
@@ -30,8 +32,7 @@ final class StoreListCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $prefix = $input->getArgument('prefix');
-        $prefix = is_string($prefix) ? $prefix : '';
+        $prefix = $this->storePrefix($input);
         $items = $this->app->store()->items($prefix);
 
         if ($input->getOption('json') === true) {
@@ -64,7 +65,7 @@ final class StoreListCommand extends Command
             $output->writeln(
                 $prefix === ''
                     ? 'The store is empty.'
-                    : sprintf('No keys start with "%s".', $prefix),
+                    : sprintf('No keys start with "%s".', $this->escapeStoreKey($prefix)),
             );
 
             return Command::SUCCESS;

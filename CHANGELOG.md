@@ -69,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Open Question 2 in `docs/cli-next-steps.md`, resolved for these two
   commands specifically (inline) but still open for the rest of the family.
 
+- **`store:add <key> <json>` / `store:count [prefix]` CLI commands** — round
+  out the `store:*` family with the two gaps `docs/cli-next-steps.md` flagged
+  as parity fills. `store:add` is the CLI twin of `Store::add()`: it inserts
+  only when the key is absent and reports which happened through the exit
+  code alone (`Command::SUCCESS` on insert, `Command::FAILURE` — with a
+  message, but no extra read — when the key already exists), so a script
+  gets the atomic uniqueness answer `add()` provides instead of racing itself
+  with a `store:get` check first. `store:count` prints a bare, undecorated
+  integer — the same count `store:list --json | jq length` gives today, but
+  without loading every value to get it.
+
 ### Fixed
 
 - **Descendant traversal's subtree match was ASCII case-insensitive.**

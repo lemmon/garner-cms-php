@@ -12,7 +12,6 @@ use JsonException;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -29,6 +28,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'page:publish', description: "Clear a page's own draft flag")]
 final class PagePublishCommand extends Command
 {
+    use WritesCliError;
+
     public function __construct(
         private readonly Application $app,
     ) {
@@ -339,7 +340,7 @@ final class PagePublishCommand extends Command
             return Command::FAILURE;
         }
 
-        $output->writeln('<error>' . OutputFormatter::escape($message) . '</error>');
+        $this->writeCliError($output, $message);
 
         return Command::FAILURE;
     }

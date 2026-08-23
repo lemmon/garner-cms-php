@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Render;
 
+use Garner\Content\EntryFile;
 use Garner\Content\Page;
 use Garner\Content\Site;
 use Garner\Core\Application;
@@ -121,8 +122,6 @@ final class PageControllers
 
     private function templateController(string $template): ?string
     {
-        $path = $this->controllersPath . '/' . $template . '.php';
-
-        return is_file($path) ? $path : null;
+        return EntryFile::siblingFile($this->controllersPath, $template . '.php');
     }
 }

@@ -161,6 +161,83 @@ final class ContentIndexTest extends TestCase
     }
 
     /**
+     * A combined endpoint's mtime (used for the content fingerprint) must
+     * reflect whichever of +controller.php / +action.php was edited most
+     * recently — not just +controller.php, which would let an edit to the
+     * action alone go unnoticed by 'scan' mode's freshness check.
+     */
+    public function testCombinedEndpointMtimeReflectsTheNewerOfControllerAndAction(): void
+    {
+        mkdir($this->root . '/routes/api', 0o777, true);
+        file_put_contents($this->root . '/routes/api/+controller.php', '<?php');
+        file_put_contents($this->root . '/routes/api/+action.php', '<?php');
+        touch($this->root . '/routes/api/+controller.php', 1_000);
+        touch($this->root . '/routes/api/+action.php', 2_000);
+
+        self::assertSame(2_000, $this->scannedRow('/api')['mtime']);
+
+        touch($this->root . '/routes/api/+controller.php', 3_000);
+
+        self::assertSame(3_000, $this->scannedRow('/api')['mtime']);
+    }
+
+    /**
+     * The fingerprint that decides whether 'scan' mode's rescan needs writing
+     * must change when a directory's classification changes, not just when its
+     * mtime does — dir:mtime alone would stay identical across an endpoint ->
+     * page conversion that lands on the same filesystem timestamp second, and
+     * ensureFresh() would then keep serving the stale (endpoint) row forever.
+     */
+    public function testFingerprintChangesWhenADirectoryConvertsFromEndpointToPage(): void
+    {
+        $sqlitePath = $this->root . '/runtime/index.sqlite';
+        mkdir($this->root . '/routes/api', 0o777, true);
+        // children('/') only reports rows with parent_path = '/', which requires
+        // a real root page to resolve against — otherwise '/api' has no parent
+        // and the assertions below can't tell this bug apart from that.
+        file_put_contents($this->root . '/routes/+page.json', '{"id": "home", "title": "Home"}');
+        file_put_contents($this->root . '/routes/api/+action.php', '<?php');
+        touch($this->root . '/routes/api/+action.php', 5_000);
+
+        $before = new ContentIndex($this->root . '/routes', $sqlitePath, 'scan');
+        self::assertSame([], $before->children('/'));
+
+        unlink($this->root . '/routes/api/+action.php');
+        file_put_contents($this->root . '/routes/api/+page.json', '{"id": "api", "title": "API"}');
+        // Same mtime as the +action.php it replaced: the failure this guards
+        // against only shows up when the timestamp doesn't change either.
+        touch($this->root . '/routes/api/+page.json', 5_000);
+
+        $after = new ContentIndex($this->root . '/routes', $sqlitePath, 'scan');
+        $children = $after->children('/');
+
+        self::assertCount(1, $children);
+        self::assertSame('/api', $children[0]['path']);
+    }
+
+    /**
+     * Runs a real filesystem scan (bypassing the SQLite-backed public API,
+     * which does not expose mtime) and returns the row for $path.
+     *
+     * @return array{path: string, mtime: int}
+     */
+    private function scannedRow(string $path): array
+    {
+        $sqlitePath = $this->root . '/runtime/index.sqlite';
+        $index = new ContentIndex($this->root . '/routes', $sqlitePath, 'scan');
+
+        $pages = new ReflectionMethod(ContentIndex::class, 'scan')->invoke($index);
+        $matches = array_values(array_filter(
+            $pages,
+            static fn(array $p): bool => $p['path'] === $path,
+        ));
+
+        self::assertCount(1, $matches, sprintf('Expected exactly one scanned row for "%s"', $path));
+
+        return $matches[0];
+    }
+
+    /**
      * Build a 'locked'-mode ContentIndex over a hand-crafted index file. Each
      * entry maps a route path to its stored parent_path; the row's dir mirrors
      * the path under routes/ (see routeDir()) and its id is the path itself.

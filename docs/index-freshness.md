@@ -19,7 +19,10 @@ answers:
 1. **Content changed** — files added / edited / removed (at deploy time, or at
    runtime if Garner writes content).
 2. **The engine changed** — a Garner upgrade alters the index _structure_ (e.g. the
-   `endpoint` column added on 2026-07-01 for route endpoints).
+   `endpoint` column added on 2026-07-01 for route endpoints) **or** how a row's
+   columns get derived from the same structure (e.g. which directories count as
+   endpoints) — a pre-existing `locked` index can hold rows classified under the
+   old rule even though no column or table changed.
 
 Guiding principle: **auto-heal where Garner has a cheap signal; require an explicit
 trigger only where it cannot detect the change without paying to scan.**
@@ -39,8 +42,12 @@ fingerprint alone:
 ### The fix
 
 `ContentIndex` stores a `schema_version` in the index `meta` table alongside the
-content fingerprint, and bumps a `SCHEMA_VERSION` code constant whenever the schema
-changes (new/removed/renamed columns or tables). On every `ensureFresh()` call, in
+content fingerprint, and bumps a `SCHEMA_VERSION` code constant whenever a row
+built under the old version could be wrong or unreadable under the new code —
+new/removed/renamed columns or tables, but also a derivation-only change (e.g.
+the action-only-endpoint classification added alongside `+action.php` support,
+which needed the bump without any column/table change). On every `ensureFresh()`
+call, in
 **both** modes, the stored version is compared to the current constant; a mismatch
 forces a rebuild regardless of whether the content fingerprint still matches. An
 index built before the marker existed simply has no `schema_version` → reads as a

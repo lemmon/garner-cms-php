@@ -9,6 +9,7 @@ use Garner\Render\PageActions;
 use Garner\Render\PageControllers;
 use Garner\Render\RenderedResponse;
 use Garner\Render\RendererInterface;
+use RuntimeException;
 
 final class PublicSite
 {
@@ -193,31 +194,33 @@ final class PublicSite
     }
 
     /**
-     * Dispatch a resolved page: route endpoints keep full method freedom
-     * (their controller answers every verb itself); tree pages are
-     * method-aware — GET/HEAD render, POST goes to the page's +action.php,
-     * and everything else must come from a controller-returned response or
-     * it is a 405.
+     * Dispatch a resolved page. Exactly two verbs are ever handled, on every
+     * route shape (page or endpoint) alike, with no exceptions and no
+     * escape hatch: GET/HEAD always belongs to the controller (page context,
+     * or the endpoint's whole response) and/or the page template; POST
+     * always belongs exclusively to +action.php when one exists. Nothing
+     * else is ever dispatched — a controller is GET/HEAD only, full stop; it
+     * is never invoked for POST or any other verb, action present or not. A
+     * verb neither side claims is a 405 with an `Allow` header naming what
+     * the route does answer.
      */
     private function respondForPage(Page $page, Site $site, string $path): RenderedResponse
     {
         $method = $this->app->request()->method();
 
-        if (!$page->isEndpoint() && $method !== 'GET' && $method !== 'HEAD') {
-            if ($method === 'POST' && $page->actionFile() !== null) {
-                return $this->respondWithAction($page, $site);
-            }
+        if ($method === 'POST') {
+            return $page->actionFile() !== null
+                ? $this->respondWithAction($page, $site)
+                : $this->methodNotAllowed($page, $site, $path);
+        }
 
-            $result = $this->controllers->dispatch($page, $site, $this->app);
+        if ($method !== 'GET' && $method !== 'HEAD') {
+            return $this->methodNotAllowed($page, $site, $path);
+        }
 
-            // A controller may still answer the verb with a full response
-            // (pre-action POST branching keeps working). A plain page render
-            // is a GET concern, so a context array means the verb is not
-            // handled here.
-            if ($result instanceof RenderedResponse) {
-                return $result;
-            }
-
+        // An action-only endpoint (no entry file, no +controller.php) has
+        // neither a controller nor a template to answer GET/HEAD with.
+        if (!$this->answersGet($page)) {
             return $this->methodNotAllowed($page, $site, $path);
         }
 
@@ -225,6 +228,22 @@ final class PublicSite
 
         if ($result instanceof RenderedResponse) {
             return $result;
+        }
+
+        // An endpoint (isEndpoint() true, no +page.json) may still carry a
+        // co-located +template.twig — resolveTemplate() picks that up
+        // regardless of isEndpoint(), so an array result renders into it just
+        // like a tree page would. Only a *templateless* endpoint has nothing
+        // to render an array result into (it would otherwise silently fall
+        // back to the site's generic default.twig with near-empty context —
+        // wrong content at 200, not an error). Mirrors the RuntimeException
+        // in respondWithAction() for the same mistake on the action side.
+        if ($this->hasNoRenderTarget($page)) {
+            throw new RuntimeException(sprintf(
+                'Endpoint controller "%s" must return a RenderedResponse; there is no'
+                . ' template to render an array result into',
+                $page->path(),
+            ));
         }
 
         // Set after the spread: `form` belongs to the action layer (null
@@ -264,12 +283,32 @@ final class PublicSite
             return RenderedResponse::redirect($location, $result->status());
         }
 
+        // An endpoint (action-only, or carrying a +controller.php too) may
+        // still carry a co-located +template.twig — placed there specifically
+        // to give failure()/invalid() something to re-render into, without
+        // that route thereby answering GET: GET/HEAD dispatch is gated on
+        // controllerFile() alone (see answersGet()), deliberately unaffected
+        // by templateFile(), so the template stays reachable only as this
+        // POST's own response body, never as a directly-navigable page. Only
+        // a truly templateless endpoint has no page to re-render into at all
+        // — unlike a page-tree route (isEndpoint() false here, the only other
+        // caller of this method), which always has one.
+        if ($this->hasNoRenderTarget($page)) {
+            throw new RuntimeException(sprintf(
+                '%s "%s" has no page to re-render; return a RenderedResponse or'
+                . ' ActionResult::redirect() instead',
+                $this->answersGet($page) ? 'Endpoint' : 'Action-only route',
+                $page->path(),
+            ));
+        }
+
         // Failure: rebuild the read-side render context, then let the action's
-        // data win the `form` key. Controllers see the request as a GET, so
-        // the re-render behaves exactly like the page's GET render — a
-        // controller branching on the method (pre-action POST handling) still
-        // contributes its normal context instead of reacting to the POST the
-        // action already handled. One that answers its GET render with a full
+        // data win the `form` key. Controllers only ever see GET/HEAD (never
+        // POST — see respondForPage()), so presenting the request as a true
+        // GET here just keeps that same guarantee true during the re-render:
+        // no submitted payload (form fields, files, body) leaks into context
+        // built for what is, from the controller's point of view, a normal
+        // GET render. A controller answering that GET render with a full
         // response keeps that authority here too.
         $context = $this->app->withRequest(
             $this->app->request()->asGet(),
@@ -302,9 +341,39 @@ final class PublicSite
         );
     }
 
+    /**
+     * GET/HEAD is available whenever there's a template (a page-tree route
+     * always has one) or a controller to answer with directly (an endpoint's
+     * whole response); an action-only endpoint has neither. The single
+     * source of truth for that predicate — respondForPage() and
+     * methodNotAllowed() both need it, and previously each computed its own
+     * (dual) boolean expression independently.
+     */
+    private function answersGet(Page $page): bool
+    {
+        return !$page->isEndpoint() || $page->controllerFile() !== null;
+    }
+
+    /**
+     * Whether $page has nowhere to render/re-render an array controller
+     * result or an action failure into — true only for a templateless
+     * endpoint (isEndpoint() true, no co-located +template.twig). A
+     * page-tree route always has a template; an endpoint that adds one is
+     * treated the same way. The single source of truth for that predicate —
+     * respondForPage() and respondWithAction() both need it, and previously
+     * each computed its own copy of the same expression independently.
+     */
+    private function hasNoRenderTarget(Page $page): bool
+    {
+        return $page->isEndpoint() && $page->templateFile() === null;
+    }
+
     private function methodNotAllowed(Page $page, Site $site, string $path): RenderedResponse
     {
-        $allow = 'GET, HEAD' . ($page->actionFile() !== null ? ', POST' : '');
+        $allow = implode(', ', array_filter([
+            $this->answersGet($page) ? 'GET, HEAD' : null,
+            $page->actionFile() !== null ? 'POST' : null,
+        ]));
 
         return RenderedResponse::html($this->renderer->renderError(
             $site,

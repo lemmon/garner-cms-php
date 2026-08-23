@@ -110,6 +110,17 @@ with the request prepended (see contracts below).
 - `HEAD` routes like `GET`.
 - The action layer is POST-only. Other verbs (PUT/DELETE/PATCH, JSON APIs)
   remain the business of route endpoints, which keep full method freedom.
+  **Superseded (2026-08-20, revisited same day):** this line, and the
+  "controller keeps full method freedom" model behind it, is gone entirely.
+  Backward compatibility with pre-action POST branching was deliberately
+  dropped in favor of one opinionated, uniform rule with no exceptions on
+  any route shape: GET/HEAD is always the controller's (and/or the page
+  template's), POST is always exclusively `+action.php`'s when one exists,
+  and every other verb is unconditionally `405 Method Not Allowed` — a
+  controller cannot rescue an unhandled verb with a `RenderedResponse`
+  anymore, on a page or an endpoint. A controller is a GET pre-processor,
+  never a router. See `README.md` ("Form actions", "Action-only endpoints")
+  and `llms.txt` for the shipped behavior.
 - An action failure re-renders the same page with the failure data available
   to the template as `form`.
 - The `form` template variable is **always defined** — `null` on plain GET
@@ -122,8 +133,9 @@ with the request prepended (see contracts below).
   the action path defaults to 303.)
 - An action may return a full `RenderedResponse` for JSON, text, custom HTML,
   or HTMX-specific responses.
-- Existing controller-returned responses continue to work for endpoints and
-  specialized pages.
+- ~~Existing controller-returned responses continue to work for endpoints and
+  specialized pages.~~ **Superseded (2026-08-20):** a controller is GET/HEAD
+  only everywhere — see the note above.
 
 ## CSRF (decided: ships with the MVP)
 
@@ -200,9 +212,12 @@ Keep the current controller behavior:
 
 - `+controller.php` may still return an array for render context;
 - `+controller.php` may still return a `RenderedResponse`;
-- controller-only route endpoints remain valid;
-- existing simple POST branching inside a controller should keep working, even if
-  it is no longer the recommended pattern for larger forms.
+- controller-only route endpoints remain valid.
+
+~~existing simple POST branching inside a controller should keep working, even
+if it is no longer the recommended pattern for larger forms.~~ **Superseded
+(2026-08-20):** dropped — a controller no longer sees POST at all, branching
+or not. See the "Proposed behavior" note above.
 
 The action layer should be additive.
 
@@ -251,11 +266,16 @@ Decided by the prototype (2026-07-05, a real notify-me form):
   `redirect(string $location, int $status = 303)` (Post/Redirect/Get).
   `success()` stayed out. Everything else is the `RenderedResponse` escape
   hatch — the HTMX-fragment case is served by it today.
-- **Pre-action compatibility**: for POST without `+action.php` (and any other
-  non-GET/HEAD verb on a page), the page's controllers run first — a returned
-  `RenderedResponse` still answers the request (existing POST branching keeps
-  working), while a context array means the verb is unhandled and yields the
-  405 + `Allow`. Endpoints keep full method freedom, untouched.
+- ~~**Pre-action compatibility**: for POST without `+action.php` (and any
+  other non-GET/HEAD verb on a page), the page's controllers run first — a
+  returned `RenderedResponse` still answers the request (existing POST
+  branching keeps working), while a context array means the verb is
+  unhandled and yields the 405 + `Allow`. Endpoints keep full method
+  freedom, untouched.~~ **Superseded (2026-08-20):** dropped in favor of a
+  single, unconditional rule — GET/HEAD is the controller's, POST is
+  exclusively the action's when one exists, everything else is always 405,
+  no controller rescue, on pages and endpoints alike. See "Proposed
+  behavior" above.
 - **The failure re-render is the GET render plus `form`**: read-side
   controllers are dispatched with the request presented as a true GET
   (`Request::asGet()` via `Application::withRequest()`) — method reads GET
@@ -340,7 +360,14 @@ Still open:
    hatch, HEAD-like-GET, endpoint method freedom, controller POST-branching
    compatibility, and the invalid-return guard; origin-check rejection was
    already covered by `tests/OriginCheckTest.php` in step 4.
-7. ~~Revisit this document after the prototype and delete anything that proved
+7. **Superseded (2026-08-20):** "endpoint method freedom" and "controller
+   POST-branching compatibility" above are gone — see the "Pre-action
+   compatibility" bullet under "Decided by the prototype" above, superseded
+   the same day. `tests/ActionTest.php`'s equivalents were renamed/inverted
+   to `testControllerOnlyEndpointOtherVerbsAre405WithGetHeadInAllow` and
+   `testPostWithoutActionIs405EvenWhenTheControllerBranchesOnMethod`, which
+   assert `405` for exactly the cases this bullet once described as covered.
+8. ~~Revisit this document after the prototype and delete anything that proved
    too clever or too vague.~~ **Done (2026-07-06):** stale present-tense gaps
    marked historical, the never-shipped `hxRedirect()`/`partial()` sketches
    annotated, and the flash item closed out against the shipped sessions.

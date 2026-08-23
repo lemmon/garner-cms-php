@@ -137,6 +137,18 @@ final class PageListShowCommandTest extends TestCase
         self::assertStringContainsString('1 page(s)', $tester->getDisplay());
     }
 
+    public function testExcludesActionOnlyEndpointsFromTheListing(): void
+    {
+        $this->writeEntry('', ['title' => 'Home']);
+        $this->writeFile('routes/subscribe/+action.php', '<?php return fn() => null;');
+
+        $tester = $this->runCommand(new PageListCommand($this->app()), []);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringNotContainsString('/subscribe', $tester->getDisplay());
+        self::assertStringContainsString('1 page(s)', $tester->getDisplay());
+    }
+
     public function testUntitledPageShowsAPlaceholder(): void
     {
         $this->writeEntry('', []);
@@ -373,6 +385,63 @@ final class PageListShowCommandTest extends TestCase
         self::assertStringContainsString('route endpoint', $display);
         self::assertStringContainsString('+controller.php', $display);
         self::assertStringNotContainsString('template:', $display);
+    }
+
+    public function testReportsAnActionOnlyEndpointDistinctlyFromAPage(): void
+    {
+        $this->writeFile('routes/subscribe/+action.php', '<?php return fn() => null;');
+
+        $tester = $this->runCommand(new PageShowCommand($this->app()), ['page' => 'subscribe']);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('route endpoint', $display);
+        self::assertStringContainsString('controller: (none)', $display);
+        self::assertStringContainsString('action:     routes/subscribe/+action.php', $display);
+        self::assertStringNotContainsString('template:', $display);
+    }
+
+    public function testReportsAnEndpointsCoLocatedTemplate(): void
+    {
+        $this->writeFile('routes/subscribe/+action.php', '<?php return fn() => null;');
+        $this->writeFile('routes/subscribe/+template.twig', '{{ form }}');
+
+        $tester = $this->runCommand(new PageShowCommand($this->app()), ['page' => 'subscribe']);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $display = $tester->getDisplay();
+        self::assertStringContainsString(
+            'template:   routes/subscribe/+template.twig (co-located)',
+            $display,
+        );
+    }
+
+    public function testEndpointJsonIncludesTemplateAsNullWhenAbsent(): void
+    {
+        $this->writeFile('routes/api/+controller.php', '<?php return fn() => null;');
+
+        $tester = $this->runCommand(new PageShowCommand($this->app()), [
+            'page' => 'api',
+            '--json' => true,
+        ]);
+
+        $decoded = json_decode($tester->getDisplay(), true);
+        self::assertArrayHasKey('template', $decoded);
+        self::assertNull($decoded['template']);
+    }
+
+    public function testEndpointJsonIncludesTemplateWhenPresent(): void
+    {
+        $this->writeFile('routes/subscribe/+action.php', '<?php return fn() => null;');
+        $this->writeFile('routes/subscribe/+template.twig', '{{ form }}');
+
+        $tester = $this->runCommand(new PageShowCommand($this->app()), [
+            'page' => 'subscribe',
+            '--json' => true,
+        ]);
+
+        $decoded = json_decode($tester->getDisplay(), true);
+        self::assertSame('routes/subscribe/+template.twig', $decoded['template']);
     }
 
     public function testEscapesConsoleMarkupInEndpointFields(): void

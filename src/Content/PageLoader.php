@@ -9,8 +9,6 @@ use RuntimeException;
 final class PageLoader
 {
     private const TEMPLATE_FILE = '+template.twig';
-    private const CONTROLLER_FILE = '+controller.php';
-    private const ACTION_FILE = '+action.php';
 
     public function __construct(
         private readonly ?MediaPublisher $publisher = null,
@@ -24,14 +22,16 @@ final class PageLoader
         bool $hidden = false,
     ): Page {
         $entry = EntryFile::find($dir);
-        $controllerFile = $this->siblingFile($dir, self::CONTROLLER_FILE);
+        $controllerFile = EntryFile::controllerFile($dir);
+        $actionFile = EntryFile::actionFile($dir);
 
-        if ($entry === null && $controllerFile === null) {
+        if ($entry === null && $controllerFile === null && $actionFile === null) {
             throw new RuntimeException(sprintf('No entry file found in "%s"', $dir));
         }
 
-        // A controller-only directory is a route endpoint: no metadata or content
-        // (see ContentIndex), it exists only to dispatch its controller.
+        // A controller-only or action-only directory is a route endpoint: no
+        // metadata or content (see ContentIndex), it exists only to dispatch
+        // its controller and/or action.
         $meta = [];
         $content = [];
 
@@ -59,22 +59,15 @@ final class PageLoader
             dir: $dir,
             draft: PageMeta::isDraft($meta),
             sort: PageMeta::sort($meta),
-            templateFile: $this->siblingFile($dir, self::TEMPLATE_FILE),
+            templateFile: EntryFile::siblingFile($dir, self::TEMPLATE_FILE),
             controllerFile: $controllerFile,
-            actionFile: $this->siblingFile($dir, self::ACTION_FILE),
+            actionFile: $actionFile,
             pages: $pages,
             publisher: $this->publisher,
             baseUrl: $this->baseUrl,
             endpoint: $entry === null,
             hidden: $hidden,
         );
-    }
-
-    private function siblingFile(string $dir, string $name): ?string
-    {
-        $path = $dir . '/' . $name;
-
-        return is_file($path) ? $path : null;
     }
 
     /**

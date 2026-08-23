@@ -198,10 +198,11 @@ final class Pages
         // A stale "locked" index can carry an ancestor row built when its
         // directory was still a page (endpoint = 0 at index time), but that
         // directory has since become an endpoint on disk (its +page.json
-        // replaced by a +controller.php) without a reindex to catch the change.
-        // PageLoader then hydrates it successfully — endpoint: true — rather
-        // than throwing, so the failure path above never sees it; reject it
-        // here instead, the same way children()/descendants() exclude it in SQL.
+        // replaced by a +controller.php and/or a bare +action.php) without a
+        // reindex to catch the change. PageLoader then hydrates it
+        // successfully — endpoint: true — rather than throwing, so the
+        // failure path above never sees it; reject it here instead, the same
+        // way children()/descendants() exclude it in SQL.
         return $page->isEndpoint() ? null : $page;
     }
 

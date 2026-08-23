@@ -87,11 +87,15 @@ exception). A request that differs from a routable path only by slashes (`/about
 canonical form, so the same content is never served at more than one URL. Paths
 whose canonical form doesn't route just 404.
 
-A directory that has a `+controller.php` but no entry file is a **route endpoint**:
-it routes and dispatches its controller (the usual `(page, site, app)` contract,
-returning a `RenderedResponse`), but carries no metadata and is excluded from the
-page tree — it never appears in `site.index`, `children`, or `findById`. Use it for
-`sitemap.txt`, feeds, and JSON APIs that should not be treated as content pages.
+A directory with a `+controller.php` and/or `+action.php` but no entry file is a
+**route endpoint**: it routes and dispatches, but carries no metadata and is
+excluded from the page tree — it never appears in `site.index`, `children`, or
+`findById`. Use it for `sitemap.txt`, feeds, and JSON APIs that should not be
+treated as content pages. Method dispatch works exactly like a page (see
+[Form actions](#form-actions)): GET/HEAD is the controller's, POST is exclusively
+`+action.php`'s when one exists, and everything else is `405`. See
+[Action-only endpoints](#action-only-endpoints) below for the POST-only shape
+(no `+controller.php` at all).
 
 ### The `+page.json` contract
 
@@ -475,12 +479,67 @@ htmx's own configuration mechanism, e.g.:
 />
 ```
 
-Page dispatch is method-aware: `HEAD` routes like `GET`, POST goes to the
-action, and a verb the page cannot answer returns `405 Method Not Allowed`
-with an `Allow` header. A page controller may still answer any verb with a
-`RenderedResponse` (method branching predating actions keeps working), and
-route endpoints keep full method freedom. Cross-site form POSTs are already
-rejected by the origin check before an action runs.
+Page dispatch is method-aware and deliberately narrow — Garner models
+old-school form/full-navigation behavior, not a REST/JSON-API framework, so
+exactly two verbs are ever handled, on every _filesystem_ route shape alike
+(a page, a `+controller.php` endpoint, an action-only endpoint), with no
+exceptions: `GET`/`HEAD` always belongs to the controller and/or the page
+template, `POST` always belongs exclusively to `+action.php` when one
+exists, and nothing else is ever dispatched. A controller is `GET`/`HEAD`
+only, full stop — it is never invoked for `POST` or any other verb, whether
+or not an action exists; a `POST` with no matching `+action.php` is a `405`,
+not a fallback to the controller. A verb neither side claims is a
+`405 Method Not Allowed` with an `Allow` header naming what the route does
+answer. Cross-site form POSTs are already rejected by the origin check
+before an action runs.
+
+This guarantee is specific to filesystem routing. A custom route registered
+in `app/routes.php` is dispatched ahead of it for any HTTP method — its
+handler receives no method information and can return a response for any
+verb, including `PUT`/`DELETE`/etc. — so it gets no automatic `405` and is
+the site builder's own responsibility to restrict, if it should be.
+
+### Action-only endpoints
+
+A directory with `+action.php` and neither an entry file nor `+controller.php`
+is routable too — the POST-axis counterpart to a `+controller.php`-only route
+endpoint:
+
+```text
+routes/subscribe/+action.php   # no +page.json, no +controller.php
+```
+
+- **POST** dispatches `+action.php`, same as a page action. A `failure()`/
+  `invalid()` result re-renders a co-located `+template.twig` with `form`
+  populated, if one is present — same failure-re-render behavior as a page
+  action. With no such template, there is no page to re-render into, so it
+  must return a `RenderedResponse` or `ActionResult::redirect()` instead, and
+  returning either of the other two throws a `RuntimeException` at dispatch
+  time instead of silently 404ing or crashing the renderer.
+- **GET / HEAD** (and any other verb) answer `405 Method Not Allowed` with
+  `Allow: POST` — the route exists, it just doesn't answer that verb (there is
+  no controller here to answer GET with). A co-located `+template.twig`
+  doesn't change this: it exists only to give POST's own failure re-render
+  something to render into, not to make the route GET-navigable — add a
+  `+controller.php` for that.
+- Like a controller-only endpoint, it is excluded from the page tree
+  (`site.index`, `children`, `findById`) and carries no metadata.
+- Still exactly one `+action.php` per directory, and still POST only — the
+  same constraints as the page action layer. Garner has no verb model beyond
+  GET/HEAD/POST; there is no other-verbs escape hatch.
+
+A directory can also combine `+controller.php` and `+action.php` with no
+entry file: GET/HEAD dispatches the controller (same contract as a
+controller-only endpoint: an array result renders into a co-located
+`+template.twig` if one is present, exactly like a page's controller; with no
+such template, it must return a `RenderedResponse` instead), POST dispatches
+the action exclusively (same failure-re-render behavior as above), and every
+other verb is `405 Method Not Allowed` with `Allow: GET, HEAD, POST`. This
+mirrors
+exactly how a page-tree route splits GET (controller/template) from POST
+(action) — a controller is a GET pre-processor everywhere in Garner, never a
+router for arbitrary verbs, whether it's co-located with a page or standing
+alone as an endpoint.
 
 ### Twig extensions
 

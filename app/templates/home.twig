@@ -19,6 +19,66 @@
                 {% endfor %}
             </ul>
         </nav>
+
+        <section>
+            <h2>Live API examples</h2>
+            <p>
+                Two route endpoints (routable, but outside the page tree —
+                see <code>routes/api/</code>): <code>GET /api/time</code>
+                (a controller-only endpoint) and
+                <code>POST /api/echo</code> (an action-only endpoint).
+            </p>
+            <p>
+                <button type="button" id="fetch-time">GET /api/time</button>
+                <button type="button" id="post-echo">POST /api/echo (JSON)</button>
+            </p>
+            <pre id="api-output">&mdash;</pre>
+        </section>
+
+        <script>
+            // "" at web root, "/blog" behind a subdirectory install — keeps
+            // these requests inside the app instead of hitting the host root.
+            // JSON_HEX_TAG escapes < and > so this can never end the <script>
+            // block early, regardless of what base_path ends up containing.
+            const apiBase = {{ base_path|json_encode(constant('JSON_HEX_TAG'))|raw }};
+
+            // Reads the body as text first so a non-JSON error response (e.g. an
+            // HTML page from renderError()) still shows its real status instead
+            // of just a misleading "not valid JSON" parse error.
+            async function showApiResult(response) {
+                const text = await response.text();
+                let body;
+
+                try {
+                    body = JSON.stringify(JSON.parse(text), null, 2);
+                } catch {
+                    body = text;
+                }
+
+                document.getElementById('api-output').textContent =
+                    response.status + ' ' + response.statusText + '\n' + body;
+            }
+
+            async function runApiDemo(url, options) {
+                try {
+                    await showApiResult(await fetch(url, options));
+                } catch (error) {
+                    document.getElementById('api-output').textContent = 'Error: ' + error.message;
+                }
+            }
+
+            document.getElementById('fetch-time').addEventListener('click', () => {
+                runApiDemo(apiBase + '/api/time');
+            });
+
+            document.getElementById('post-echo').addEventListener('click', () => {
+                runApiDemo(apiBase + '/api/echo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hello: 'from the browser' }),
+                });
+            });
+        </script>
     </main>
 </body>
 </html>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Garner\Content;
 
+use Garner\Core\MutesWarnings;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -32,15 +33,19 @@ use Throwable;
  */
 final class ContentIndex
 {
-    private const CONTROLLER_FILE = '+controller.php';
+    use MutesWarnings;
 
     /**
-     * Bump whenever the SQLite schema changes (new/removed/renamed columns or
-     * tables). An index built under a different version is treated as stale and
-     * rebuilt regardless of the content fingerprint, so engine upgrades self-heal
-     * instead of surfacing as a "no such column" 500. See docs/index-freshness.md.
+     * Bump whenever a row built under the old version could be wrong or
+     * unreadable under the new code: new/removed/renamed columns or tables, but
+     * also a change to how a row's columns are derived (e.g. which directories
+     * count as endpoints). An index built under a different version is treated
+     * as stale and rebuilt regardless of the content fingerprint, so engine
+     * upgrades self-heal instead of surfacing as a "no such column" 500 — or,
+     * for a derivation-only change, silently serving rows classified under the
+     * old rule until the next manual reindex. See docs/index-freshness.md.
      */
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 3;
 
     /**
      * Upper bound on how many levels ancestors() will walk up parent_path before
@@ -455,10 +460,41 @@ final class ContentIndex
     private function collect(string $dir, array &$pages): void
     {
         $entry = EntryFile::find($dir);
-        $isEndpoint = $entry === null && is_file($dir . '/' . self::CONTROLLER_FILE);
+        $controllerMtime = null;
+        $actionMtime = null;
+
+        // EntryFile::controllerFile()/actionFile() each do their own is_file()
+        // check and hand back the resolved path in one call, reused here for
+        // the mtime lookup rather than reimplementing that existence check.
+        // An endpoint routinely carries only one of these two files (that's
+        // the whole point of a controller-only or action-only endpoint), so
+        // filemtime() is only ever called on one that's confirmed present —
+        // calling it unconditionally on the other would turn every such scan
+        // into a warning-turned-ErrorException (see fileMtimeOrNull())
+        // instead of only the narrow concurrent-deploy race that guard
+        // exists for. Captured once here, though, rather than re-derived a
+        // second time in pageRow()/endpointMtime() from freshly
+        // reconstructed paths.
+        $isEndpoint = false;
+
+        if ($entry === null) {
+            $controllerPath = EntryFile::controllerFile($dir);
+            $actionPath = EntryFile::actionFile($dir);
+            // Endpoint-ness is decided by presence (confirmed by controllerFile()/
+            // actionFile()'s own is_file() check), not by whether the mtime read
+            // below succeeds — a file that vanishes between that check and
+            // fileMtimeOrNull() (the same narrow race fileMtimeOrNull() is built
+            // to survive) still makes this a real endpoint, just one whose row
+            // falls back to endpointMtime()'s time() default below.
+            $isEndpoint = $controllerPath !== null || $actionPath !== null;
+            $controllerMtime = $controllerPath !== null
+                ? $this->fileMtimeOrNull($controllerPath)
+                : null;
+            $actionMtime = $actionPath !== null ? $this->fileMtimeOrNull($actionPath) : null;
+        }
 
         if ($entry !== null || $isEndpoint) {
-            $pages[] = $this->pageRow($dir, $entry, $isEndpoint);
+            $pages[] = $this->pageRow($dir, $entry, $controllerMtime, $actionMtime, $isEndpoint);
         }
 
         $names = scandir($dir);
@@ -482,15 +518,21 @@ final class ContentIndex
 
     /**
      * Build the index row for a routable directory. A directory with an entry file
-     * is a content page; one with only a +controller.php is a route endpoint —
-     * routable and dispatchable, but carrying no metadata and kept out of the tree.
+     * is a content page; one with only a +controller.php and/or +action.php is a
+     * route endpoint — routable and dispatchable, but carrying no metadata and
+     * kept out of the tree.
      *
      * @return PageRow
      */
-    private function pageRow(string $dir, ?string $entry, bool $isEndpoint): array
-    {
+    private function pageRow(
+        string $dir,
+        ?string $entry,
+        ?int $controllerMtime,
+        ?int $actionMtime,
+        bool $isEndpoint,
+    ): array {
         $meta = [];
-        $mtimeSource = $dir . '/' . self::CONTROLLER_FILE;
+        $mtime = null;
 
         if ($entry !== null) {
             $parsed = FormatParser::parse($entry);
@@ -504,7 +546,13 @@ final class ContentIndex
 
             PageMeta::assertValid($parsed, $entry);
             $meta = $parsed;
-            $mtimeSource = $entry;
+            // Same vanished-file race fileMtimeOrNull() exists to survive for
+            // +controller.php/+action.php above: EntryFile::find() confirmed
+            // this file a moment ago, but a concurrent deploy could still
+            // delete or replace it before this read. A null here falls back
+            // to endpointMtime()'s time()-based default below instead of
+            // failing the whole scan.
+            $mtime = $this->fileMtimeOrNull($entry);
         }
 
         $path = $this->routePath($dir);
@@ -517,11 +565,53 @@ final class ContentIndex
             'title' => is_string($meta['title'] ?? null) ? $meta['title'] : null,
             'created' => is_string($meta['created'] ?? null) ? $meta['created'] : null,
             'depth' => $this->depth($path),
-            'mtime' => (int) filemtime($mtimeSource),
+            'mtime' => $mtime ?? $this->endpointMtime($controllerMtime, $actionMtime),
             'draft' => PageMeta::isDraft($meta),
             'sort' => PageMeta::sort($meta),
             'endpoint' => $isEndpoint,
         ];
+    }
+
+    /**
+     * Endpoint mtime: the newest of +controller.php / +action.php, whichever are
+     * present, so an edit to either file bumps the fingerprint for a combined
+     * endpoint. $controllerMtime/$actionMtime come from collect()'s
+     * existence-and-mtime read moments earlier rather than being re-derived
+     * here, so this can't observe a different filesystem state than the
+     * classification already made, and never needs a second stat per file.
+     *
+     * The empty-$mtimes branch covers a page entry whose own filemtime() read
+     * raced a deletion, and also an endpoint whose only file(s) vanished
+     * between collect()'s existence check and its mtime read — both fall back
+     * to time() here rather than dropping the row or failing the scan.
+     */
+    private function endpointMtime(?int $controllerMtime, ?int $actionMtime): int
+    {
+        $mtimes = array_filter(
+            [$controllerMtime, $actionMtime],
+            static fn(?int $mtime): bool => $mtime !== null,
+        );
+
+        return $mtimes === [] ? time() : max($mtimes);
+    }
+
+    /**
+     * filemtime() on a file that vanished between collect()'s existence check
+     * and this call (a narrow concurrent-deploy race) raises a warning —
+     * muted() swaps in a warning-swallowing handler for the call instead of
+     * `@` (which only works if every installed handler checks
+     * error_reporting()), so the race degrades to a missing mtime source for
+     * this one row instead of this project's ErrorHandler escalating it to
+     * an uncaught ErrorException and aborting the whole scan. Also covers
+     * CLI/test contexts where that handler isn't registered at all: without
+     * muting, filemtime()'s plain E_WARNING would otherwise print straight
+     * to output and could contaminate a concurrent `reindex` run.
+     */
+    private function fileMtimeOrNull(string $path): ?int
+    {
+        $mtime = $this->muted(static fn(): int|false => filemtime($path));
+
+        return $mtime === false ? null : $mtime;
     }
 
     private function routePath(string $dir): string
@@ -578,7 +668,22 @@ final class ContentIndex
         $parts = [];
 
         foreach ($pages as $page) {
-            $parts[] = $page['dir'] . ':' . $page['mtime'];
+            // Not just dir:mtime — a directory that flips between an endpoint and a
+            // content page (or otherwise changes what it parses to, e.g. +action.php
+            // swapped for +page.json) within the same filesystem timestamp second
+            // keeps an identical mtime even though every other indexed field
+            // changed, so mtime alone isn't a reliable enough change signal.
+            $parts[] = implode(':', [
+                $page['dir'],
+                (string) $page['mtime'],
+                $page['endpoint'] ? '1' : '0',
+                $page['id'],
+                $page['template'] ?? '',
+                $page['title'] ?? '',
+                $page['created'] ?? '',
+                $page['draft'] ? '1' : '0',
+                (string) $page['sort'],
+            ]);
         }
 
         sort($parts);

@@ -154,11 +154,15 @@ final class PageShowCommand extends Command
 
     private function reportEndpoint(OutputInterface $output, bool $json, Page $page): int
     {
+        $templateFile = $this->relativePath($page->templateFile());
+
         $data = [
             'path' => $page->path(),
             'id' => $page->id(),
             'endpoint' => true,
             'controller' => $this->relativePath($page->controllerFile()),
+            'action' => $this->relativePath($page->actionFile()),
+            'template' => $templateFile,
         ];
 
         if ($json) {
@@ -186,6 +190,21 @@ final class PageShowCommand extends Command
             'controller: %s',
             OutputFormatter::escape($data['controller'] ?? '(none)'),
         ));
+        $output->writeln(sprintf(
+            'action:     %s',
+            OutputFormatter::escape($data['action'] ?? '(none)'),
+        ));
+
+        // Unlike controller/action (always shown, defaulting to "(none)"),
+        // an endpoint's template is only ever meaningful when present — it
+        // has no name-resolved fallback the way a page's does (see
+        // resolveTemplate()), so there is nothing useful to print without one.
+        if ($templateFile !== null) {
+            $output->writeln(sprintf(
+                'template:   %s (co-located)',
+                OutputFormatter::escape($templateFile),
+            ));
+        }
 
         return Command::SUCCESS;
     }

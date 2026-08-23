@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Action-only endpoints** — a directory with `+action.php` and no page
+  entry file now routes, even without a `+controller.php`. Previously a
+  directory with only `+action.php` indexed as neither a page nor an
+  endpoint and 404'd on every request, with `+action.php` never `require`d
+  and no validator warning; that trap is now closed. Excluded from the page
+  tree the same way a controller-only endpoint already is. An endpoint with
+  no co-located `+template.twig` has no page to re-render a `failure()`/
+  `invalid()` result into, so an action dispatched there must return a
+  `RenderedResponse` or `ActionResult::redirect()` instead — returning either
+  of the other two throws a `RuntimeException` at dispatch time instead of
+  silently 404ing or crashing the renderer. Adding a `+template.twig` (see
+  "Action-only endpoints" in the README) gives it something to re-render
+  into, the same as a page action.
+
+### Changed
+
+- **Method dispatch is now strict and uniform on every route shape, with no
+  exceptions** — a deliberate, opinionated simplification, not just an
+  addition. Exactly two verbs are ever handled: `GET`/`HEAD` always belongs
+  to the controller and/or the page template, `POST` always belongs
+  exclusively to `+action.php` when one exists, and nothing else is ever
+  dispatched. A controller is GET/HEAD only, full stop — it is simply never
+  invoked for `POST` or any other verb, whether or not an action exists; a
+  `POST` with no matching `+action.php` is a `405`, not a fallback to the
+  controller. The old "controller rescues an unhandled verb with a
+  `RenderedResponse`" fallback and "controller-only endpoints keep full
+  method freedom" behavior are both gone. A verb neither side claims is
+  unconditionally `405 Method Not Allowed` with an `Allow` header naming
+  what the route does answer. This is a breaking change with no
+  compatibility shim: a controller that branched on `POST` (or any other
+  verb) to take over a response will no longer be reached for it. A
+  controller is a `GET` pre-processor, never a router.
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

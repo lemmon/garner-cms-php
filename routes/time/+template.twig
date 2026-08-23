@@ -1,0 +1,9 @@
+{% extends "base.twig" %}
+
+{% block content %}
+    <article>
+        <h1>{{ page.title }}</h1>
+        <p>The server's clock currently reads <time datetime="{{ now }}">{{ now }}</time> (UTC).</p>
+        <p><a href="{{ base_path }}/">&larr; Home</a></p>
+    </article>
+{% endblock %}

@@ -36,7 +36,9 @@ final class Page
      * @param Pages|null           $pages          Repository used to resolve children/descendants lazily.
      * @param MediaPublisher|null  $publisher      Publishes owned files and resolves their public URLs.
      * @param string               $baseUrl        Site base URL (no trailing slash) used to compose url().
-     * @param bool                 $endpoint       Route endpoint (controller-only directory), not a tree page.
+     * @param bool                 $endpoint       Route endpoint (a +controller.php and/or +action.php directory
+     *                                              with no entry file), not a tree page. May have no controller —
+     *                                              check controllerFile() before calling it.
      * @param bool                 $hidden         Cascaded visibility: this page's own `draft`, OR a hidden/draft
      *                                              ancestor's — the flag `PageCollection::published()`/`drafts()`
      *                                              filter on. Independent of `$draft`, which is never cascaded.
@@ -109,8 +111,10 @@ final class Page
     }
 
     /**
-     * Whether this is a route endpoint (a controller-only directory): routable
-     * and dispatchable, but not part of the page tree.
+     * Whether this is a route endpoint (a +controller.php and/or +action.php
+     * directory with no entry file): routable and dispatchable, but not part
+     * of the page tree. Does not imply a controller — an action-only endpoint
+     * has controllerFile() === null; check before calling it.
      */
     public function isEndpoint(): bool
     {

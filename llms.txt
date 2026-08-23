@@ -280,15 +280,50 @@ must produce one of:
   headers.
 
 The `form` template variable is always defined (`null` on plain GET). `HEAD`
-routes like `GET`. A POST without `+action.php` (or any other unhandled verb)
-returns `405 Method Not Allowed` with an `Allow` header, unless a controller
-answers it with a `RenderedResponse`. For a success message across a
-redirect, use `$app->session()->flash(...)` (see "Sessions" below) rather
-than baking it into the URL.
+routes like `GET`. Method dispatch is strict and uniform everywhere in
+Garner, with no exceptions: GET/HEAD always belongs to the controller
+and/or page template, POST always belongs exclusively to `+action.php` when
+one exists, and nothing else is ever dispatched — a controller is GET/HEAD
+only, full stop: it is never invoked for POST or any other verb, whether or
+not an action exists; a POST with no matching `+action.php` is a 405, not a
+fallback to the controller (no "controller rescues an unhandled verb"
+behavior at all anymore). A verb neither side claims returns
+`405 Method Not Allowed` with an `Allow` header naming what the route does
+answer. For a success message
+across a redirect, use `$app->session()->flash(...)` (see "Sessions" below)
+rather than baking it into the URL.
 
-A directory with `+controller.php` and no page entry file is a route endpoint.
-Use this for JSON APIs, feeds, sitemaps, or similar routes that should not appear
-in the page tree.
+A directory with `+controller.php` and no page entry file is a route
+endpoint. Use this for JSON APIs, feeds, sitemaps, or similar routes that
+should not appear in the page tree. Method dispatch is identical to a
+page's: GET/HEAD dispatches the controller — an array result renders into
+a co-located `+template.twig` if one is present, exactly like a page's
+controller; with no such template, the controller must return a
+`RenderedResponse` instead, since there is nothing to render an array
+into. POST is `+action.php`'s exclusively when one exists (see the
+combined shape below), and every other verb — including POST here, since
+a controller-only directory has no `+action.php` — is `405 Method Not
+Allowed`. A controller is a GET pre-processor here too, never a router
+for arbitrary verbs.
+
+A directory with `+action.php` and neither a page entry file nor
+`+controller.php` is an action-only endpoint: POST-only, dispatching
+`+action.php` the same as a page action. A `failure()`/`invalid()` result
+re-renders a co-located `+template.twig` with `form` populated, exactly like
+a page action's failure re-render — but only as that POST's own response
+body: a `+template.twig` here does not make the route GET-navigable (GET/HEAD
+dispatch is gated on `+controller.php` alone, unaffected by the template's
+presence — add a `+controller.php` to answer GET too). With no such
+template, there is nothing to re-render a `failure()`/`invalid()` result
+into, so it must return a `RenderedResponse` or `ActionResult::redirect()`
+instead, and returning either of the other two throws a `RuntimeException`.
+GET/HEAD (and every other verb) get `405 Method Not Allowed` with
+`Allow: POST`. Also excluded from the page tree.
+
+A directory can combine `+controller.php` and `+action.php` with no page
+entry file: GET/HEAD dispatches the controller, POST dispatches the action
+exclusively (same failure-re-render behavior as above), and every other verb
+is `405 Method Not Allowed` with `Allow: GET, HEAD, POST`.
 
 ## Sessions
 

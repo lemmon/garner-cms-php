@@ -60,6 +60,21 @@ final class TreeValidatorTest extends TestCase
         self::assertStringContainsString('Duplicate page id "feed.xml"', $messages);
     }
 
+    public function testActionOnlyEndpointSharesTheGlobalIdNamespace(): void
+    {
+        // Same bookkeeping as the controller-only endpoint case above, but for
+        // a directory routable only through its +action.php.
+        $this->writeEntry('duplicate', ['id' => 'subscribe']);
+        $this->writeFile('subscribe/+action.php', "<?php\nreturn static fn() => null;\n");
+
+        $messages = implode("\n", array_map(
+            static fn(ValidationIssue $issue): string => $issue->message,
+            new TreeValidator($this->root)->validate(),
+        ));
+
+        self::assertStringContainsString('Duplicate page id "subscribe"', $messages);
+    }
+
     /**
      * @return list<string>
      */

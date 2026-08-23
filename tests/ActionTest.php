@@ -144,10 +144,12 @@ final class ActionTest extends TestCase
     public function testFailureReRenderPresentsGetToMethodBranchingControllers(): void
     {
         $this->writeSubscribeAction();
-        // A controller that still branches on the method (pre-action POST
-        // handling) must not hijack or starve the failure re-render: it sees
-        // the re-render as a true GET — no POST payload either, so context
-        // built from form()/body() cannot react to the handled submission.
+        // A controller is only ever dispatched for GET/HEAD (see
+        // respondForPage()) — the failure re-render's internal dispatch must
+        // uphold that invariant too, presenting a true GET even though the
+        // real request was the POST the action already handled, so context
+        // built from form()/body() cannot react to the submission and a
+        // method check can never see anything but GET.
         $this->writeFile('routes/subscribe/+controller.php', <<<'PHP'
             <?php
 
@@ -306,10 +308,11 @@ final class ActionTest extends TestCase
         self::assertSame('GET, HEAD, POST', $response->header('Allow'));
     }
 
-    public function testControllerReturnedResponseStillAnswersPostWithoutAction(): void
+    public function testPostWithoutActionIs405EvenWhenTheControllerBranchesOnMethod(): void
     {
-        // Pre-action compatibility: a page controller may branch on the method
-        // and take over the POST with a full response.
+        // A controller is GET/HEAD only, period — it is never dispatched for
+        // POST, so it gets no chance to "rescue" an unhandled verb even if
+        // it explicitly checks for one. Only +action.php can answer POST.
         $this->writeFile('routes/subscribe/+controller.php', <<<'PHP'
             <?php
 
@@ -329,11 +332,12 @@ final class ActionTest extends TestCase
 
         $response = $this->respond($this->formPost('/subscribe', ['email' => 'a@example.test']));
 
-        self::assertSame(200, $response->status());
-        self::assertStringContainsString('by-controller', $response->body());
+        self::assertSame(405, $response->status());
+        self::assertSame('GET, HEAD', $response->header('Allow'));
+        self::assertStringNotContainsString('by-controller', $response->body());
     }
 
-    public function testEndpointKeepsFullMethodFreedom(): void
+    public function testControllerOnlyEndpointAnswersGet(): void
     {
         $this->writeFile('routes/api/+controller.php', <<<'PHP'
             <?php
@@ -347,10 +351,69 @@ final class ActionTest extends TestCase
                 => RenderedResponse::json(['method' => $app->request()->method()]);
             PHP);
 
-        $response = $this->respond(Request::create('http://localhost/api', 'DELETE'), '/api');
+        $response = $this->respond(Request::create('http://localhost/api'), '/api');
 
         self::assertSame(200, $response->status());
-        self::assertStringContainsString('DELETE', $response->body());
+        self::assertStringContainsString('GET', $response->body());
+    }
+
+    public function testControllerOnlyEndpointOtherVerbsAre405WithGetHeadInAllow(): void
+    {
+        // No +action.php, so a controller-only endpoint answers exactly
+        // GET/HEAD — no more "full method freedom": a controller is a GET
+        // pre-processor, never a router for arbitrary verbs.
+        $this->writeFile('routes/api/+controller.php', <<<'PHP'
+            <?php
+
+            use Garner\Content\Page;
+            use Garner\Content\Site;
+            use Garner\Core\Application;
+            use Garner\Render\RenderedResponse;
+
+            return static fn(Page $page, Site $site, Application $app): RenderedResponse
+                => RenderedResponse::json(['method' => $app->request()->method()]);
+            PHP);
+
+        $delete = $this->respond(Request::create('http://localhost/api', 'DELETE'), '/api');
+        $post = $this->respond(Request::create('http://localhost/api', 'POST'), '/api');
+
+        self::assertSame(405, $delete->status());
+        self::assertSame('GET, HEAD', $delete->header('Allow'));
+        self::assertSame(405, $post->status());
+        self::assertSame('GET, HEAD', $post->header('Allow'));
+    }
+
+    public function testControllerOnlyEndpointMustReturnARenderedResponse(): void
+    {
+        $this->writeFile(
+            'routes/api/+controller.php',
+            '<?php return static fn(): array => ["method" => "GET"];',
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('must return a RenderedResponse');
+        $this->respond(Request::create('http://localhost/api'), '/api');
+    }
+
+    /**
+     * An endpoint (no +page.json) with a co-located +template.twig is not
+     * templateless — resolveTemplate() picks up +template.twig regardless of
+     * isEndpoint(), so an array result from the controller must render into
+     * it exactly like a tree page would, not be forced into a
+     * RenderedResponse just because the directory has no +page.json.
+     */
+    public function testControllerOnlyEndpointWithATemplateRendersAnArrayResultIntoIt(): void
+    {
+        $this->writeFile(
+            'routes/api/+controller.php',
+            '<?php return static fn(): array => ["message" => "hello from controller"];',
+        );
+        $this->writeFile('routes/api/+template.twig', 'Custom: {{ message }}');
+
+        $response = $this->respond(Request::create('http://localhost/api'), '/api');
+
+        self::assertSame(200, $response->status());
+        self::assertSame('Custom: hello from controller', $response->body());
     }
 
     public function testActionMayReturnAFullResponseForHtmx(): void
@@ -377,6 +440,190 @@ final class ActionTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('must return an ActionResult or RenderedResponse');
         $this->respond($this->formPost('/subscribe', ['email' => 'a@example.test']));
+    }
+
+    public function testActionOnlyEndpointDispatchesOnPost(): void
+    {
+        $this->writeFile('routes/notify/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Core\Request;
+            use Garner\Render\RenderedResponse;
+
+            return static fn(Request $request): RenderedResponse
+                => RenderedResponse::json(['email' => $request->form()['email'] ?? null]);
+            PHP);
+
+        $response = $this->respond($this->formPost('/notify', ['email' => 'a@example.test']));
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('a@example.test', $response->body());
+    }
+
+    public function testActionOnlyEndpointRedirectsOnPost(): void
+    {
+        $this->writeFile('routes/notify/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Render\ActionResult;
+
+            return static fn(): ActionResult => ActionResult::redirect('/subscribe/thanks');
+            PHP);
+
+        $response = $this->respond($this->formPost('/notify', ['email' => 'a@example.test']));
+
+        self::assertSame(303, $response->status());
+        self::assertSame('/subscribe/thanks', $response->location());
+    }
+
+    public function testActionOnlyEndpointGetIs405WithPostOnlyAllow(): void
+    {
+        $this->writeFile(
+            'routes/notify/+action.php',
+            '<?php return static fn() => \Garner\Render\RenderedResponse::json([]);',
+        );
+
+        $response = $this->respond(Request::create('http://localhost/notify'), '/notify');
+
+        self::assertSame(405, $response->status());
+        self::assertSame('POST', $response->header('Allow'));
+    }
+
+    public function testActionOnlyEndpointFailureThrowsBecauseThereIsNoPageToReRender(): void
+    {
+        $this->writeFile('routes/notify/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Render\ActionResult;
+
+            return static fn(): ActionResult => ActionResult::failure(['error' => 'nope']);
+            PHP);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Action-only route "/notify" has no page to re-render');
+        $this->respond($this->formPost('/notify', ['email' => 'a@example.test']));
+    }
+
+    /**
+     * A +template.twig co-located with a controllerless +action.php exists
+     * only to give failure()/invalid() something to re-render as this POST's
+     * response body — it does not thereby make the route GET-navigable.
+     * GET/HEAD dispatch is gated on controllerFile() alone (see
+     * answersGet()), deliberately unaffected by templateFile(): if the site
+     * wants a GET response too, it adds a +controller.php, an explicit
+     * decision rather than an incidental one from adding a template.
+     */
+    public function testActionOnlyEndpointWithATemplateStillRejectsGet(): void
+    {
+        $this->writeFile(
+            'routes/notify/+action.php',
+            '<?php return static fn() => \Garner\Render\ActionResult::failure(["error" => "nope"]);',
+        );
+        $this->writeFile('routes/notify/+template.twig', 'Error: {{ form.error }}');
+
+        $response = $this->respond(Request::create('http://localhost/notify'), '/notify');
+
+        self::assertSame(405, $response->status());
+        self::assertSame('POST', $response->header('Allow'));
+    }
+
+    /**
+     * Same shape as above, but exercising the actual point of the template:
+     * a POST failure() re-renders it with `form` populated instead of
+     * throwing "no page to re-render" — the template is reachable, just only
+     * as this POST's own response.
+     */
+    public function testActionOnlyEndpointWithATemplateRendersFailureIntoIt(): void
+    {
+        $this->writeFile(
+            'routes/notify/+action.php',
+            '<?php return static fn() => \Garner\Render\ActionResult::failure(["error" => "nope"]);',
+        );
+        $this->writeFile('routes/notify/+template.twig', 'Error: {{ form.error }}');
+
+        $response = $this->respond($this->formPost('/notify', ['email' => 'a@example.test']));
+
+        self::assertSame(422, $response->status());
+        self::assertSame('Error: nope', $response->body());
+    }
+
+    public function testEndpointWithControllerAndActionAnswersGetViaControllerAndRejectsOtherVerbs(): void
+    {
+        // GET is the controller's, exactly like any other route; anything
+        // beyond GET/HEAD/POST is 405 even though a controller is present —
+        // it does not become a free-form router just because it's an
+        // endpoint.
+        $this->writeFile('routes/api/+controller.php', <<<'PHP'
+            <?php
+
+            use Garner\Content\Page;
+            use Garner\Content\Site;
+            use Garner\Core\Application;
+            use Garner\Render\RenderedResponse;
+
+            return static fn(Page $page, Site $site, Application $app): RenderedResponse
+                => RenderedResponse::json(['method' => $app->request()->method()]);
+            PHP);
+        $this->writeFile(
+            'routes/api/+action.php',
+            '<?php return static fn() => \Garner\Render\RenderedResponse::json(["via" => "action"]);',
+        );
+
+        $get = $this->respond(Request::create('http://localhost/api'), '/api');
+        $delete = $this->respond(Request::create('http://localhost/api', 'DELETE'), '/api');
+
+        self::assertSame(200, $get->status());
+        self::assertStringContainsString('GET', $get->body());
+        self::assertSame(405, $delete->status());
+        self::assertSame('GET, HEAD, POST', $delete->header('Allow'));
+    }
+
+    public function testEndpointWithControllerAndActionGivesPostToTheAction(): void
+    {
+        // POST is the action's exclusively, mirroring a page-tree route —
+        // the controller never sees it, even though it's present.
+        $this->writeFile(
+            'routes/api/+controller.php',
+            '<?php return static fn() => \Garner\Render\RenderedResponse::json(["via" => "controller"]);',
+        );
+        $this->writeFile('routes/api/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Core\Request;
+            use Garner\Render\RenderedResponse;
+
+            return static fn(Request $request): RenderedResponse
+                => RenderedResponse::json(['email' => $request->form()['email'] ?? null]);
+            PHP);
+
+        $response = $this->respond($this->formPost('/api', ['email' => 'a@example.test']));
+
+        self::assertSame(200, $response->status());
+        self::assertStringContainsString('a@example.test', $response->body());
+        self::assertStringNotContainsString('via', $response->body());
+    }
+
+    public function testEndpointWithControllerAndActionFailureThrowsBecauseThereIsNoPageToReRender(): void
+    {
+        $this->writeFile(
+            'routes/api/+controller.php',
+            '<?php return static fn() => \Garner\Render\RenderedResponse::json(["via" => "controller"]);',
+        );
+        $this->writeFile('routes/api/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Render\ActionResult;
+
+            return static fn(): ActionResult => ActionResult::failure(['error' => 'nope']);
+            PHP);
+
+        // Distinct from the action-only case above: this endpoint does have a
+        // controller, so the message must not call it "Action-only route" —
+        // that would misdirect debugging toward "add a controller" when the
+        // real fix is in the action's return value.
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Endpoint "/api" has no page to re-render');
+        $this->respond($this->formPost('/api', ['email' => 'a@example.test']));
     }
 
     /**

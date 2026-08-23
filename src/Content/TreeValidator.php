@@ -50,7 +50,7 @@ final class TreeValidator
             $this->checkEntry($dir, $entry, $issues, $seenIds);
         }
 
-        if ($entry === null && is_file($dir . '/+controller.php')) {
+        if ($entry === null && EntryFile::hasEndpointFiles($dir)) {
             $this->checkEndpoint($dir, $issues, $seenIds);
         }
 
@@ -119,8 +119,9 @@ final class TreeValidator
     }
 
     /**
-     * A directory with a +controller.php but no entry file is a route endpoint: it
-     * carries no metadata, but its id (the directory name) shares the global id
+     * A directory with a +controller.php and/or +action.php but no entry file is a
+     * route endpoint (the latter alone makes it a POST-only action-only endpoint):
+     * it carries no metadata, but its id (the directory name) shares the global id
      * namespace, so duplicates are reported here just as ContentIndex enforces them.
      *
      * @param list<ValidationIssue> $issues

@@ -415,6 +415,19 @@ final class ContentIndex
         return ['count' => count($pages), 'index_path' => $this->sqlitePath];
     }
 
+    /**
+     * Brings the index in line with the content tree now, regardless of mode:
+     * the scan-mode check (rebuild only when the fingerprint or schema version
+     * differs), even when this index is 'locked'. For callers that must not
+     * read a stale index — CLI inspection commands run right after a content
+     * edit, where no host means the mode defaults to 'locked'.
+     */
+    public function refresh(): void
+    {
+        $this->fresh = true;
+        $this->syncWithContent();
+    }
+
     private function ensureFresh(): void
     {
         if ($this->fresh) {
@@ -422,17 +435,22 @@ final class ContentIndex
         }
 
         $this->fresh = true;
-        $meta = $this->readMeta();
-        $schemaStale = $meta['schema_version'] !== self::SCHEMA_VERSION;
 
         if ($this->mode === 'locked') {
-            if ($schemaStale) {
+            if ($this->readMeta()['schema_version'] !== self::SCHEMA_VERSION) {
                 $this->rebuild();
             }
 
             return;
         }
 
+        $this->syncWithContent();
+    }
+
+    private function syncWithContent(): void
+    {
+        $meta = $this->readMeta();
+        $schemaStale = $meta['schema_version'] !== self::SCHEMA_VERSION;
         $pages = $this->scan();
         $fingerprint = $this->fingerprint($pages);
 

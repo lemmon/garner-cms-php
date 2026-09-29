@@ -250,6 +250,30 @@ final class CliTest extends TestCase
         self::assertStringContainsString('already public', $tester->getDisplay());
     }
 
+    public function testPagePreviewOpenSeesADraftAncestorSetAfterTheIndexWasBuiltInLockedMode(): void
+    {
+        // Built while public; the parent is drafted afterwards, by hand. The
+        // child's cascaded hidden state comes from the index, so a stale
+        // 'locked' index would still report it public and refuse --open.
+        $this->writeEntry('blog', ['created' => '2026-06-19']);
+        $this->writeEntry('blog/post', ['created' => '2026-06-19']);
+        $this->lockedApp()->contentIndex()->rebuild();
+        $this->writeEntry('blog', ['created' => '2026-06-19', 'draft' => true]);
+
+        $command = new PagePreviewCommand(
+            $this->lockedApp(),
+            browserOpener: static fn(string $url): bool => true,
+        );
+
+        $tester = $this->runCommand($command, [
+            'route' => 'blog/post',
+            '--open' => true,
+            '--base-url' => 'http://localhost:8040',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+    }
+
     public function testPagePreviewOpenFailsWithoutABaseUrl(): void
     {
         $this->writeEntry('wip', ['created' => '2026-06-19', 'draft' => true]);
@@ -611,6 +635,13 @@ final class CliTest extends TestCase
     {
         return new Application($this->root, $this->root, [
             'app' => ['debug' => true, 'name' => 'Test Site'],
+        ]);
+    }
+
+    private function lockedApp(): Application
+    {
+        return new Application($this->root, $this->root, [
+            'app' => ['debug' => false, 'name' => 'Test Site', 'index' => ['mode' => 'locked']],
         ]);
     }
 

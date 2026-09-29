@@ -48,6 +48,23 @@ final class PageListShowCommandTest extends TestCase
         self::assertStringContainsString('4 page(s)', $display);
     }
 
+    public function testListReflectsContentEditedAfterTheIndexWasBuiltInLockedMode(): void
+    {
+        // The CLI has no host, so the index mode defaults to 'locked', which a
+        // web request would trust as-is. Inspection must still see the edit.
+        $this->writeEntry('', ['id' => 'start', 'title' => 'Home']);
+        $this->lockedApp()->contentIndex()->rebuild();
+        $this->writeEntry('', ['title' => 'Home']);
+        $this->writeEntry('about', ['title' => 'About']);
+
+        $tester = $this->runCommand(new PageListCommand($this->lockedApp()), []);
+
+        $display = $tester->getDisplay();
+        self::assertStringContainsString('home', $display);
+        self::assertStringNotContainsString('start', $display);
+        self::assertStringContainsString('/about', $display);
+    }
+
     public function testListScopesToASubtree(): void
     {
         $this->writeEntry('', ['title' => 'Home']);
@@ -173,6 +190,18 @@ final class PageListShowCommandTest extends TestCase
     }
 
     // page:show
+
+    public function testShowFindsAPageAddedAfterTheIndexWasBuiltInLockedMode(): void
+    {
+        $this->writeEntry('', ['title' => 'Home']);
+        $this->lockedApp()->contentIndex()->rebuild();
+        $this->writeEntry('contact', ['title' => 'Contact']);
+
+        $tester = $this->runCommand(new PageShowCommand($this->lockedApp()), ['page' => 'contact']);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Contact', $tester->getDisplay());
+    }
 
     public function testShowsAPageByRoute(): void
     {
@@ -609,6 +638,13 @@ final class PageListShowCommandTest extends TestCase
     {
         return new Application($this->root, $this->root, [
             'app' => ['debug' => true, 'name' => 'Test Site'],
+        ]);
+    }
+
+    private function lockedApp(): Application
+    {
+        return new Application($this->root, $this->root, [
+            'app' => ['debug' => false, 'name' => 'Test Site', 'index' => ['mode' => 'locked']],
         ]);
     }
 

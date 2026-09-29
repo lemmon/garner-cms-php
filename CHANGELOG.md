@@ -57,6 +57,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `runtime/index.sqlite` re-derives the root row on the next request in
   either index mode — no manual `reindex` needed.
 
+### Fixed
+
+- **CLI inspection commands could report a stale index after a content
+  edit.** With no `APP_DEBUG` set, the CLI has no host to infer development
+  from, so the index mode defaulted to `locked` — which trusts the built
+  index until a `reindex` or schema bump. `page:list`, `page:show`, and
+  `page:preview --open` (for a page's cascaded hidden state) would then keep
+  reporting ids, titles, and pages from before the edit, silently. They now
+  check the index against the content tree before reading it, rebuilding
+  only when something changed, via the new `ContentIndex::refresh()`. Web
+  requests keep their configured mode. A rebuild the CLI triggers is written
+  to the shared `runtime/index.sqlite` like `reindex`'s, so in a `locked`
+  production deploy it also brings the web up to date with whatever content
+  is on disk.
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

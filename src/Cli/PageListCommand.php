@@ -57,6 +57,9 @@ final class PageListCommand extends Command
         // content file anywhere in the tree) scale with total site content
         // instead of with the index read it actually is.
         $index = $this->app->contentIndex();
+        // Inspection runs right after content edits, and the CLI's mode
+        // defaults to 'locked' (no host), so check freshness regardless.
+        $index->refresh();
         $rootRow = $index->listingRowForPath($root, $drafts);
         $descendants = $index->listingDescendants($root, $drafts);
         $rows = $rootRow !== null ? [$rootRow, ...$descendants] : $descendants;

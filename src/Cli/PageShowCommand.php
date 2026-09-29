@@ -97,6 +97,8 @@ final class PageShowCommand extends Command
         bool $asRoute,
         bool $asId,
     ): ?Page {
+        // Same freshness guarantee as page:list, regardless of index mode.
+        $this->app->contentIndex()->refresh();
         $pages = $this->app->pages();
 
         if ($asRoute) {

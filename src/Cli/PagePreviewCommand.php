@@ -131,6 +131,9 @@ final class PagePreviewCommand extends Command
         }
 
         if ($open) {
+            // Same freshness guarantee as page:list, regardless of index mode:
+            // the cascaded hidden state below comes from the index.
+            $this->app->contentIndex()->refresh();
             // PublicSite resolves an already-visible page before it ever looks
             // at ?preview=, so a token issued for a public page is never
             // consumed — the printed "one-time" link would just be the page's

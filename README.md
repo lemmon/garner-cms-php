@@ -103,14 +103,14 @@ treated as content pages. Method dispatch works exactly like a page (see
 directory with a `+page.json` (even `{}`) is a page. Any keys are kept as freeform
 metadata.
 
-| Field           | Default            | Notes                                      |
-| --------------- | ------------------ | ------------------------------------------ |
-| `id`            | the directory name | Any unique string; explicit value wins.    |
-| `template`      | `default`          | Twig template / controller name.           |
-| `draft`         | `false`            | Hides the page and its route descendants.  |
-| `draft_preview` | none               | Unlisted preview link secret; see below.   |
-| `sort`          | `0`                | Integer; lower comes first in listings.    |
-| `created`       | none               | Non-empty string (timestamp) when present. |
+| Field           | Default                                 | Notes                                      |
+| --------------- | --------------------------------------- | ------------------------------------------ |
+| `id`            | the directory name (`home` at the root) | Any unique string; explicit value wins.    |
+| `template`      | `default`                               | Twig template / controller name.           |
+| `draft`         | `false`                                 | Hides the page and its route descendants.  |
+| `draft_preview` | none                                    | Unlisted preview link secret; see below.   |
+| `sort`          | `0`                                     | Integer; lower comes first in listings.    |
+| `created`       | none                                    | Non-empty string (timestamp) when present. |
 
 YAML is accepted as an alternative entry file (`+page.yaml` / `+page.yml`).
 

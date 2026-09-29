@@ -51,7 +51,7 @@ final class PageLoader
         }
 
         return new Page(
-            id: PageMeta::resolveId($meta, $dir),
+            id: PageMeta::resolveId($meta, $dir, root: $path === '/'),
             template: PageMeta::template($meta),
             path: $path,
             meta: $meta,

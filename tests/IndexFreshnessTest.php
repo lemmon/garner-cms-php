@@ -52,6 +52,29 @@ final class IndexFreshnessTest extends TestCase
         self::assertSame($this->root . '/routes/about', $children[0]['dir']);
     }
 
+    public function testLockedModeRederivesTheRootFallbackIdAfterUpgrade(): void
+    {
+        // An index built before the root fell back to "home" stored the content
+        // directory's name instead. The schema is otherwise identical, so only
+        // the version bump makes 'locked' mode re-derive the row rather than keep
+        // serving an id PageLoader no longer agrees with.
+        $this->writeFile($this->root . '/routes/+page.json', '{"title": "Home"}');
+        $sqlitePath = $this->root . '/runtime/index.sqlite';
+        new ContentIndex($this->root . '/routes', $sqlitePath, 'locked')->rowForPath('/');
+
+        // Pinned, not derived from the current constant: 3 is the last version
+        // whose root row stored the directory name, so this fails if the bump
+        // is ever reverted.
+        $pdo = new PDO('sqlite:' . $sqlitePath);
+        $pdo->exec("UPDATE pages SET id = 'routes' WHERE path = '/'");
+        $pdo->exec("UPDATE meta SET value = '3' WHERE key = 'schema_version'");
+
+        $index = new ContentIndex($this->root . '/routes', $sqlitePath, 'locked');
+
+        self::assertSame('/', $index->pathForId('home'));
+        self::assertNull($index->pathForId('routes'));
+    }
+
     /**
      * Writes content, then hand-crafts a SQLite index in the pre-endpoint,
      * pre-schema_version shape (the schema Garner used before 2026-07-01), with a

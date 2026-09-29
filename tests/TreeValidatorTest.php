@@ -75,6 +75,20 @@ final class TreeValidatorTest extends TestCase
         self::assertStringContainsString('Duplicate page id "subscribe"', $messages);
     }
 
+    public function testRootHomeFallbackSharesTheGlobalIdNamespace(): void
+    {
+        // The root (no explicit id) falls back to "home", so a /home page
+        // without its own id collides with it.
+        $this->writeEntry('home', ['title' => 'Home']);
+
+        $messages = implode("\n", array_map(
+            static fn(ValidationIssue $issue): string => $issue->message,
+            new TreeValidator($this->root)->validate(),
+        ));
+
+        self::assertStringContainsString('Duplicate page id "home"', $messages);
+    }
+
     /**
      * @return list<string>
      */

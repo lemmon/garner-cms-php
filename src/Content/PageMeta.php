@@ -14,7 +14,9 @@ use Lemmon\Validator\Validator;
  * - `template` is optional; when absent the renderer falls back to the configured
  *   default template. When present it must be a non-empty string.
  * - `id` is optional; when absent it is inherited from the directory name (an
- *   explicit `id` always wins). Global id uniqueness is enforced by ContentIndex.
+ *   explicit `id` always wins), except at the root, which falls back to
+ *   `home` rather than the content directory's own name. Global id
+ *   uniqueness is enforced by ContentIndex.
  * - `draft` is optional (default false); when true the page — and every page
  *   nested beneath it, regardless of their own `draft` value — 404s publicly and
  *   is excluded from listings. When present it must be a boolean.
@@ -27,6 +29,13 @@ use Lemmon\Validator\Validator;
  */
 final class PageMeta
 {
+    /**
+     * Fallback id for the root directory: its basename is the configured content
+     * directory (`routes` by default), an internal name rather than one a site
+     * chose for its home page.
+     */
+    public const ROOT_ID = 'home';
+
     /**
      * @param array<string, mixed> $data
      *
@@ -83,7 +92,7 @@ final class PageMeta
     /**
      * @param array<string, mixed> $data
      */
-    public static function resolveId(array $data, string $dir): string
+    public static function resolveId(array $data, string $dir, bool $root): string
     {
         $id = $data['id'] ?? null;
 
@@ -91,7 +100,7 @@ final class PageMeta
             return trim($id);
         }
 
-        return basename($dir);
+        return $root ? self::ROOT_ID : basename($dir);
     }
 
     /**

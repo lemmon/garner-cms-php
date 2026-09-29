@@ -82,6 +82,25 @@ final class RenderTest extends TestCase
         self::assertSame('widget', $this->indexedId($app, '/products/widget'));
     }
 
+    public function testRootIdFallsBackToHomeRatherThanTheContentDirectoryName(): void
+    {
+        // The root's directory is the content root ("routes"), an internal name
+        // no site chose for its home page.
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19']);
+
+        $app = $this->app();
+        self::assertSame('home', $this->indexedId($app, '/'));
+        self::assertSame('home', $app->pages()->home()?->id());
+        self::assertSame('/', $app->pages()->findById('home')?->path());
+    }
+
+    public function testExplicitRootIdWinsOverTheHomeFallback(): void
+    {
+        $this->writeEntry('', ['id' => 'start', 'template' => 'home', 'created' => '2026-06-19']);
+
+        self::assertSame('start', $this->indexedId($this->app(), '/'));
+    }
+
     public function testDuplicateIdsAcrossDirectoriesAreRejected(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19']);

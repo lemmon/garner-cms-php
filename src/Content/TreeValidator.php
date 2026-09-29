@@ -102,7 +102,7 @@ final class TreeValidator
             $issues[] = new ValidationIssue($this->relative($entry), $exception->getMessage());
         }
 
-        $id = PageMeta::resolveId($meta, $dir);
+        $id = PageMeta::resolveId($meta, $dir, root: $dir === $this->contentPath);
         $relative = $this->relative($entry);
 
         if (array_key_exists($id, $seenIds)) {
@@ -121,7 +121,8 @@ final class TreeValidator
     /**
      * A directory with a +controller.php and/or +action.php but no entry file is a
      * route endpoint (the latter alone makes it a POST-only action-only endpoint):
-     * it carries no metadata, but its id (the directory name) shares the global id
+     * it carries no metadata, but its id (the directory name, or PageMeta::ROOT_ID
+     * at the root) shares the global id
      * namespace, so duplicates are reported here just as ContentIndex enforces them.
      *
      * @param list<ValidationIssue> $issues
@@ -129,7 +130,7 @@ final class TreeValidator
      */
     private function checkEndpoint(string $dir, array &$issues, array &$seenIds): void
     {
-        $id = PageMeta::resolveId([], $dir);
+        $id = PageMeta::resolveId([], $dir, root: $dir === $this->contentPath);
         $relative = $this->relative($dir);
 
         if (array_key_exists($id, $seenIds)) {

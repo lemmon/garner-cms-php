@@ -44,8 +44,11 @@ final class ContentIndex
      * upgrades self-heal instead of surfacing as a "no such column" 500 — or,
      * for a derivation-only change, silently serving rows classified under the
      * old rule until the next manual reindex. See docs/index-freshness.md.
+     *
+     * 4: the root's fallback id became PageMeta::ROOT_ID instead of the content
+     * directory's basename.
      */
-    private const SCHEMA_VERSION = 3;
+    private const SCHEMA_VERSION = 4;
 
     /**
      * Upper bound on how many levels ancestors() will walk up parent_path before
@@ -560,7 +563,7 @@ final class ContentIndex
         return [
             'path' => $path,
             'dir' => $dir,
-            'id' => PageMeta::resolveId($meta, $dir),
+            'id' => PageMeta::resolveId($meta, $dir, root: $path === '/'),
             'template' => PageMeta::template($meta),
             'title' => is_string($meta['title'] ?? null) ? $meta['title'] : null,
             'created' => is_string($meta['created'] ?? null) ? $meta['created'] : null,

@@ -42,6 +42,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verb) to take over a response will no longer be reached for it. A
   controller is a `GET` pre-processor, never a router.
 
+- **The root page's fallback id is now `home`, not `routes`.** A page with no
+  explicit `id` inherits its directory name, which for the root was the
+  content directory's own name (`routes` by default) — an internal folder
+  name nobody chose for a home page. The root now falls back to
+  `PageMeta::ROOT_ID` (`home`); every other page is unchanged, and an
+  explicit `id` still wins, the root's included. This is a breaking change
+  for a site whose root `+page.json` has no `id`: `findById('routes')` (or
+  anything else that stored that id) no longer resolves, and a `/home` page
+  that also has no explicit `id` now collides with the root in the global id
+  namespace — the index build rejects it and `validate` reports the
+  duplicate. Give either page an explicit `id` to keep the old value or
+  resolve the clash. The index schema version is bumped, so an existing
+  `runtime/index.sqlite` re-derives the root row on the next request in
+  either index mode — no manual `reindex` needed.
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

@@ -173,15 +173,28 @@ final class ContentIndex
      * — drafts, and pages nested under a draft ancestor — are excluded unless
      * $drafts is true.
      *
+     * For "/", a page with no parent page at all (parent_path NULL) counts as a
+     * child too: without a home page — a root endpoint, or no root entry — the
+     * top-level pages have no page ancestor, yet they are still the site's
+     * top-level sections. With a home page, only "/" itself has a NULL parent,
+     * so the result is unchanged.
+     *
      * @return list<array{path: string, dir: string, hidden: bool}>
      */
     public function children(string $path, bool $drafts = false): array
     {
+        $normalized = RoutePath::normalize($path);
+        $parentClause = $normalized === '/'
+            ? "(parent_path = '/' OR parent_path IS NULL AND path <> '/')"
+            : 'parent_path = :path';
+
         return $this->select(
-            'SELECT path, dir, hidden FROM pages WHERE parent_path = :path AND endpoint = 0'
+            'SELECT path, dir, hidden FROM pages WHERE '
+            . $parentClause
+            . ' AND endpoint = 0'
             . $this->hiddenClause($drafts)
             . ' ORDER BY sort, path',
-            [':path' => RoutePath::normalize($path)],
+            $normalized === '/' ? [] : [':path' => $normalized],
         );
     }
 

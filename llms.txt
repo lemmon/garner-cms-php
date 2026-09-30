@@ -110,8 +110,10 @@ Useful values in templates:
 - `content`: parsed content files for the current page.
 - `page.url`: absolute URL.
 - `page.path`: route path only.
-- `site.children`: home plus direct children, excluding hidden pages.
-- `site.index`: home plus all descendants, excluding hidden pages.
+- `site.children`: home plus the top-level pages, excluding hidden pages.
+- `site.index`: home plus every page under it, excluding hidden pages.
+- Both still list the pages when `/` has no home page (e.g. a root endpoint
+  that only redirects); home is simply absent from the list.
 - `page.children`: direct child pages, excluding hidden pages.
 - `page.parent`: nearest ancestor page, or `null` for home.
 - `page.ancestors`: ancestor pages root first, suitable for breadcrumbs.

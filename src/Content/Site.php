@@ -48,21 +48,22 @@ final class Site
     }
 
     /**
-     * Home plus its direct children (home is forced first; published only by default).
+     * Home plus the direct children of "/" (home first when it exists; published
+     * only by default — $drafts includes a draft home too). Without a home page — a root endpoint, or no root entry
+     * at all — the top-level pages are still the site's top-level sections.
      */
     public function children(bool $drafts = false): PageCollection
     {
-        $home = $this->pages?->home();
-
-        if ($home === null) {
+        if ($this->pages === null) {
             return new PageCollection();
         }
 
-        return new PageCollection([$home, ...$home->children($drafts)->all()]);
+        return $this->withHome($this->pages->children('/', $drafts), $drafts);
     }
 
     /**
-     * Home plus all descendants (published only by default).
+     * Home plus all descendants of "/" (home first when it exists; published
+     * only by default — $drafts includes a draft home too). Like children(), the descendants don't depend on home.
      */
     public function index(bool $drafts = false): PageCollection
     {
@@ -70,13 +71,7 @@ final class Site
             return new PageCollection();
         }
 
-        $home = $this->pages->home();
-
-        if ($home === null) {
-            return new PageCollection();
-        }
-
-        return new PageCollection([$home, ...$this->pages->index('/', $drafts)->all()]);
+        return $this->withHome($this->pages->index('/', $drafts), $drafts);
     }
 
     /**
@@ -90,5 +85,12 @@ final class Site
     public function get(string $key, mixed $default = null): mixed
     {
         return $this->meta[$key] ?? $default;
+    }
+
+    private function withHome(PageCollection $pages, bool $drafts): PageCollection
+    {
+        $home = $this->pages?->home($drafts);
+
+        return $home === null ? $pages : new PageCollection([$home, ...$pages->all()]);
     }
 }

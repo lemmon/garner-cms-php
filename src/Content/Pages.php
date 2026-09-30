@@ -74,13 +74,14 @@ final class Pages
     }
 
     /**
-     * The home page (route "/"), or null when none is defined. A root endpoint
-     * still routes via find('/'), but it is not a page — so it is not home, and
-     * it never anchors site.children / site.index.
+     * The home page (route "/"), or null when none is defined (or it is a draft,
+     * unless $drafts is true). A root endpoint
+     * still routes via find('/'), but it is not a page — so it is not home and
+     * never appears in site.children / site.index (the pages beneath it do).
      */
-    public function home(): ?Page
+    public function home(bool $drafts = false): ?Page
     {
-        $home = $this->find('/');
+        $home = $this->find('/', $drafts);
 
         return $home === null || $home->isEndpoint() ? null : $home;
     }

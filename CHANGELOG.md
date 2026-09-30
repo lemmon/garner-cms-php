@@ -72,6 +72,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   production deploy it also brings the web up to date with whatever content
   is on disk.
 
+- **`site.index()` and `site.children()` returned nothing without a home
+  page.** When `/` was a route endpoint (e.g. a root that only redirects) or
+  had no entry at all, both returned an empty collection even though the
+  pages beneath `/` were indexed and routable — a sitemap built on
+  `site.index()` came out empty with no error. Both now list those pages,
+  with home first only when it exists. `children()` of `/` needed an index
+  query change too: without a home page, top-level pages have no parent page
+  to point at, so `ContentIndex::children('/')` now also matches pages with
+  no parent. Results for a site with a published home page are unchanged.
+  A draft home now also leads both lists when `drafts: true` is passed (it
+  was previously left out, since `Pages::home()` never returned a draft;
+  it now takes the same `drafts` flag as `find()`). `site.home` itself
+  stays published-only. ([#3](https://github.com/lemmon/garner-cms-php/issues/3))
+
 ## [0.6.0] - 2026-08-20
 
 ### Added

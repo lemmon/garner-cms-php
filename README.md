@@ -275,9 +275,14 @@ pin to the top, positives sink below the defaults, and unset pages sort by path.
 
 Available in templates and via the `Garner\Content\Pages` repository:
 
-- `site.home` — the `/` page
-- `site.children` — home plus its direct children
-- `site.index` — home plus all descendants
+- `site.home` — the `/` page, or `null` when `/` is a route endpoint or has
+  no entry
+- `site.children` — home plus the top-level pages
+- `site.index` — home plus every page under it
+
+Without a home page, `site.children` and `site.index` still list the pages
+beneath `/` — home is just absent — so a root that only redirects keeps a
+working nav and sitemap.
 - `page.children` — direct children
 - `page.index` — all descendants
 - `page.parent` — the nearest ancestor page, or `null` for home

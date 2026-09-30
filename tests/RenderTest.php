@@ -350,6 +350,7 @@ final class RenderTest extends TestCase
             . "return static fn(\$page, \$site, \$app) => RenderedResponse::text('root-endpoint');\n",
         );
         $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'About']);
+        $this->writeEntry('about/team', ['created' => '2026-06-19', 'title' => 'Team']);
 
         $app = $this->app();
 
@@ -358,14 +359,46 @@ final class RenderTest extends TestCase
         self::assertSame(200, $response->status());
         self::assertStringContainsString('root-endpoint', $response->body());
 
-        // ...but it is not the home page and never anchors the tree.
+        // ...but it is not the home page, so it is left out of the site-level
+        // listings while the pages beneath it still appear.
         self::assertNull($app->pages()->home());
         $site = $app->siteLoader()->load($app->pages());
-        self::assertCount(0, $site->children());
-        self::assertCount(0, $site->index());
+        self::assertSame(['/about'], $this->paths($site->children()));
+        self::assertSame(['/about', '/about/team'], $this->paths($site->index()));
 
         // Sibling content pages still route normally.
         self::assertSame(200, $app->publicSite()->respond('/about')->status());
+    }
+
+    public function testSiteListingsIncludeADraftHomeOnlyWhenDraftsAreRequested(): void
+    {
+        $this->writeEntry('', ['created' => '2026-06-19', 'title' => 'Home', 'draft' => true]);
+        $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'About']);
+        $this->writeEntry('about/team', ['created' => '2026-06-19', 'title' => 'Team']);
+
+        $app = $this->app();
+        $site = $app->siteLoader()->load($app->pages());
+
+        // Published only: the draft home hides itself and, by cascade, its pages.
+        self::assertNull($site->home());
+        self::assertSame([], $this->paths($site->children()));
+        self::assertSame([], $this->paths($site->index()));
+
+        self::assertSame(['/', '/about'], $this->paths($site->children(drafts: true)));
+        self::assertSame(['/', '/about', '/about/team'], $this->paths($site->index(drafts: true)));
+    }
+
+    public function testSiteListingsWithoutAnyRootEntryStillListTopLevelPages(): void
+    {
+        // routes/ as a plain container: no page entry, no endpoint at the root.
+        $this->writeEntry('about', ['created' => '2026-06-19', 'title' => 'About']);
+        $this->writeEntry('about/team', ['created' => '2026-06-19', 'title' => 'Team']);
+
+        $app = $this->app();
+        $site = $app->siteLoader()->load($app->pages());
+
+        self::assertSame(['/about'], $this->paths($site->children()));
+        self::assertSame(['/about', '/about/team'], $this->paths($site->index()));
     }
 
     public function testEndpointIsNotResolvedByFindById(): void

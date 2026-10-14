@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-14
+
 ### Changed
 
 - **The Composer package is renamed from `lemmon/garner` to `garner/cms`.**
@@ -22,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Then update the vendor path in `public/index.php`
   (`vendor/lemmon/garner/boot/web.php` → `vendor/garner/cms/boot/web.php`)
   and in the dev-server command (`vendor/garner/cms/boot/server.php`).
+
+- **`lemmon/validator` bumped to `^0.18` and `visus/cuid2` to `^7`.** Validator
+  0.18 adds `strict()` on associative and object schemas and
+  `Validator::isInstance()`, and fixes `stdClass` coercion so a subclass's
+  private properties are no longer copied through, plus `uniqueField()` so
+  distinct resource handles are no longer reported as duplicates.
 
 ## [0.7.0] - 2026-09-30
 
@@ -632,7 +640,8 @@ Initial implementation of the agent-first, flat-file CMS.
 - **Tooling** — a single `composer check` gate running Mago (format + lint),
   PHPStan (level 7), and PHPUnit.
 
-[Unreleased]: https://github.com/lemmon/garner-cms-php/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/lemmon/garner-cms-php/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/lemmon/garner-cms-php/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/lemmon/garner-cms-php/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/lemmon/garner-cms-php/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/lemmon/garner-cms-php/compare/v0.4.1...v0.5.0

@@ -1,5 +1,5 @@
 {
-    "name": "lemmon/garner",
+    "name": "garner/cms",
     "description": "Agent-first, flat-file PHP CMS with filesystem routing and Twig rendering",
     "license": "MIT",
     "type": "library",

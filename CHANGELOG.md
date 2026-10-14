@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The Composer package is renamed from `lemmon/garner` to `garner/cms`.**
+  The PHP namespace stays `Garner\`, so no code changes. `lemmon/garner` is
+  abandoned on Packagist in favor of `garner/cms`; its existing releases
+  (up to 0.7.0) stay installable. To migrate a site:
+
+  ```sh
+  composer remove lemmon/garner
+  composer require garner/cms
+  ```
+
+  Then update the vendor path in `public/index.php`
+  (`vendor/lemmon/garner/boot/web.php` → `vendor/garner/cms/boot/web.php`)
+  and in the dev-server command (`vendor/garner/cms/boot/server.php`).
+
 ## [0.7.0] - 2026-09-30
 
 ### Added

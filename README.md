@@ -45,8 +45,13 @@ storage/   persistent app state
 ## Using Garner as a package
 
 A site can require Garner as a Composer dependency and keep only its own
-content and configuration (`routes/`, `app/`, `config/`, `public/`). The web
-entry point is a two-liner — `public/index.php`:
+content and configuration (`routes/`, `app/`, `config/`, `public/`):
+
+```sh
+composer require garner/cms
+```
+
+The web entry point is a two-liner — `public/index.php`:
 
 ```php
 <?php
@@ -55,7 +60,7 @@ declare(strict_types=1);
 
 define('GARNER_PROJECT_ROOT', dirname(__DIR__));
 
-require dirname(__DIR__) . '/vendor/lemmon/garner/boot/web.php';
+require dirname(__DIR__) . '/vendor/garner/cms/boot/web.php';
 ```
 
 `GARNER_PROJECT_ROOT` declares where the site lives — the directory holding
@@ -72,7 +77,7 @@ For local development, serve through the bundled router script — it sets
 other static files directly, and hands everything else to Garner:
 
 ```sh
-php -S localhost:8000 -t public vendor/lemmon/garner/boot/server.php
+php -S localhost:8000 -t public vendor/garner/cms/boot/server.php
 ```
 
 ## How a page works
@@ -283,6 +288,7 @@ Available in templates and via the `Garner\Content\Pages` repository:
 Without a home page, `site.children` and `site.index` still list the pages
 beneath `/` — home is just absent — so a root that only redirects keeps a
 working nav and sitemap.
+
 - `page.children` — direct children
 - `page.index` — all descendants
 - `page.parent` — the nearest ancestor page, or `null` for home

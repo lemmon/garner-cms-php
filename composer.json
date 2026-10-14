@@ -9,7 +9,7 @@
         "ext-pdo_sqlite": "*",
         "illuminate/collections": "^13",
         "league/commonmark": "^2",
-        "lemmon/validator": "^0.17",
+        "lemmon/validator": "^0.18",
         "symfony/console": "^8",
         "symfony/dotenv": "^8",
         "symfony/error-handler": "^8",
@@ -19,7 +19,7 @@
         "symfony/var-dumper": "^8",
         "symfony/yaml": "^8",
         "twig/twig": "^3",
-        "visus/cuid2": "^6"
+        "visus/cuid2": "^7"
     },
     "require-dev": {
         "carthage-software/mago": "^1",

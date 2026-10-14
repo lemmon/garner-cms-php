@@ -189,6 +189,7 @@ final class Cache
      * lock in v1), but SQLite keeps their resulting writes complete and safe.
      *
      * @param callable(): mixed $callback
+     * @phpstan-impure
      */
     public function remember(string $key, callable $callback, ?int $ttl = null): mixed
     {

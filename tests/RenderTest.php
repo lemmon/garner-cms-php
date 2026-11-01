@@ -1117,6 +1117,52 @@ final class RenderTest extends TestCase
         self::assertSame(['/shown'], $this->paths($nav));
     }
 
+    public function testTemplatesSortChildrenByStringKeyAndReadMetadataAsAttributes(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('sorted', [
+            'template' => 'list',
+            'created' => '2026-06-19',
+            'title' => 'List',
+        ]);
+        $this->writeEntry('sorted/a', ['created' => '2024-03-01', 'title' => 'A']);
+        $this->writeEntry('sorted/b', ['created' => '2023-01-01', 'title' => 'B', 'nav' => false]);
+        $this->writeEntry('sorted/c', ['created' => '2025-01-01', 'title' => 'C', 'draft' => true]);
+        // The README's own example, a freeform key read as an attribute, and
+        // accessors (`draft` -> isDraft()) resolving exactly as before.
+        $this->writeFile(
+            'app/templates/list.twig',
+            "{% for p in page.children(drafts=true).sortBy('created').reverse %}"
+            . "{{ p.title }}:{{ p.nav is same as(false) ? 'off' : 'on' }}:{{ p.draft ? 'draft' : 'live' }} "
+            . '{% endfor %}',
+        );
+
+        $response = $this->app()->publicSite()->respond('/sorted');
+
+        self::assertSame('C:on:draft A:on:live B:off:live ', $response->body());
+    }
+
+    public function testTwigStillCallsParameterizedMethodsWithTheirArguments(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        // A freeform `children` key must not stand in for children().
+        $this->writeEntry('list', [
+            'template' => 'list',
+            'created' => '2026-06-19',
+            'children' => 'from-meta',
+        ]);
+        $this->writeEntry('list/live', ['created' => '2026-06-19']);
+        $this->writeEntry('list/wip', ['created' => '2026-06-19', 'draft' => true]);
+        $this->writeFile(
+            'app/templates/list.twig',
+            "{{ attribute(page, 'children', [true])|length }}:{{ page.children|length }}",
+        );
+
+        $response = $this->app()->publicSite()->respond('/list');
+
+        self::assertSame('2:1', $response->body());
+    }
+
     public function testDraftIsExcludedFromListingsButIncludableWithFlag(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

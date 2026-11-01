@@ -118,6 +118,10 @@ Useful values in templates:
 - `page.parent`: nearest ancestor page, or `null` for home.
 - `page.ancestors`: ancestor pages root first, suitable for breadcrumbs.
 - `site.findById(id)`: resolve a stable page id.
+- `page.<key>`: an accessor (`page.title`, `page.created`, `page.draft`)
+  or, failing that, a freeform `+page.json` key (`page.nav`). A key named
+  like a page method is never read from metadata; `page.get(key)` always
+  reads the raw value.
 
 Use `|markdown` when rendering Markdown content. Prefer escaping/default Twig
 behavior for ordinary values.
@@ -136,6 +140,11 @@ Example:
   <a href="{{ child.url }}">{{ child.title ?? child.id }}</a>
 {% endfor %}
 ```
+
+Collection helpers accept string keys resolved the same way:
+`page.children.sortBy('created')`, `pluck('title')`,
+`whereStrict('nav', false)` (plain `where` compares loosely, so `false` also
+matches a missing key).
 
 Use stable page ids for cross-page references. Avoid hard-coding URLs when a
 relationship should survive a page move.

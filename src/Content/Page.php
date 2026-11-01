@@ -350,4 +350,83 @@ final class Page
     {
         return $this->meta[$key] ?? $default;
     }
+
+    /**
+     * Read a page by key: an accessor first, then freeform metadata. This is
+     * what lets the string-key helpers of PageCollection work (`sortBy('created')`,
+     * `where('template', 'post')`, `pluck('title')`, dot paths like `content.main`):
+     * Illuminate resolves keys through data_get(), which reads object
+     * properties. Twig reads `page.x` through the same property path before
+     * it looks for methods, so the lookup mirrors Twig's own order — `x()`,
+     * `getX()`, `isX()`, `hasX()` — keeping `page.title`/`page.draft` exactly
+     * what they were. A key naming a method is never read as metadata;
+     * `get()` always reads the raw metadata value.
+     */
+    public function __get(string $key): mixed
+    {
+        $method = self::method($key);
+
+        if ($method === null) {
+            return $this->meta[$key] ?? null;
+        }
+
+        return $method !== false ? $this->{$method}() : null;
+    }
+
+    /**
+     * Whether __get() resolves $key: always for an accessor (without calling
+     * it, so a test from Twig or data_get() never runs a traversal query
+     * twice), never for a method taking parameters (see method()), otherwise
+     * when the metadata key holds a non-null value.
+     */
+    public function __isset(string $key): bool
+    {
+        $method = self::method($key);
+
+        if ($method === null) {
+            return ($this->meta[$key] ?? null) !== null;
+        }
+
+        return $method !== false;
+    }
+
+    /**
+     * The public method $key names, in Twig's precedence: its name when it is
+     * a non-static method with no parameters at all (an accessor); false when
+     * it takes parameters, even optional ones (`children()`, `index()`,
+     * `file()`) or is static; null when $key names no public method. A false
+     * key reports unset, so Twig calls the method itself and arguments passed
+     * through `attribute(page, 'children', [true])` still reach it, and a
+     * same-named metadata key never stands in for the method.
+     */
+    private static function method(string $key): string|false|null
+    {
+        static $methods = [];
+
+        if (array_key_exists($key, $methods)) {
+            return $methods[$key];
+        }
+
+        if ($key === '') {
+            return $methods[$key] = null;
+        }
+
+        foreach ([$key, 'get' . $key, 'is' . $key, 'has' . $key] as $candidate) {
+            if (!method_exists(self::class, $candidate)) {
+                continue;
+            }
+
+            $method = new \ReflectionMethod(self::class, $candidate);
+
+            if (!$method->isPublic()) {
+                continue;
+            }
+
+            return $methods[$key] = !$method->isStatic() && $method->getNumberOfParameters() === 0
+                ? $method->getName()
+                : false;
+        }
+
+        return $methods[$key] = null;
+    }
 }

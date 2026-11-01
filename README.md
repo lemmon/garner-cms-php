@@ -304,6 +304,16 @@ of `Page`), so the full query API is available — `filter`, `reject`, `where`,
 {% for post in page.children.sortBy('created').reverse.take(5) %}
 ```
 
+String keys in those helpers (`sortBy('created')`, `where('template', 'post')`,
+`pluck('title')`, `groupBy(...)`, dot paths like `content.main`) read a page
+the way Twig's `page.x` does: an accessor first (`x()`, `getX()`, `isX()`,
+`hasX()`, so `created`, `title`, `draft`, `hidden` …), then freeform
+`+page.json` metadata. The same lookup lets templates read freeform metadata
+as `page.nav`. A key that names a page method (`url`, `children`, `file` …)
+is never read from metadata, so use `page.get('url')` for the raw value.
+`where('nav', false)` compares loosely, as in Laravel, so it also matches
+pages with no `nav`; use `whereStrict` to tell `false` from absent.
+
 ```twig
 {% for ancestor in page.ancestors %}{{ ancestor.title }} / {% endfor %}{{ page.title }}
 ```

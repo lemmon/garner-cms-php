@@ -32,6 +32,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filesystem routing.
   ([#6](https://github.com/lemmon/garner-cms-php/issues/6))
 
+- **Collection helpers with a string key did nothing on page collections.**
+  `sortBy('created')` kept the original order, `where('created', ...)`
+  matched nothing, and `pluck('id')` returned only `null`, the README's own
+  traversal example included. Illuminate resolves string keys by reading
+  object properties, and `Page` exposed none. `Page` now answers key reads
+  (`__get`/`__isset`) with an accessor first, in Twig's order (`x()`,
+  `getX()`, `isX()`, `hasX()`), then freeform metadata, so every string-key
+  helper works, dot paths into `content`/`meta` included. Templates
+  gain the same reads: `page.nav` now returns the `nav` metadata value
+  (previously `null`, or an error under `strict_variables`). Accessors keep
+  resolving exactly as before. A key naming a method that takes parameters
+  (`children`, `index`, `file`) is left to Twig's own method call, so
+  `attribute(page, 'children', [true])` still passes its arguments; a key
+  naming any method is never read from metadata, and `page.get(key)` still
+  reads the raw value.
+  ([#5](https://github.com/lemmon/garner-cms-php/issues/5))
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

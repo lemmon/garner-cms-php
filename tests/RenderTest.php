@@ -63,6 +63,39 @@ final class RenderTest extends TestCase
         self::assertSame(404, $response->status());
     }
 
+    public function testControllerNotFoundExceptionRendersSite404(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('boom', ['template' => 'default', 'created' => '2026-06-19']);
+        $this->writeFile(
+            'routes/boom/+controller.php',
+            "<?php\nuse Garner\\Core\\NotFoundException;\n"
+            . "return static function (\$page, \$site, \$app) { throw new NotFoundException('no such thing'); };\n",
+        );
+
+        $response = $this->app()->publicSite()->respond('/boom');
+
+        self::assertSame(404, $response->status());
+        self::assertSame('Not found: /boom', $response->body());
+    }
+
+    public function testCustomRouteNotFoundExceptionRendersSite404(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Core\\NotFoundException;\n"
+            . "return ['/custom' => static function (\$app) { throw new NotFoundException(); }];\n",
+        );
+        $app = $this->app();
+
+        $response = $app->customRoutes()->respond('/custom', $app);
+
+        self::assertNotNull($response);
+        self::assertSame(404, $response->status());
+        self::assertSame('Not found: /custom', $response->body());
+    }
+
     public function testContainerDirectoryWithoutEntryIsNotRoutable(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

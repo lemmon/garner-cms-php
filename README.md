@@ -393,6 +393,12 @@ Data for a template comes from up to two controllers, both with the same
   Must return an array (it provides data, not responses). Page controller keys
   win on conflict. The name `site` is reserved for this role.
 
+When a page routes but the thing it names doesn't exist — an unknown filter
+value in the query, a record that's gone — throw `Garner\Core\NotFoundException`
+from the controller. Garner answers with the site's `404` template and a
+`404` status, exactly as for an unrouted path. The same works from an
+`+action.php` and from a custom route handler in `app/routes.php`.
+
 ### Form actions
 
 A co-located `+action.php` handles the page's POST — the write side, kept

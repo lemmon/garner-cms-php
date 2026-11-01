@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Garner\Content;
 
 use Garner\Core\Application;
+use Garner\Core\NotFoundException;
 use Garner\Render\PageActions;
 use Garner\Render\PageControllers;
 use Garner\Render\RenderedResponse;
@@ -71,10 +72,17 @@ final class PublicSite
         $site = $this->siteLoader->load($this->pages);
 
         if ($page === null) {
-            return RenderedResponse::html($this->renderer->renderNotFound($site, $path), 404);
+            return $this->notFoundFor($site, $path);
         }
 
-        $response = $this->respondForPage($page, $site, $path);
+        // A controller or action that throws NotFoundException ("this URL
+        // routes, but the thing it names doesn't exist" — an unknown filter
+        // value, a missing record) answers exactly like an unrouted path.
+        try {
+            $response = $this->respondForPage($page, $site, $path);
+        } catch (NotFoundException) {
+            $response = $this->notFoundFor($site, $path);
+        }
 
         if (!$preview) {
             return $response;
@@ -94,6 +102,20 @@ final class PublicSite
         $response = $this->withMergedDirectives($response, 'X-Robots-Tag', 'noindex');
 
         return $this->withMergedDirectives($response, 'Cache-Control', 'private', 'no-store');
+    }
+
+    /**
+     * The site's 404 page for $path, for a producer outside filesystem
+     * routing (a custom route) that has no Site of its own to render with.
+     */
+    public function notFound(string $path): RenderedResponse
+    {
+        return $this->notFoundFor($this->siteLoader->load($this->pages), $path);
+    }
+
+    private function notFoundFor(Site $site, string $path): RenderedResponse
+    {
+        return RenderedResponse::html($this->renderer->renderNotFound($site, $path), 404);
     }
 
     /**

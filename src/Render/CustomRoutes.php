@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Garner\Render;
 
 use Garner\Core\Application;
+use Garner\Core\NotFoundException;
 use Garner\Support\PhpFile;
 use RuntimeException;
 
@@ -39,7 +40,11 @@ final class CustomRoutes
             throw new RuntimeException(sprintf('Route "%s" must be callable', $path));
         }
 
-        $response = $handler($app);
+        try {
+            $response = $handler($app);
+        } catch (NotFoundException) {
+            return $app->publicSite()->notFound($path);
+        }
 
         if (!$response instanceof RenderedResponse) {
             throw new RuntimeException(sprintf('Route "%s" must return a RenderedResponse', $path));

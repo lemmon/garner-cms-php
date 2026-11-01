@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   receives (`$app` and friends) instead.
   ([#4](https://github.com/lemmon/garner-cms-php/issues/4))
 
+- **Throwing `Garner\Core\NotFoundException` returned a 500, not a 404.**
+  The class existed but nothing caught it. Thrown from a controller
+  (`+controller.php`, `app/controllers/*.php`, `site.php`), an
+  `+action.php`, or a custom route handler, it now renders the site's 404
+  template with a 404 status, the same response as an unrouted path. The
+  new `PublicSite::notFound($path)` builds that response for code outside
+  filesystem routing.
+  ([#6](https://github.com/lemmon/garner-cms-php/issues/6))
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

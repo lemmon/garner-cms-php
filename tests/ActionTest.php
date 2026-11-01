@@ -49,6 +49,23 @@ final class ActionTest extends TestCase
         self::assertSame('/subscribe/thanks', $response->location());
     }
 
+    public function testActionNotFoundExceptionAnswers404(): void
+    {
+        $this->writeFile('routes/subscribe/+action.php', <<<'PHP'
+            <?php
+
+            use Garner\Core\NotFoundException;
+
+            return static function (): never {
+                throw new NotFoundException('no such list');
+            };
+            PHP);
+
+        $response = $this->respond($this->formPost('/subscribe', ['email' => 'a@example.test']));
+
+        self::assertSame(404, $response->status());
+    }
+
     public function testActionRedirectAnswersHtmxWithHxRedirect(): void
     {
         // htmx would follow the 303 inside its XHR and swap the target page

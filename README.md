@@ -273,8 +273,15 @@ fields and is filtered with the collection API (see [Traversal](#traversal)):
 
 ## Ordering
 
-Listings order by `sort`, then route path. `sort` defaults to `0`, so negatives
+Siblings order by `sort`, then route path. `sort` defaults to `0`, so negatives
 pin to the top, positives sink below the defaults, and unset pages sort by path.
+
+Whole-tree listings (`site.index`, `page.index`, `page:list`) are in tree
+order: depth-first, each page followed by its own descendants, with `sort`
+ordering siblings at every level. A child never comes before its parent,
+whatever their `sort` values, so the listing reads like a sitemap. Pages
+beneath a grouping directory (one with no entry file) count as children of
+the nearest page above it.
 
 ## Traversal
 
@@ -295,7 +302,7 @@ working nav and sitemap.
 - `page.ancestors` — the full ancestor chain, root first (home ... nearest
   parent) — the order a breadcrumb reads left to right
 
-Listings exclude hidden pages and are ordered by `sort` then path. Each returns a
+Listings exclude hidden pages and follow the ordering above. Each returns a
 `Garner\Content\PageCollection` (a [Laravel collection](https://laravel.com/docs/collections)
 of `Page`), so the full query API is available — `filter`, `reject`, `where`,
 `sortBy`, `first`, `take`, plus `published()` and `drafts()`:

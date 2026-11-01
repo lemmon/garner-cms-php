@@ -142,6 +142,23 @@ final class ContentIndexTest extends TestCase
     }
 
     /**
+     * Tree ordering walks parent_path from the subtree's top-level rows. A
+     * corrupted index whose parent_path forms a cycle has no such top for
+     * those rows; they must still be listed, not silently dropped.
+     */
+    public function testDescendantsKeepRowsCaughtInAParentPathCycle(): void
+    {
+        $index = $this->indexWithHandCraftedRows([
+            '/' => null,
+            '/a' => '/',
+            '/b' => '/c',
+            '/c' => '/b',
+        ]);
+
+        self::assertSame(['/a', '/b', '/c'], array_column($index->descendants('/'), 'path'));
+    }
+
+    /**
      * Same case-sensitivity requirement as descendants() (see above), for
      * the lightweight listing() projection page:list uses.
      */

@@ -199,9 +199,11 @@ final class ContentIndex
     }
 
     /**
-     * All descendant pages of a route (excluding the route itself), ordered by
-     * sort then path. Hidden pages — drafts, and pages nested under a draft
-     * ancestor — are excluded unless $drafts is true.
+     * All descendant pages of a route (excluding the route itself), in tree
+     * order: depth-first, each page followed by its own descendants, with
+     * siblings ordered by sort then path (see depthFirst()). Hidden pages —
+     * drafts, and pages nested under a draft ancestor — are excluded unless
+     * $drafts is true.
      *
      * substr() equality rather than LIKE for the prefix match, the same
      * reason as Store::prefixClause(): SQLite's LIKE is ASCII
@@ -219,19 +221,21 @@ final class ContentIndex
 
         if ($normalized === '/') {
             return $this->select(
-                'SELECT path, dir, hidden FROM pages WHERE path != :root AND endpoint = 0'
+                'SELECT path, dir, hidden, parent_path FROM pages WHERE path != :root AND endpoint = 0'
                 . $this->hiddenClause($drafts)
                 . ' ORDER BY sort, path',
                 [':root' => '/'],
+                depthFirst: true,
             );
         }
 
         return $this->select(
-            'SELECT path, dir, hidden FROM pages'
+            'SELECT path, dir, hidden, parent_path FROM pages'
             . ' WHERE substr(path, 1, length(:prefix)) = :prefix AND endpoint = 0'
             . $this->hiddenClause($drafts)
             . ' ORDER BY sort, path',
             [':prefix' => $normalized . '/'],
+            depthFirst: true,
         );
     }
 
@@ -266,7 +270,7 @@ final class ContentIndex
 
     /**
      * Lightweight descendant rows for `page:list` — same filtering,
-     * ordering, and case-sensitive substr() prefix match as descendants()
+     * tree ordering, and case-sensitive substr() prefix match as descendants()
      * (see its docblock), but selecting id/title/draft directly from the
      * index instead of {dir}, so a listing never triggers PageLoader
      * hydration (and the content-file parsing that comes with it) for pages
@@ -280,7 +284,8 @@ final class ContentIndex
 
         if ($normalized === '/') {
             return $this->selectListing(
-                'SELECT path, id, title, draft, hidden FROM pages WHERE path != :root AND endpoint = 0'
+                'SELECT path, id, title, draft, hidden, parent_path FROM pages'
+                . ' WHERE path != :root AND endpoint = 0'
                 . $this->hiddenClause($drafts)
                 . ' ORDER BY sort, path',
                 [':root' => '/'],
@@ -288,7 +293,7 @@ final class ContentIndex
         }
 
         return $this->selectListing(
-            'SELECT path, id, title, draft, hidden FROM pages'
+            'SELECT path, id, title, draft, hidden, parent_path FROM pages'
             . ' WHERE substr(path, 1, length(:prefix)) = :prefix AND endpoint = 0'
             . $this->hiddenClause($drafts)
             . ' ORDER BY sort, path',
@@ -905,7 +910,7 @@ final class ContentIndex
      * @param array<string, string> $params
      * @return list<array{path: string, dir: string, hidden: bool}>
      */
-    private function select(string $sql, array $params): array
+    private function select(string $sql, array $params, bool $depthFirst = false): array
     {
         $this->ensureFresh();
 
@@ -917,10 +922,11 @@ final class ContentIndex
 
         $statement = $pdo->prepare($sql);
         $statement->execute($params);
+        $fetched = $statement->fetchAll();
 
         $rows = [];
 
-        foreach ($statement->fetchAll() as $row) {
+        foreach ($depthFirst ? self::depthFirst($fetched) : $fetched as $row) {
             $normalized = $this->normalizeRow($row);
 
             if ($normalized !== null) {
@@ -929,6 +935,69 @@ final class ContentIndex
         }
 
         return $rows;
+    }
+
+    /**
+     * Reorder rows fetched in sibling order (`ORDER BY sort, path`) into tree
+     * order: depth-first, each page followed by its own descendants. A flat
+     * `ORDER BY sort, path` across levels interleaves them — a child with
+     * `sort: 1` would precede a parent with `sort: 2` — which no sitemap or
+     * flat navigation wants. Each row must carry `parent_path`, the nearest
+     * ancestor *page* (grouping directories skipped), so the tree here is
+     * the same one children()/parent() traverse. A row whose parent is not
+     * in the result set (the subtree's top level, or a page under a grouping
+     * directory scoped from outside it) starts a branch; branches and
+     * siblings keep the fetched order. A row only reachable through a
+     * corrupted parent_path cycle is appended at the end rather than lost.
+     *
+     * @param array<mixed> $fetched
+     * @return list<array<mixed>>
+     */
+    private static function depthFirst(array $fetched): array
+    {
+        $rows = [];
+
+        foreach ($fetched as $row) {
+            if (!is_array($row) || !is_string($row['path'] ?? null)) {
+                continue;
+            }
+
+            $rows[$row['path']] = $row;
+        }
+
+        $roots = [];
+        $childrenOf = [];
+
+        foreach ($rows as $path => $row) {
+            $parent = $row['parent_path'] ?? null;
+
+            if (!is_string($parent) || $parent === $path || !array_key_exists($parent, $rows)) {
+                $roots[] = $path;
+
+                continue;
+            }
+
+            $childrenOf[$parent][] = $path;
+        }
+
+        $ordered = [];
+        $stack = array_reverse($roots);
+
+        while ($stack !== []) {
+            $path = array_pop($stack);
+
+            if (array_key_exists($path, $ordered)) {
+                continue;
+            }
+
+            $ordered[$path] = $rows[$path];
+
+            foreach (array_reverse($childrenOf[$path] ?? []) as $child) {
+                $stack[] = $child;
+            }
+        }
+
+        return array_values($ordered + $rows);
     }
 
     /**
@@ -969,7 +1038,7 @@ final class ContentIndex
 
         $rows = [];
 
-        foreach ($statement->fetchAll() as $row) {
+        foreach (self::depthFirst($statement->fetchAll()) as $row) {
             $normalized = $this->normalizeListingRow($row);
 
             if ($normalized !== null) {

@@ -1305,6 +1305,54 @@ final class RenderTest extends TestCase
         self::assertStringContainsString('could not be completed', $appError);
     }
 
+    public function testIndexListsEachParentBeforeItsDescendants(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('x', ['created' => '2026-06-19', 'sort' => 1]);
+        $this->writeEntry('y', ['created' => '2026-06-19', 'sort' => 2]);
+        $this->writeEntry('y/child', ['created' => '2026-06-19', 'sort' => 1]);
+        $this->writeEntry('y/child/deep', ['created' => '2026-06-19']);
+        $this->writeEntry('y/a-sibling', ['created' => '2026-06-19', 'sort' => 2]);
+        $app = $this->app();
+        $site = $app->siteLoader()->load($app->pages());
+
+        // `sort` orders siblings only; it never lifts a child above its parent.
+        $tree = ['/', '/x', '/y', '/y/child', '/y/child/deep', '/y/a-sibling'];
+        self::assertSame($tree, $this->paths($site->index()));
+        self::assertSame(array_slice($tree, 3), $this->paths($app->pages()->find('/y')?->index()));
+        // page:list reads the same order through the lightweight listing rows.
+        self::assertSame(
+            array_slice($tree, 1),
+            array_column($app->contentIndex()->listingDescendants('/'), 'path'),
+        );
+    }
+
+    public function testIndexOrdersPagesUnderGroupingDirectoriesAsSiblingsOfTheirParentPage(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('b', ['created' => '2026-06-19', 'sort' => 2]);
+        // No entry at /work: its pages belong to home, ordered among home's children.
+        $this->writeEntry('work/a', ['created' => '2026-06-19', 'sort' => 1]);
+        $this->writeEntry('work/a/detail', ['created' => '2026-06-19']);
+        $this->writeEntry('work/c', ['created' => '2026-06-19', 'sort' => 3, 'draft' => true]);
+        $this->writeEntry('work/c/inner', ['created' => '2026-06-19']);
+        $app = $this->app();
+
+        self::assertSame(
+            ['/work/a', '/work/a/detail', '/b'],
+            $this->paths($app->pages()->index('/')),
+        );
+        self::assertSame(
+            ['/work/a', '/work/a/detail', '/b', '/work/c', '/work/c/inner'],
+            $this->paths($app->pages()->index('/', drafts: true)),
+        );
+        // Scoped to the grouping directory itself: its pages head their own branches.
+        self::assertSame(
+            ['/work/a', '/work/a/detail', '/work/c', '/work/c/inner'],
+            $this->paths($app->pages()->index('/work', drafts: true)),
+        );
+    }
+
     public function testIndexTreatsUnderscoreInPathLiterally(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

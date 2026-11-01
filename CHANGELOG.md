@@ -49,6 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads the raw value.
   ([#5](https://github.com/lemmon/garner-cms-php/issues/5))
 
+- **`site.index()` / `page.index()` applied `sort` across every level of the
+  tree, so a child could come before its own parent.** With `/x` at
+  `sort: 1`, `/y` at `sort: 2` and `/y/child` at `sort: 1`, the index read
+  `/x`, `/y/child`, `/y`. Whole-tree listings are now depth-first, each page
+  followed by its own descendants, with `sort` then path ordering siblings
+  at every level, which is what a sitemap or flat navigation expects.
+  `page:list` uses the same order. This changes the order a site's
+  existing index listings render in; `children()` is unchanged.
+  ([#8](https://github.com/lemmon/garner-cms-php/issues/8))
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

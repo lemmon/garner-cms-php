@@ -129,9 +129,11 @@ behavior for ordinary values.
 ## Navigation And Listings
 
 Garner listings exclude explicit drafts and descendants hidden by a draft
-ancestor, then sort by `sort` and route path. Pass `drafts: true` to traversal
-methods when a listing needs both. Filter project-specific visibility with
-freeform metadata instead of inventing global publication states.
+ancestor. Siblings sort by `sort`, then route path; `index` listings are
+depth-first, each page followed by its descendants. Pass `drafts: true` to
+traversal methods when a listing needs both. Filter project-specific
+visibility with freeform metadata instead of inventing global publication
+states.
 
 Example:
 

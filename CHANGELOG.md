@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Top-level variables in project PHP files leaked into Garner's own
+  scope.** `app/routes.php`, `+controller.php`, `+action.php`,
+  `app/controllers/*.php`, `app/twig.php`, and `config/*.php` were each
+  `require`d inside the method that went on to use its own locals, so an
+  ordinary top-level assignment silently replaced them — a routes file
+  that looped `foreach (... as $path)` made every request match the last
+  route in the loop, shadowing the whole filesystem tree with no error.
+  Each file is now loaded in an isolated scope via the new
+  `Garner\Support\PhpFile::load()`. A side effect: `$this` (Garner's
+  internal loader object) is no longer bound in those files, nor in
+  non-static closures they return; use the arguments each callable
+  receives (`$app` and friends) instead.
+  ([#4](https://github.com/lemmon/garner-cms-php/issues/4))
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

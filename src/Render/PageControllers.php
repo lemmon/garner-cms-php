@@ -8,6 +8,7 @@ use Garner\Content\EntryFile;
 use Garner\Content\Page;
 use Garner\Content\Site;
 use Garner\Core\Application;
+use Garner\Support\PhpFile;
 use RuntimeException;
 
 final class PageControllers
@@ -95,7 +96,7 @@ final class PageControllers
         Site $site,
         Application $app,
     ): array|RenderedResponse {
-        $controller = require $controllerFile;
+        $controller = PhpFile::load($controllerFile);
 
         if (!is_callable($controller)) {
             throw new RuntimeException(sprintf(

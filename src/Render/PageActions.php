@@ -7,6 +7,7 @@ namespace Garner\Render;
 use Garner\Content\Page;
 use Garner\Content\Site;
 use Garner\Core\Application;
+use Garner\Support\PhpFile;
 use RuntimeException;
 
 /**
@@ -33,7 +34,7 @@ final class PageActions
             ));
         }
 
-        $action = require $actionFile;
+        $action = PhpFile::load($actionFile);
 
         if (!is_callable($action)) {
             throw new RuntimeException(sprintf('Action "%s" must return a callable', $actionFile));

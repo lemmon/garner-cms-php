@@ -207,6 +207,45 @@ final class RenderTest extends TestCase
         self::assertStringContainsString('"ok"', $response->body());
     }
 
+    public function testControllerFileVariablesDoNotLeakIntoDispatch(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('api', [
+            'template' => 'default',
+            'created' => '2026-06-19',
+            'title' => 'Api',
+        ]);
+        // Top-level names matching the dispatcher's own locals must not
+        // replace the page and site it passes to the controller.
+        $this->writeFile(
+            'routes/api/+controller.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "\$page = 'clobbered';\n\$site = null;\n"
+            . "return static fn(\$page, \$site, \$app) => RenderedResponse::text(\$page->path());\n",
+        );
+
+        $response = $this->app()->publicSite()->respond('/api');
+
+        self::assertSame(200, $response->status());
+        self::assertSame('/api', $response->body());
+    }
+
+    public function testCustomRoutesFileVariablesDoNotChangeMatchedPath(): void
+    {
+        // A routes file that loops over `$path` at the top level must not
+        // overwrite the requested path the route lookup uses.
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "foreach (['/one', '/two', '/three'] as \$path) {}\n"
+            . "return ['/three' => static fn(\$app) => RenderedResponse::text('three')];\n",
+        );
+        $app = $this->app();
+
+        self::assertNull($app->customRoutes()->respond('/unrelated', $app));
+        self::assertSame('three', $app->customRoutes()->respond('/three', $app)?->body());
+    }
+
     public function testControllerOnlyDirectoryRoutesAsEndpoint(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

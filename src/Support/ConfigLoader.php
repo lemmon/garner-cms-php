@@ -16,7 +16,7 @@ final class ConfigLoader
 
         foreach ($files === false ? [] : $files as $file) {
             $key = pathinfo($file, PATHINFO_FILENAME);
-            $loaded = require $file;
+            $loaded = PhpFile::load($file);
 
             if (is_array($loaded)) {
                 $config[$key] = $loaded;

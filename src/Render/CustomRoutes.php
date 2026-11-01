@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Garner\Render;
 
 use Garner\Core\Application;
+use Garner\Support\PhpFile;
 use RuntimeException;
 
 final class CustomRoutes
@@ -19,7 +20,7 @@ final class CustomRoutes
             return null;
         }
 
-        $routes = require $this->routesFile;
+        $routes = PhpFile::load($this->routesFile);
 
         if (!is_array($routes)) {
             throw new RuntimeException(sprintf(

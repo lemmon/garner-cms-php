@@ -22,6 +22,7 @@ use Garner\Render\TwigRenderer;
 use Garner\Support\CallbackIdGenerator;
 use Garner\Support\IdGenerator;
 use Garner\Support\IdGeneratorType;
+use Garner\Support\PhpFile;
 use Garner\Support\SecureRandomIdGenerator;
 use RuntimeException;
 use Twig\Environment;
@@ -496,7 +497,7 @@ final class Application
             return null;
         }
 
-        $register = require $file;
+        $register = PhpFile::load($file);
 
         if (!is_callable($register)) {
             throw new RuntimeException(sprintf(

@@ -34,7 +34,7 @@ That answers `/hello`. `main.md` is exposed to the template as `content.main`.
 ## Project layout
 
 ```
-app/       templates, controllers, routes.php, favicon
+app/       templates, controllers, routes.php, favicon; site classes in app/src/
 config/    configuration (config/app.php)
 public/    web root — point the document root here (public/index.php)
 routes/    the page tree (one directory per route)
@@ -79,6 +79,34 @@ other static files directly, and hands everything else to Garner:
 ```sh
 php -S localhost:8000 -t public vendor/garner/cms/boot/server.php
 ```
+
+The command line tool is Composer's `vendor/bin/garner`. Run it from the
+site root: it treats the working directory as the project, unless the
+`GARNER_PROJECT_ROOT` environment variable names another one.
+
+```sh
+vendor/bin/garner list
+```
+
+Commands in this README use that form. In a checkout of Garner itself, the
+script is `bin/garner`.
+
+### The site's own PHP classes
+
+Garner looks for a fixed set of lowercase entries directly under `app/`:
+`templates/`, `controllers/`, `routes.php`, `twig.php` and `favicon.ico`.
+Put the site's own classes (an API client, a webhook handler, Twig helpers)
+in `app/src/` and autoload the `App\` namespace from there, in the site's
+`composer.json`:
+
+```json
+"autoload": { "psr-4": { "App\\": "app/src/" } }
+```
+
+Run `composer dump-autoload` after changing it. This keeps everything Garner
+reads apart from the site's code, so a future convention directory under
+`app/` can't collide with a class directory. A root-level `src/` stays free
+for front-end sources (`src/css/`, `src/js/`).
 
 ## How a page works
 
@@ -333,8 +361,8 @@ are returned even when they are drafts because the relationship is structural.
 The same tree is inspectable from the shell without SQL or template code:
 
 ```sh
-php bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
-php bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
+vendor/bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
+vendor/bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
 ```
 
 `page:show` accepts either a route path or a stable id; a route lookup
@@ -372,7 +400,7 @@ This follows `app.debug` by default; override with `app.index.mode` (`scan` /
 `locked`). Rebuild manually:
 
 ```sh
-php bin/garner reindex
+vendor/bin/garner reindex
 ```
 
 Compiled Twig templates are cached the same way (`runtime/cache/twig`, never
@@ -380,7 +408,7 @@ recompiled in production), so a deploy must refresh both derived caches or keep
 serving stale pages:
 
 ```sh
-php bin/garner cache:clear && php bin/garner reindex
+vendor/bin/garner cache:clear && vendor/bin/garner reindex
 ```
 
 For the freshness model in depth — the two kinds of staleness, per-environment
@@ -642,7 +670,7 @@ them, so Garner's file-legibility bias (which is about content meant for
 human editing) doesn't apply, and `serialize()` avoids known JSON round-trip
 hazards for values stored blindly (whole-number float precision, objects
 silently decoding as plain arrays). Sweep expired sessions with
-`php bin/garner session:gc`
+`vendor/bin/garner session:gc`
 (wire it into a deploy hook or cron, the same way `reindex` is). This is a
 generic primitive, not a "logged-in user" concept — a future auth feature
 would store a user id in it rather than inventing its own storage.
@@ -690,7 +718,7 @@ decoding the payload.
 
 The SQLite backing file is `runtime/cache/data.sqlite` by default
 (`cache.path` config) and is created lazily on the first `set()`. Clear it
-together with compiled Twig templates using `php bin/garner cache:clear`.
+together with compiled Twig templates using `vendor/bin/garner cache:clear`.
 
 ## Key-value store
 
@@ -747,12 +775,12 @@ never a black box: values sit as JSON in a plain TEXT column, inspectable
 with the `sqlite3` CLI or the console commands:
 
 ```sh
-php bin/garner store:list [prefix] [--json]   # list items, optionally by prefix
-php bin/garner store:get <key>                # print one value as JSON
-php bin/garner store:set <key> <json>         # upsert a value ('"text"', '42', '{"a":1}')
-php bin/garner store:add <key> <json>         # insert only if absent; fails (nonzero exit) if the key exists
-php bin/garner store:count [prefix]           # count items, optionally by prefix
-php bin/garner store:remove <key>             # delete a key
+vendor/bin/garner store:list [prefix] [--json]   # list items, optionally by prefix
+vendor/bin/garner store:get <key>                # print one value as JSON
+vendor/bin/garner store:set <key> <json>         # upsert a value ('"text"', '42', '{"a":1}')
+vendor/bin/garner store:add <key> <json>         # insert only if absent; fails (nonzero exit) if the key exists
+vendor/bin/garner store:count [prefix]           # count items, optionally by prefix
+vendor/bin/garner store:remove <key>             # delete a key
 ```
 
 ## Configuration
@@ -768,7 +796,7 @@ Key-value store above), and
 `Origin` / `Sec-Fetch-Site` — answer 403; JSON APIs and header-less
 non-browser clients are unaffected).
 
-`php bin/garner id:generate [--count=N] [--json]` prints one or more fresh ids
+`vendor/bin/garner id:generate [--count=N] [--json]` prints one or more fresh ids
 from the project's configured `ids.generator` — the same primitive `page:create`
 calls internally, useful from the shell or a script that needs an id (e.g.
 seeding a `store:set` key) without hand-rolling one in a format the project

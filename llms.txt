@@ -14,12 +14,23 @@ not contributor guidance for changing Garner's CMS engine.
 - A page may use a co-located `+controller.php` for page-specific data or a
   custom response.
 - A page may use a co-located `+action.php` to handle its form POST.
+- `app/src/` holds the site's own PHP classes (API clients, webhook handlers,
+  Twig helpers) in the `App\` namespace, autoloaded with
+  `"autoload": { "psr-4": { "App\\": "app/src/" } }` in the site's
+  `composer.json`. Put new classes there, not directly under `app/`, where
+  Garner's own lowercase entries live (`templates/`, `controllers/`,
+  `routes.php`, `twig.php`).
 - `config/app.php` contains project configuration.
 - `public/` is the web root. Do not place source content here.
 - `runtime/` contains derived indexes and caches. Treat it as disposable.
 
-Avoid editing `src/`, `boot/`, `bin/`, `tests/`, or Composer metadata unless the
-task is explicitly to change Garner itself rather than build the current site.
+Avoid editing Garner's own files (`vendor/garner/cms/`, or `src/`, `boot/`,
+`bin/`, and `tests/` in a checkout of Garner) or Composer metadata beyond the
+`App\` autoload entry, unless the task is explicitly to change Garner itself
+rather than build the current site.
+
+Run the Garner CLI from the project root as `vendor/bin/garner <command>`
+(`vendor/bin/garner list` shows every command).
 
 ## Pages And Routes
 
@@ -49,7 +60,7 @@ metadata.
 To create a new page, prefer scaffolding over hand-writing the entry file:
 
 ```sh
-php bin/garner page:create blog/hello --title="Hello" [--template=NAME] [--draft] [--dry-run] [--json]
+vendor/bin/garner page:create blog/hello --title="Hello" [--template=NAME] [--draft] [--dry-run] [--json]
 ```
 
 It creates the route directory and a valid `+page.json` with a generated
@@ -81,7 +92,7 @@ reasons — stable cross-references that survive edits and reordering. Generate
 those ids with:
 
 ```sh
-php bin/garner id:generate [--count=N] [--json]
+vendor/bin/garner id:generate [--count=N] [--json]
 ```
 
 instead of inventing one by hand. This matters more than it sounds: a
@@ -155,8 +166,8 @@ Orient in an unfamiliar tree from the shell rather than opening every entry
 file by hand:
 
 ```sh
-php bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
-php bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
+vendor/bin/garner page:list [path] [--drafts] [--json]   # route, id, title, draft/hidden state
+vendor/bin/garner page:show <route-or-id> [--route] [--id] [--json]   # one page's metadata, content, files, template
 ```
 
 `page:show` accepts either a route path or a stable id — useful when you
@@ -171,8 +182,8 @@ Toggle a page's own `draft` flag from the shell rather than hand-editing
 `+page.json`:
 
 ```sh
-php bin/garner page:draft blog/hello     # sets "draft": true
-php bin/garner page:publish blog/hello   # removes the "draft" key entirely
+vendor/bin/garner page:draft blog/hello     # sets "draft": true
+vendor/bin/garner page:publish blog/hello   # removes the "draft" key entirely
 ```
 
 Both are no-ops (report the current state, not an error) when the page is
@@ -198,10 +209,10 @@ reusable string, not a secret.
 Manage it with the CLI instead of hand-editing `+page.json`:
 
 ```sh
-php bin/garner page:preview blog/hello --generate   # random token, shown once
-php bin/garner page:preview blog/hello --set "letmein"
-php bin/garner page:preview blog/hello              # show the current state
-php bin/garner page:preview blog/hello --clear      # turn the link off
+vendor/bin/garner page:preview blog/hello --generate   # random token, shown once
+vendor/bin/garner page:preview blog/hello --set "letmein"
+vendor/bin/garner page:preview blog/hello              # show the current state
+vendor/bin/garner page:preview blog/hello --clear      # turn the link off
 ```
 
 For a quick local look instead of a link to hand someone else, `--open`
@@ -209,7 +220,7 @@ mints a one-time token stored only in the local disposable cache (never
 written to `+page.json`) and opens it in the default browser:
 
 ```sh
-php bin/garner page:preview blog/hello --open --base-url http://localhost:8040
+vendor/bin/garner page:preview blog/hello --open --base-url http://localhost:8040
 ```
 
 ## Media And Files
@@ -360,7 +371,7 @@ in `storage/sessions` by default (one file per session, serialized with PHP's
 feature builds on this rather than replacing it.
 
 Expired session files are not swept automatically per request; run
-`php bin/garner session:gc` from a deploy or cron hook in production.
+`vendor/bin/garner session:gc` from a deploy or cron hook in production.
 
 ## Application Cache
 
@@ -410,7 +421,7 @@ settings. Unlike sessions it is not per-visitor and never expires.
 Values must be JSON-encodable: scalars, lists, and maps round-trip; objects
 come back as plain arrays. Data lives in `storage/store.sqlite` (created on
 first write; canonical — back it up, unlike `runtime/`). Inspect it without
-SQL via `php bin/garner store:list [prefix] [--json]`, `store:get <key>`,
+SQL via `vendor/bin/garner store:list [prefix] [--json]`, `store:get <key>`,
 `store:set <key> <json>`, `store:add <key> <json>` (insert-if-absent — fails
 with a nonzero exit when the key already exists, so a script gets the
 uniqueness answer from the exit code alone, no separate `store:get` race),
@@ -423,8 +434,8 @@ the `sqlite3` CLI (table `store`, JSON in the `value` column).
 For site-building tasks, prefer these commands when available:
 
 ```sh
-php bin/garner validate [--json]
-php bin/garner reindex
+vendor/bin/garner validate [--json]
+vendor/bin/garner reindex
 composer test
 ```
 
@@ -445,12 +456,12 @@ The source of truth is the file tree, not generated caches.
 - Application and Twig cache files under `runtime/cache/` are rebuildable.
 - Published media under `public/media/` is derived from page-owned files.
 
-After content, template, or deployment changes, `php bin/garner reindex` may be
+After content, template, or deployment changes, `vendor/bin/garner reindex` may be
 needed. For production deploys, refresh derived caches with:
 
 ```sh
-php bin/garner cache:clear
-php bin/garner reindex
+vendor/bin/garner cache:clear
+vendor/bin/garner reindex
 ```
 
 ## Site-Building Principles

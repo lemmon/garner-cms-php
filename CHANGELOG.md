@@ -59,6 +59,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing index listings render in; `children()` is unchanged.
   ([#8](https://github.com/lemmon/garner-cms-php/issues/8))
 
+- **The README and `llms.txt` showed CLI commands as `php bin/garner`,
+  which does not exist in a site that installs Garner as a package.** Both
+  now use `vendor/bin/garner`; the README notes that a checkout of Garner
+  itself runs `bin/garner`.
+  ([#7](https://github.com/lemmon/garner-cms-php/issues/7))
+
+- **Nothing said where a site's own PHP classes belong.** The README and
+  `llms.txt` now document `app/src/`, autoloaded as `App\`, keeping the
+  site's classes apart from the lowercase entries Garner reads under `app/`.
+  ([#12](https://github.com/lemmon/garner-cms-php/issues/12))
+
 ## [0.8.0] - 2026-10-14
 
 ### Changed

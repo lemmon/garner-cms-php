@@ -8,6 +8,7 @@ use Garner\Core\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
@@ -21,24 +22,46 @@ final class CacheClearCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption(
+            'templates',
+            null,
+            InputOption::VALUE_NONE,
+            'Clear only the compiled template cache',
+        );
+        $this->addOption('app', null, InputOption::VALUE_NONE, 'Clear only the application cache');
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $cache = $this->app->cache();
-        $twigPath = $this->app->twigCachePath();
+        // No flag clears both layers. A flag narrows to its layer; both flags
+        // together are the same as none.
+        $templates = $input->getOption('templates') === true;
+        $application = $input->getOption('app') === true;
+        $all = !$templates && !$application;
 
         // Each layer: where it lives, whether there is anything there, and
         // how to clear it. Checked against the same path clear() acts on
         // (cache()->path(), not a separately recomputed default) so a
         // withCache()-overridden cache is reported and cleared consistently.
+        // A layer that isn't selected is never resolved.
         /** @var list<array{label: string, path: string, exists: bool, clear: callable(): bool}> $layers */
-        $layers = [
-            [
+        $layers = [];
+
+        if ($all || $application) {
+            $cache = $this->app->cache();
+            $layers[] = [
                 'label' => 'application cache',
                 'path' => $cache->path(),
                 'exists' => is_file($cache->path()) || is_link($cache->path()),
                 'clear' => $cache->clear(...),
-            ],
-            [
+            ];
+        }
+
+        if ($all || $templates) {
+            $twigPath = $this->app->twigCachePath();
+            $layers[] = [
                 'label' => 'template cache',
                 'path' => $twigPath,
                 'exists' => is_dir($twigPath),
@@ -47,8 +70,8 @@ final class CacheClearCommand extends Command
 
                     return true;
                 },
-            ],
-        ];
+            ];
+        }
 
         $failed = false;
 

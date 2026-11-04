@@ -404,12 +404,18 @@ vendor/bin/garner reindex
 ```
 
 Compiled Twig templates are cached the same way (`runtime/cache/twig`, never
-recompiled in production), so a deploy must refresh both derived caches or keep
-serving stale pages:
+recompiled in production), so a deploy must refresh both or keep serving stale
+pages:
 
 ```sh
-vendor/bin/garner cache:clear && vendor/bin/garner reindex
+vendor/bin/garner cache:clear --templates && vendor/bin/garner reindex
 ```
+
+`cache:clear` with no option also empties the application cache (see
+Application cache below); `--app` empties only that. A deploy needs it only
+when it changes what cached values mean, such as their shape or the class of
+a cached object. Otherwise, keeping it spares the first visitors after a
+deploy from recomputing expensive values like remote API responses.
 
 For the freshness model in depth — the two kinds of staleness, per-environment
 guidance, and the schema-version auto-heal that recovers from engine upgrades — see
@@ -680,8 +686,8 @@ would store a user id in it rather than inventing its own storage.
 `$app->cache()` stores disposable computed values — remote API responses,
 expensive transformations, or other data that can be recomputed when absent.
 It is site-wide like `store()`, but its contract is the opposite: cache data
-lives under `runtime/`, may expire, is cleared during deployment, and must
-never be treated as canonical:
+lives under `runtime/`, may expire, may be cleared at any time (a deploy
+can drop it with `cache:clear`), and must never be treated as canonical:
 
 ```php
 $weather = $app->cache()->remember(
@@ -718,7 +724,8 @@ decoding the payload.
 
 The SQLite backing file is `runtime/cache/data.sqlite` by default
 (`cache.path` config) and is created lazily on the first `set()`. Clear it
-together with compiled Twig templates using `vendor/bin/garner cache:clear`.
+together with compiled Twig templates using `vendor/bin/garner cache:clear`,
+or on its own with `vendor/bin/garner cache:clear --app`.
 
 ## Key-value store
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`cache:clear --templates` and `cache:clear --app`** clear one layer
+  instead of both. A deploy needs fresh compiled templates, but usually not
+  an empty application cache, and dropping that cache made the first views
+  after a deploy recompute every expensive value (remote API responses,
+  rendered fragments). `cache:clear` with no option, or with both, still
+  clears both. The README and `llms.txt` deploy recipe is now
+  `cache:clear --templates` followed by `reindex`.
+  ([#10](https://github.com/lemmon/garner-cms-php/issues/10))
+
 ### Fixed
 
 - **Top-level variables in project PHP files leaked into Garner's own

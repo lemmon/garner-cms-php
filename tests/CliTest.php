@@ -620,6 +620,66 @@ final class CliTest extends TestCase
         self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
     }
 
+    public function testCacheClearTemplatesKeepsApplicationValues(): void
+    {
+        $app = $this->app();
+        $app->cache()->set('computed', ['value' => 42]);
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($app), ['--templates' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Cleared template cache', $tester->getDisplay());
+        self::assertStringNotContainsString('application cache', $tester->getDisplay());
+        self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
+        self::assertSame(['value' => 42], $app->cache()->get('computed'));
+    }
+
+    public function testCacheClearTemplatesIgnoresABrokenApplicationCache(): void
+    {
+        // A deploy that only needs fresh templates must not fail on an
+        // application cache it was told to leave alone.
+        $this->writeFile('runtime/cache/data.sqlite', 'not a sqlite database');
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($this->app()), ['--templates' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
+        self::assertFileExists($this->root . '/runtime/cache/data.sqlite');
+    }
+
+    public function testCacheClearAppKeepsCompiledTemplates(): void
+    {
+        $app = $this->app();
+        $app->cache()->set('computed', ['value' => 42]);
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($app), ['--app' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertStringContainsString('Cleared application cache', $tester->getDisplay());
+        self::assertStringNotContainsString('template cache', $tester->getDisplay());
+        self::assertNull($app->cache()->get('computed'));
+        self::assertFileExists($this->root . '/runtime/cache/twig/ab/cdef.php');
+    }
+
+    public function testCacheClearWithBothFlagsClearsBoth(): void
+    {
+        $app = $this->app();
+        $app->cache()->set('computed', ['value' => 42]);
+        $this->writeFile('runtime/cache/twig/ab/cdef.php', '<?php // compiled template');
+
+        $tester = $this->runCommand(new CacheClearCommand($app), [
+            '--templates' => true,
+            '--app' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertNull($app->cache()->get('computed'));
+        self::assertDirectoryDoesNotExist($this->root . '/runtime/cache/twig');
+    }
+
     /**
      * @param array<string, mixed> $input
      */

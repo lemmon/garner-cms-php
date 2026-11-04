@@ -457,12 +457,17 @@ The source of truth is the file tree, not generated caches.
 - Published media under `public/media/` is derived from page-owned files.
 
 After content, template, or deployment changes, `vendor/bin/garner reindex` may be
-needed. For production deploys, refresh derived caches with:
+needed. For production deploys, refresh compiled templates and the index with:
 
 ```sh
-vendor/bin/garner cache:clear
+vendor/bin/garner cache:clear --templates
 vendor/bin/garner reindex
 ```
+
+`cache:clear` without an option also empties the application cache; `--app`
+empties only that. Drop it on deploy only when the deploy changes what cached
+values mean (their shape, or the class of a cached object); otherwise keep it,
+so expensive values such as remote API responses aren't recomputed.
 
 ## Site-Building Principles
 

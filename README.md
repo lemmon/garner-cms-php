@@ -432,6 +432,50 @@ exposed as a `markdown` Twig filter:
 {{ content.main|markdown }}
 ```
 
+The renderer enables CommonMark, GitHub-flavored Markdown (tables, task
+lists, strikethrough, autolinks) and attributes (`{#id .class}`). Add more
+League CommonMark extensions in `app.markdown.extensions`, after those
+defaults, in order. Each entry is an extension class name (constructed
+without arguments), an extension instance (for one that takes constructor
+arguments), or a callable that receives the CommonMark `Environment` for
+anything an extension object doesn't cover, such as a custom renderer. A
+callable runs in its place among the extensions as League sets them up, so
+what it adds is ordered like an extension's; it may add to the `Environment`
+but not read from it, and may return an extension to add. Entries naming a
+default are skipped, so a setup copied from League's documentation works as
+is. An extension's own settings sit next to it in `app.markdown`, under the
+key the extension documents. In `config/app.php`:
+
+```php
+use App\Markdown\HighlightedCode; // the site's own renderer, in app/src/
+use League\CommonMark\Environment\Environment;
+use League\CommonMark\Extension\CommonMark\Node\Block\FencedCode;
+use League\CommonMark\Extension\Footnote\FootnoteExtension;
+use League\CommonMark\Extension\HeadingPermalink\HeadingPermalinkExtension;
+
+'markdown' => [
+    'html_input' => 'strip',
+    'extensions' => [
+        FootnoteExtension::class,
+        new HeadingPermalinkExtension(),
+        static function (Environment $environment): void {
+            $environment->addRenderer(FencedCode::class, new HighlightedCode(), 10);
+        },
+    ],
+    'footnote' => ['backref_symbol' => '↑'],
+],
+```
+
+An entry that is none of the three, or a class name that needs constructor
+arguments, fails at boot with an error naming its position. Extensions are
+built on the first `markdown` render of a request, so pages without Markdown
+never construct them. Every key in `app.markdown` is checked then, so an
+invalid or misspelled setting fails on that first render (naming
+`app.markdown`) rather than being ignored, as does the same extension listed
+twice or two extensions claiming the same syntax. Markdown renders on each
+request, not into the compiled template cache, so changing extensions needs
+no `cache:clear`.
+
 ### Controllers
 
 Data for a template comes from up to two controllers, both with the same

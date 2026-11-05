@@ -33,6 +33,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Custom routes section.
   ([#9](https://github.com/lemmon/garner-cms-php/issues/9))
 
+- **`app.markdown.extensions` adds League CommonMark extensions to the
+  `markdown` filter.** The renderer's extension set was fixed (CommonMark,
+  GitHub-flavored, attributes), so footnotes or a custom code renderer meant
+  building a second converter in the site and a filter of its own. Each
+  entry is an extension class name, an extension instance, or a callable
+  receiving the `Environment` (which may also return an extension),
+  registered after Garner's defaults in order; entries naming a default are
+  skipped. An extension's own settings (e.g. `footnote`) go alongside in
+  `app.markdown`. An invalid entry fails at boot with an error naming its
+  position; the extensions themselves are built on the first render, which
+  also checks every `app.markdown` key, so a misspelled or invalid setting
+  (previously ignored until read, or never) is reported against
+  `app.markdown`.
+  ([#11](https://github.com/lemmon/garner-cms-php/issues/11))
+
 ### Fixed
 
 - **Top-level variables in project PHP files leaked into Garner's own

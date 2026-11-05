@@ -65,6 +65,14 @@ return [
     'markdown' => [
         'allow_unsafe_links' => false,
         'html_input' => 'strip',
+        // League CommonMark extensions added after Garner's defaults (core,
+        // GitHub-flavored, attributes): a class name, an instance, or a
+        // callable receiving the Environment (it may return an extension to
+        // add). Entries naming a default are skipped. An extension's own
+        // settings go alongside, under the key it documents, e.g.
+        //   'extensions' => [League\CommonMark\Extension\Footnote\FootnoteExtension::class],
+        //   'footnote' => ['backref_symbol' => '↑'],
+        'extensions' => [],
     ],
     'ids' => [
         // Generator for scaffolded ids. Use an IdGeneratorType case for a built-in,

@@ -137,6 +137,15 @@ Useful values in templates:
 Use `|markdown` when rendering Markdown content. Prefer escaping/default Twig
 behavior for ordinary values.
 
+The `markdown` filter supports CommonMark, GitHub-flavored Markdown, and
+attributes (`{#id .class}`). For more (footnotes, heading permalinks, custom
+renderers), add League CommonMark extensions to `app.markdown.extensions` in
+`config/app.php` (a class name, an instance, or a callable receiving the
+`Environment`; Garner's defaults are already registered and skipped if listed)
+instead of building a second converter or a custom filter. An
+extension's settings go in `app.markdown` under the key it documents, e.g.
+`'footnote' => [...]`.
+
 ## Navigation And Listings
 
 Garner listings exclude explicit drafts and descendants hidden by a draft

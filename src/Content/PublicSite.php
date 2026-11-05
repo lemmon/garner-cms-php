@@ -106,11 +106,12 @@ final class PublicSite
 
     /**
      * The site's 404 page for $path, for a producer outside filesystem
-     * routing (a custom route) that has no Site of its own to render with.
+     * routing (a custom route). Pass the Site when it is already loaded;
+     * otherwise it is loaded here.
      */
-    public function notFound(string $path): RenderedResponse
+    public function notFound(string $path, ?Site $site = null): RenderedResponse
     {
-        return $this->notFoundFor($this->siteLoader->load($this->pages), $path);
+        return $this->notFoundFor($site ?? $this->siteLoader->load($this->pages), $path);
     }
 
     private function notFoundFor(Site $site, string $path): RenderedResponse

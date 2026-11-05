@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `cache:clear --templates` followed by `reindex`.
   ([#10](https://github.com/lemmon/garner-cms-php/issues/10))
 
+- **Custom routes in `app/routes.php` redirect trailing-slash requests and
+  can receive the `Site`.** A request for `/custom/` now answers with a
+  `308` to a registered `/custom` (query string and base path kept), as
+  filesystem pages already did, instead of a `404` that forced every route
+  to be registered twice. Handlers are called as `($app, $site)` when they
+  declare a second parameter, receiving the same `Site` object controllers
+  and templates get; the Site is loaded only for those, and one-argument
+  handlers are called exactly as before. An existing handler with an
+  optional second parameter of its own now receives the Site in it, and a
+  second parameter typed as anything that can't hold a `Site` fails with an
+  error naming the `($app)` / `($app, $site)` contract. A path registered
+  with its own trailing slash is still matched exactly. The README gains a
+  Custom routes section.
+  ([#9](https://github.com/lemmon/garner-cms-php/issues/9))
+
 ### Fixed
 
 - **Top-level variables in project PHP files leaked into Garner's own

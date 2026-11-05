@@ -27,7 +27,12 @@ final class Router
             $this->renderFavicon();
         }
 
-        $customResponse = $this->app->customRoutes()->respond($path, $this->app);
+        $customResponse = $this->app->customRoutes()->respond(
+            $path,
+            $this->app,
+            $request->queryString(),
+            $request->basePath(),
+        );
         if ($customResponse !== null) {
             $this->emit($customResponse);
         }

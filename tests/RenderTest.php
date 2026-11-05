@@ -11,6 +11,7 @@ use Garner\Content\PublicSite;
 use Garner\Core\Application;
 use Garner\Core\Request;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class RenderTest extends TestCase
 {
@@ -86,6 +87,183 @@ final class RenderTest extends TestCase
             'app/routes.php',
             "<?php\nuse Garner\\Core\\NotFoundException;\n"
             . "return ['/custom' => static function (\$app) { throw new NotFoundException(); }];\n",
+        );
+        $app = $this->app();
+
+        $response = $app->customRoutes()->respond('/custom', $app);
+
+        self::assertNotNull($response);
+        self::assertSame(404, $response->status());
+        self::assertSame('Not found: /custom', $response->body());
+    }
+
+    public function testCustomRouteTrailingSlashRedirectsToRegisteredPath(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(\$app) => RenderedResponse::text('custom')];\n",
+        );
+        $app = $this->app();
+
+        $response = $app->customRoutes()->respond('/custom/', $app, 'a=1&b=2', '/blog');
+
+        self::assertNotNull($response);
+        self::assertSame(308, $response->status());
+        self::assertSame('/blog/custom?a=1&b=2', $response->header('Location'));
+
+        $plain = $app->customRoutes()->respond('//custom', $app);
+
+        self::assertNotNull($plain);
+        self::assertSame(308, $plain->status());
+        self::assertSame('/custom', $plain->header('Location'));
+    }
+
+    public function testCustomRouteRegisteredWithTrailingSlashStillMatchesExactly(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return [\n"
+            . "    '/custom' => static fn(\$app) => RenderedResponse::text('bare'),\n"
+            . "    '/custom/' => static fn(\$app) => RenderedResponse::text('slashed'),\n"
+            . "];\n",
+        );
+        $app = $this->app();
+
+        self::assertSame('slashed', $app->customRoutes()->respond('/custom/', $app)?->body());
+        self::assertSame('bare', $app->customRoutes()->respond('/custom', $app)?->body());
+    }
+
+    public function testCustomRouteTrailingSlashWithoutARegisteredRouteFallsThrough(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(\$app) => RenderedResponse::text('custom')];\n",
+        );
+        $app = $this->app();
+
+        // Not a custom route: left to filesystem routing, which owns its own
+        // canonical redirect.
+        self::assertNull($app->customRoutes()->respond('/other/', $app));
+    }
+
+    public function testNullCustomRouteIsAbsentForTheRedirectToo(): void
+    {
+        $this->writeFile('app/routes.php', "<?php\nreturn ['/x' => null];\n");
+        $app = $this->app();
+
+        self::assertNull($app->customRoutes()->respond('/x', $app));
+        self::assertNull($app->customRoutes()->respond('/x/', $app));
+    }
+
+    public function testCustomRouteHandlerReceivesTheSite(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(\$app, \$site) => RenderedResponse::text(\n"
+            . "    \$site->title() . ' / ' . \$site->home()?->title(),\n"
+            . ")];\n",
+        );
+        $app = $this->app();
+
+        self::assertSame(
+            'Test Site / Home',
+            $app->customRoutes()->respond('/custom', $app)?->body(),
+        );
+    }
+
+    public function testOneArgumentCustomRouteHandlerDoesNotLoadTheSite(): void
+    {
+        // Unparseable site metadata: loading the Site would throw, so a
+        // successful response shows a handler that only takes $app never
+        // triggers the load.
+        $this->writeFile('routes/+site.json', '{');
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/hook' => static fn(\$app) => RenderedResponse::json(['ok' => true])];\n",
+        );
+        $app = $this->app();
+
+        $response = $app->customRoutes()->respond('/hook', $app);
+
+        self::assertNotNull($response);
+        self::assertSame(200, $response->status());
+    }
+
+    public function testInvokableCustomRouteHandlerReceivesTheSite(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => new class {\n"
+            . "    public function __invoke(\$app, \$site): RenderedResponse\n"
+            . "    {\n"
+            . "        return RenderedResponse::text(\$site->title());\n"
+            . "    }\n"
+            . "}];\n",
+        );
+        $app = $this->app();
+
+        self::assertSame('Test Site', $app->customRoutes()->respond('/custom', $app)?->body());
+    }
+
+    public function testVariadicCustomRouteHandlerReceivesTheSite(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(...\$args) => RenderedResponse::text(\n"
+            . "    \$args[1]->title(),\n"
+            . ")];\n",
+        );
+        $app = $this->app();
+
+        self::assertSame('Test Site', $app->customRoutes()->respond('/custom', $app)?->body());
+    }
+
+    public function testTypedSiteParameterReceivesTheSite(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Content\\Site;\nuse Garner\\Core\\Application;\n"
+            . "use Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(Application \$app, ?Site \$site) => "
+            . "RenderedResponse::text(\$site?->title() ?? '')];\n",
+        );
+        $app = $this->app();
+
+        self::assertSame('Test Site', $app->customRoutes()->respond('/custom', $app)?->body());
+    }
+
+    public function testSecondParameterThatCannotTakeTheSiteNamesTheContract(): void
+    {
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Core\\Application;\nuse Garner\\Core\\Request;\n"
+            . "use Garner\\Render\\RenderedResponse;\n"
+            . "return ['/custom' => static fn(Application \$app, Request \$request) => "
+            . "RenderedResponse::text('never')];\n",
+        );
+        $app = $this->app();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('handlers are called as ($app) or ($app, $site)');
+
+        $app->customRoutes()->respond('/custom', $app);
+    }
+
+    public function testTwoArgumentCustomRouteNotFoundExceptionRendersSite404(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeFile(
+            'app/routes.php',
+            "<?php\nuse Garner\\Core\\NotFoundException;\n"
+            . "return ['/custom' => static function (\$app, \$site) { throw new NotFoundException(); }];\n",
         );
         $app = $this->app();
 

@@ -609,6 +609,38 @@ exactly how a page-tree route splits GET (controller/template) from POST
 router for arbitrary verbs, whether it's co-located with a page or standing
 alone as an endpoint.
 
+### Custom routes
+
+`app/routes.php` registers URLs outside the page tree. It returns an array of
+exact paths to handlers; each handler returns a `RenderedResponse`:
+
+```php
+<?php
+
+use Garner\Render\RenderedResponse;
+
+return [
+    '/feed.json' => static fn($app, $site) => RenderedResponse::json([
+        'title' => $site->title(),
+        'items' => $site->index()->pluck('url')->all(),
+    ]),
+    '/webhooks/deploy' => static fn($app) => RenderedResponse::text("ok\n"),
+];
+```
+
+A handler receives `$app` and, if it declares a second parameter, the
+`Site` (the same object templates see as `site`). Leave that parameter
+untyped or type it `Site`; any type that can't hold a Site is reported as an
+error. The Site is loaded only for handlers that ask for it, so a webhook or
+JSON route that takes only `$app` skips that work. Custom routes are matched before the page tree,
+for every HTTP method (see Form actions above).
+
+Paths canonicalize the way pages do: a request for `/feed.json/` redirects
+with a `308` to the registered `/feed.json`, keeping the query string. A
+path registered with its own trailing slash is still matched exactly.
+Throwing `Garner\Core\NotFoundException` from a handler renders the site's
+`404`.
+
 ### Twig extensions
 
 `app/twig.php` extends the Twig environment: it returns a callable

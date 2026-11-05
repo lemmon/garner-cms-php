@@ -265,6 +265,13 @@ To answer a routable URL with the site's 404 (an unknown query filter, a
 missing record), throw `Garner\Core\NotFoundException` from the controller,
 action, or custom route handler. Do not return an empty page with status 200.
 
+For a URL outside the page tree (a feed, a webhook), register a handler in
+`app/routes.php`, which returns an array of exact path => callable. Handlers
+are called as `($app)` or `($app, $site)` (the Site is loaded only when the
+handler declares it; leave `$site` untyped or type it `Site`) and must return
+a `RenderedResponse`. Register the
+canonical path without a trailing slash; `/path/` redirects to it.
+
 Read the current request through `$app->request()` instead of PHP
 superglobals: `method()`, `form()`, `json()`, `body()`, `queryParams()`,
 `queryParam(name)`, `cookie(name)`, `header(name)`, `file(name)`, and

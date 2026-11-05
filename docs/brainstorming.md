@@ -879,3 +879,72 @@ twice instead of once — no cross-user exposure, no privilege gained. Revisit
 only if `Cache` grows an atomic primitive for an unrelated reason.
 
 Not planned; recorded so the gap is a decision, not an accident.
+
+## 2026-11-05 — Trailing slashes stay a single hard-coded form
+
+Question raised while closing the custom-routes gap (issue #9): should a site be
+able to choose URLs with a trailing slash (`/about/`) instead of Garner's form
+without one (`/about`)? No current site needs it, so the answer for now is no.
+This entry records why, and what an option would look like if one ever does.
+
+### Where Garner stands
+
+Every route is canonical without a trailing slash, the root `/` excepted
+(`RoutePath::normalize()`). A request that differs from a routable path only by
+slashes gets a `308` to the canonical form, with the query string and base path
+kept; filesystem pages and, since #9, custom routes behave the same. The
+redirect fires only when the canonical path really routes, so a slash variant
+of a draft or a missing page is a plain `404`, never a hint. `308` rather than
+`301` keeps a `POST /contact/` body intact through the redirect. The rule
+lives in PHP, so it is the same under Apache, nginx, Caddy, and `php -S`, with
+no server rewrite rules to copy.
+
+### How other tools approach it
+
+A survey from memory, to inform the choice rather than as a reference; check
+current documentation before quoting any detail.
+
+- **Serve both, normalize at the web server.** Laravel's router ignores a
+  trailing slash and its stock `public/.htaccess` redirects the slashed form
+  for non-directories. Rails ignores it too, with an opt-in `trailing_slash`
+  for generated URLs. Drupal core paths are slash-less, with redirect
+  normalization offered by the contributed Redirect module. Craft's
+  `addTrailingSlashesToUrls` shapes the URLs it generates. These keep the
+  router simple and leave canonicalization to deployment.
+- **One canonical form, the other redirects.** WordPress takes the form from
+  the permalink structure (the defaults end in `/`) and `redirect_canonical()`
+  enforces it. Django chooses per URL pattern, and `APPEND_SLASH` redirects
+  `/about` to `/about/` only when the slashed pattern exists. Symfony treats
+  the route definition as canonical and redirects the other spelling for
+  `GET`/`HEAD`.
+- **A site-wide setting with built-in redirects.** Next.js
+  (`trailingSlash: true/false`, `308`), SvelteKit (`'never' | 'always' |
+  'ignore'`, settable per route or layout), Astro and Gatsby (the same three
+  values). The per-route control in SvelteKit, and the slashed default in
+  static generators such as Hugo, follow from static output: a page written as
+  `about/index.html` is a directory, and servers add the slash to directories.
+
+Garner already matches the second group and the `'never'` default of the
+third: one form, a method-preserving redirect, and (like `APPEND_SLASH`) a
+redirect only when its target exists.
+
+### If an option is ever needed
+
+The likely trigger is migrating a site whose existing URLs end in a slash
+(WordPress's default permalinks, a static-site export) without breaking inbound
+links. The shape that fits Garner:
+
+- A site-wide `app.routing.trailing_slash` with `'never'` (default) and
+  `'always'`, named as in Next.js and SvelteKit. No `'ignore'`: serving both
+  forms is the duplicate-URL behavior the redirect exists to prevent.
+- It changes the public form only. Route identity stays slash-less: index keys,
+  `parent_path`, `findById()`, CLI arguments, and `app/routes.php` keys. What
+  changes is `page.path`/`page.url` output and the direction of the `308` in
+  `PublicSite` and `CustomRoutes`.
+- Paths ending in a file name (`/feed.json`, `/sitemap.xml`) never take a
+  slash, in both the redirect and the generated URLs.
+- Relative links in content resolve differently under `/about/` (`img.jpg`
+  becomes `/about/img.jpg`, not `/img.jpg`); the option's documentation has to
+  say so.
+
+Not planned; recorded so the single form is a decision, not an accident.

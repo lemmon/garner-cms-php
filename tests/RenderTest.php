@@ -732,6 +732,69 @@ final class RenderTest extends TestCase
         self::assertStringContainsString('Test Site', $body);
     }
 
+    public function testExcerptFiltersRenderListingCardsAndDescriptions(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeEntry('posts', [
+            'template' => 'list',
+            'created' => '2026-06-19',
+            'title' => 'Posts',
+        ]);
+        $this->writeEntry('posts/one', [
+            'template' => 'default',
+            'created' => '2026-06-19',
+            'title' => 'One',
+            'summary' => 'Kids <12 eat free & more',
+        ]);
+        $this->writeFile(
+            'routes/posts/one/main.md',
+            "# One\n\nWe **ship** fast & [well][x].\n\nSecond paragraph.\n\n[x]: /x",
+        );
+        $this->writeFile(
+            'app/templates/list.twig',
+            "{% for child in page.children %}\n"
+            . "{{ child.content.main|first_paragraph }}\n"
+            . '<meta content="{{ child.content.main|first_paragraph|excerpt(20) }}">'
+            . "\n<meta content=\"{{ child.summary|excerpt(160) }}\">"
+            . "\n{% endfor %}"
+            . "\n<i>{{ '<b>Raw</b> &amp; safe'|raw|excerpt }}</i>"
+            . "\n{% set note %}<p>Set</p>\n<p>block</p>{% endset %}<i>{{ note|excerpt }}</i>",
+        );
+
+        $body = $this->app()->publicSite()->respond('/posts')->body();
+
+        self::assertStringContainsString(
+            '<p>We <strong>ship</strong> fast &amp; <a href="/x">well</a>.</p>',
+            $body,
+        );
+        self::assertStringNotContainsString('Second paragraph', $body);
+        // Plain text, escaped once: no Markdown syntax, no double-encoding.
+        self::assertStringContainsString('<meta content="We ship fast &amp; well.">', $body);
+        // A plain string is not read as HTML: `<12` survives.
+        self::assertStringContainsString('<meta content="Kids &lt;12 eat free &amp; more">', $body);
+        // HTML Twig knows to be safe is read as HTML, however it got there.
+        self::assertStringContainsString('<i>Raw &amp; safe</i>', $body);
+        self::assertStringContainsString('<i>Set block</i>', $body);
+    }
+
+    public function testSiteFilterReplacesABuiltInOfTheSameName(): void
+    {
+        $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);
+        $this->writeFile('app/templates/home.twig', '{{ page.title|excerpt }}');
+        $this->writeFile(
+            'app/twig.php',
+            "<?php\nuse Twig\\TwigFilter;\n"
+            . "return static function (\$twig): void {\n"
+            . "    \$twig->addFilter(new TwigFilter('excerpt', static fn(\$value) => 'site: ' . \$value));\n"
+            . "};\n",
+        );
+
+        self::assertStringContainsString(
+            'site: Home',
+            $this->app()->publicSite()->respond('/')->body(),
+        );
+    }
+
     public function testTwigExtensionsHookMustReturnACallable(): void
     {
         $this->writeEntry('', ['template' => 'home', 'created' => '2026-06-19', 'title' => 'Home']);

@@ -9,6 +9,8 @@ use Garner\Render\MarkdownRenderer;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Environment\EnvironmentBuilderInterface;
 use League\CommonMark\Event\DocumentParsedEvent;
+use League\CommonMark\Event\DocumentPreRenderEvent;
+use League\CommonMark\Event\DocumentRenderedEvent;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use League\CommonMark\Extension\ConfigurableExtensionInterface;
@@ -20,6 +22,7 @@ use League\CommonMark\Extension\SmartPunct\SmartPunctExtension;
 use League\CommonMark\Extension\Strikethrough\StrikethroughExtension;
 use League\CommonMark\Node\Inline\Text;
 use League\CommonMark\Node\Node;
+use League\CommonMark\Output\RenderedContent;
 use League\CommonMark\Renderer\ChildNodeRendererInterface;
 use League\CommonMark\Renderer\NodeRendererInterface;
 use LogicException;
@@ -40,6 +43,106 @@ final class MarkdownRendererTest extends TestCase
         $html = new MarkdownRenderer()->render(self::FOOTNOTE);
 
         self::assertStringNotContainsString('class="footnotes"', $html);
+    }
+
+    /**
+     * @return iterable<string, array{?string, string}>
+     */
+    public static function firstParagraphs(): iterable
+    {
+        yield 'plain paragraphs' => [
+            "First **one**\nwrapped.\n\nSecond.",
+            "<p>First <strong>one</strong>\nwrapped.</p>",
+        ];
+        yield 'heading passed over' => ["# Title\n\nBody.", '<p>Body.</p>'];
+        yield 'image-only paragraph passed over' => ["![Hero](/h.jpg)\n\nText.", '<p>Text.</p>'];
+        yield 'zero-width space only passed over' => ["&#8203;\n\nText.", '<p>Text.</p>'];
+        yield 'non-breaking space only passed over' => ["&nbsp;\n\nText.", '<p>Text.</p>'];
+        yield 'image and non-breaking space passed over' => [
+            "![Hero](/h.jpg)&nbsp;\n\nText.",
+            '<p>Text.</p>',
+        ];
+        yield 'reference link resolved from later in the document' => [
+            "See [docs][1].\n\n[1]: /docs",
+            '<p>See <a href="/docs">docs</a>.</p>',
+        ];
+        yield 'code fence with a blank line passed over' => [
+            "```\na\n\nb\n```\n\nAfter.",
+            '<p>After.</p>',
+        ];
+        yield 'quote and list paragraphs passed over' => [
+            "> quoted\n\n- item\n\nReal.",
+            '<p>Real.</p>',
+        ];
+        yield 'no paragraph' => ['# Only a heading', ''];
+        yield 'empty' => [null, ''];
+    }
+
+    #[DataProvider('firstParagraphs')]
+    public function testFirstParagraph(?string $markdown, string $expected): void
+    {
+        self::assertSame($expected, new MarkdownRenderer()->firstParagraph($markdown));
+    }
+
+    public function testFirstParagraphKeepsTheDocumentDataRenderListenersRead(): void
+    {
+        $markdown = new MarkdownRenderer([
+            'extensions' => [
+                static function (EnvironmentBuilderInterface $environment): void {
+                    $environment->addEventListener(DocumentParsedEvent::class, static function (DocumentParsedEvent $event): void {
+                        $event->getDocument()->data->set('lang', 'cs');
+                    });
+                    $environment->addEventListener(DocumentRenderedEvent::class, static function (DocumentRenderedEvent $event): void {
+                        $output = $event->getOutput();
+                        $lang = $output->getDocument()->data->get('lang');
+                        $event->replaceOutput(
+                            new RenderedContent($output->getDocument(), str_replace(
+                                '<p>',
+                                '<p lang="' . $lang . '">',
+                                $output->getContent(),
+                            )),
+                        );
+                    });
+                },
+            ],
+        ]);
+
+        self::assertSame('<p lang="cs">Ahoj.</p>', $markdown->firstParagraph("# Title\n\nAhoj."));
+    }
+
+    public function testFirstParagraphRunsRenderEventsLikeMarkdown(): void
+    {
+        $markdown = new MarkdownRenderer([
+            'extensions' => [
+                static function (EnvironmentBuilderInterface $environment): void {
+                    $environment->addEventListener(DocumentPreRenderEvent::class, static function (DocumentPreRenderEvent $event): void {
+                        foreach ($event->getDocument()->iterator() as $node) {
+                            if (!$node instanceof Text) {
+                                continue;
+                            }
+
+                            $node->setLiteral(strtoupper($node->getLiteral()));
+                        }
+                    });
+                    $environment->addEventListener(DocumentRenderedEvent::class, static function (DocumentRenderedEvent $event): void {
+                        $output = $event->getOutput();
+                        $event->replaceOutput(
+                            new RenderedContent($output->getDocument(), str_replace(
+                                '<p>',
+                                '<p class="lead">',
+                                $output->getContent(),
+                            )),
+                        );
+                    });
+                },
+            ],
+        ]);
+
+        self::assertSame("<p class=\"lead\">SHOUT.</p>\n", $markdown->render('Shout.'));
+        self::assertSame(
+            '<p class="lead">SHOUT.</p>',
+            $markdown->firstParagraph("# Title\n\nShout."),
+        );
     }
 
     public function testExtensionByClassName(): void

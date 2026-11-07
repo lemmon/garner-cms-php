@@ -48,6 +48,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `app.markdown`.
   ([#11](https://github.com/lemmon/garner-cms-php/issues/11))
 
+- **`first_paragraph` and `excerpt` Twig filters** for listing cards, search
+  results and meta descriptions, which every site was writing for itself.
+  `first_paragraph` renders a document's first top-level paragraph with
+  text (headings, code blocks and image-only paragraphs are skipped;
+  reference links still resolve); `excerpt(length = 160, ellipsis = '…')`
+  returns plain text cut after a whole word, reading its input as HTML only
+  when Twig knows it is safe, as `markdown`, `first_paragraph` and `raw`
+  output is.
+  `{{ content.main|first_paragraph|excerpt(160) }}` makes a meta
+  description. There is no first-sentence filter, since sentence splitting
+  breaks on abbreviations and decimals. Garner's filters now come from a
+  Twig extension, so a site's own filter with the same name, registered in
+  `app/twig.php`, still takes precedence.
+  ([#2](https://github.com/lemmon/garner-cms-php/issues/2))
+
 ### Fixed
 
 - **Top-level variables in project PHP files leaked into Garner's own

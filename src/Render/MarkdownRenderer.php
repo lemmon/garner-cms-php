@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Garner\Render;
 
 use Closure;
+use Garner\Support\Text;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Environment\EnvironmentBuilderInterface;
 use League\CommonMark\Extension\Attributes\AttributesExtension;
@@ -17,11 +18,14 @@ use League\CommonMark\Extension\Strikethrough\StrikethroughExtension;
 use League\CommonMark\Extension\Table\TableExtension;
 use League\CommonMark\Extension\TaskList\TaskListExtension;
 use League\CommonMark\MarkdownConverter;
+use League\CommonMark\Node\Block\Document;
+use League\CommonMark\Node\Block\Paragraph;
+use League\CommonMark\Parser\MarkdownParser;
+use League\CommonMark\Renderer\HtmlRenderer;
 use League\CommonMark\Util\HtmlFilter;
 use League\Config\Exception\ConfigurationExceptionInterface;
 use ReflectionClass;
 use RuntimeException;
-use Stringable;
 use Throwable;
 
 final class MarkdownRenderer
@@ -59,6 +63,11 @@ final class MarkdownRenderer
 
     private ?MarkdownConverter $converter = null;
 
+    /** For firstParagraph(), which parses and renders in separate steps. */
+    private ?MarkdownParser $parser = null;
+
+    private ?HtmlRenderer $htmlRenderer = null;
+
     private ?RuntimeException $failure = null;
 
     /**
@@ -94,13 +103,76 @@ final class MarkdownRenderer
 
     public function render(mixed $value): string
     {
-        $markdown = $this->normalize($value);
+        $markdown = Text::from($value);
 
         if ($markdown === '') {
             return '';
         }
 
         return (string) $this->converter()->convert($markdown);
+    }
+
+    /**
+     * HTML of the document's first top-level paragraph that has text,
+     * parsed with the whole document (so reference links and footnote
+     * markers resolve) and rendered as that document with only the
+     * paragraph left in it, with the same render events as `markdown`. Headings, code blocks, lists,
+     * quotes and image-only paragraphs before it are passed over; '' when
+     * there is none.
+     */
+    public function firstParagraph(mixed $value): string
+    {
+        $markdown = Text::from($value);
+
+        if ($markdown === '') {
+            return '';
+        }
+
+        $environment = $this->converter()->getEnvironment();
+        $this->parser ??= new MarkdownParser($environment);
+        $this->htmlRenderer ??= new HtmlRenderer($environment);
+
+        $document = $this->parser->parse($markdown);
+        $paragraph = self::firstParagraphWithText($document, $this->htmlRenderer);
+
+        if ($paragraph === null) {
+            return '';
+        }
+
+        // The parsed document itself is rendered, its other blocks taken
+        // out, so render-time listeners (DocumentPreRenderEvent,
+        // DocumentRenderedEvent) run once and see the same document data
+        // and references as they do for `markdown`.
+        foreach ($document->children() as $node) {
+            if ($node === $paragraph) {
+                continue;
+            }
+
+            $node->detach();
+        }
+
+        return rtrim($this->htmlRenderer->renderDocument($document)->getContent(), "\n");
+    }
+
+    /**
+     * Paragraphs are rendered here only to see whether they show any text,
+     * outside the render events: a custom renderer that depends on data a
+     * DocumentPreRenderEvent listener prepares works with `markdown` but
+     * not with `first_paragraph`. A deliberate limit; judging "has text"
+     * from the parsed nodes instead would misjudge paragraphs made only of
+     * an extension's inline nodes.
+     */
+    private static function firstParagraphWithText(
+        Document $document,
+        HtmlRenderer $renderer,
+    ): ?Paragraph {
+        foreach ($document->children() as $node) {
+            if ($node instanceof Paragraph && Text::plain($renderer->renderNodes([$node])) !== '') {
+                return $node;
+            }
+        }
+
+        return null;
     }
 
     private function converter(): MarkdownConverter
@@ -369,30 +441,5 @@ final class MarkdownRenderer
             'app.markdown.extensions[%s]',
             is_int($key) ? (string) $key : '"' . $key . '"',
         );
-    }
-
-    private function normalize(mixed $value): string
-    {
-        if ($value === null) {
-            return '';
-        }
-
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if ($value instanceof Stringable) {
-            return (string) $value;
-        }
-
-        return '';
     }
 }

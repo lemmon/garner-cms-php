@@ -9,13 +9,10 @@ use Garner\Content\Site;
 use RuntimeException;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
-use Twig\Markup;
-use Twig\TwigFilter;
 
 final class TwigRenderer implements RendererInterface
 {
     private readonly FilesystemLoader $loader;
-    private readonly MarkdownRenderer $markdownRenderer;
     private readonly Environment $twig;
     private readonly TemplateResolver $templateResolver;
 
@@ -33,20 +30,14 @@ final class TwigRenderer implements RendererInterface
         ?callable $extensions = null,
     ) {
         $this->loader = new FilesystemLoader($templatesPath);
-        $this->markdownRenderer = $markdownRenderer ?? new MarkdownRenderer();
         $this->twig = new Environment($this->loader, $this->normalizeOptions($options));
         $this->templateResolver = new TemplateResolver(
             templatesPath: $templatesPath,
             defaultTemplate: $defaultTemplate,
         );
-        $this->twig->addFilter(new TwigFilter(
-            'markdown',
-            fn(mixed $value): Markup => new Markup(
-                $this->markdownRenderer->render($value),
-                'UTF-8',
-            ),
-            ['is_safe' => ['html']],
-        ));
+        $this->twig->addExtension(
+            new TwigTextExtension($markdownRenderer ?? new MarkdownRenderer()),
+        );
         $this->twig->addExtension(new TwigDumpExtension());
 
         if ($extensions !== null) {

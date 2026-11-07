@@ -146,6 +146,35 @@ instead of building a second converter or a custom filter. An
 extension's settings go in `app.markdown` under the key it documents, e.g.
 `'footnote' => [...]`.
 
+For a listing card, search result, or meta description, use the built-in
+excerpt filters rather than slicing strings in templates or adding your own:
+
+- `first_paragraph`: renders Markdown like `markdown`, but only the first
+  top-level paragraph with text (headings, code blocks, lists, quotes and
+  image-only paragraphs are skipped). Use it on the Markdown source instead
+  of `markdown`, not before or after it.
+- `excerpt(length = 160, ellipsis = '…')`: plain text of at most `length`
+  characters, cut after a whole word. After `markdown`, `first_paragraph`
+  or any other safe filter it reads the input as HTML (tags stripped,
+  entities decoded); a plain string such as `page.summary` is taken
+  literally. Never add `|raw` after it.
+
+```twig
+{% for child in page.children %}
+  <a href="{{ child.url }}">{{ child.title }}</a>
+  {{ child.content.main|first_paragraph }}
+{% endfor %}
+
+<meta name="description" content="{{ content.main|first_paragraph|excerpt(160) }}">
+```
+
+There is no first-sentence filter: splitting on `.`, `!` or `?` breaks on
+abbreviations, decimals and URLs. If a page has an explicit summary (a
+`summary` key in `+page.json`, or an `intro.md`), prefer it over deriving
+one. An `intro.md` is Markdown source, so render it first:
+`{{ content.intro|markdown|excerpt(160) }}`; a `summary` string goes straight
+to `excerpt`.
+
 ## Navigation And Listings
 
 Garner listings exclude explicit drafts and descendants hidden by a draft

@@ -476,6 +476,34 @@ twice or two extensions claiming the same syntax. Markdown renders on each
 request, not into the compiled template cache, so changing extensions needs
 no `cache:clear`.
 
+Two filters cover the usual teaser needs (a listing card, a search result, a
+meta description):
+
+- `first_paragraph` renders Markdown like `markdown` but returns only the
+  first top-level paragraph that has text, passing over headings, code
+  blocks, lists, quotes and image-only paragraphs. Use it on the Markdown
+  source in place of `markdown`, not before or after it. Reference links
+  resolve against the whole document; footnote markers keep their number,
+  but the footnotes themselves aren't included.
+- `excerpt(length = 160, ellipsis = '…')` returns plain text of at most
+  `length` characters (ellipsis included), cut after the last whole word
+  that fits. HTML that Twig knows is safe (the output of `markdown`,
+  `first_paragraph`, `raw` or any other safe filter) is read as HTML: tags
+  stripped, entities decoded, whitespace collapsed. That is exact for
+  Markdown output; HTML you write yourself is stripped as written, so
+  `<p>a</p><p>b</p>` reads as `ab` and the contents of a `<style>` remain.
+  Any other string is taken literally, so `page.summary|excerpt` keeps a `<`
+  or `&` it contains. Twig escapes the result as usual; don't mark it `raw`.
+
+```twig
+{% for child in page.children %}
+  <a href="{{ child.url }}">{{ child.title }}</a>
+  {{ child.content.main|first_paragraph }}
+{% endfor %}
+
+<meta name="description" content="{{ content.main|first_paragraph|excerpt(160) }}">
+```
+
 ### Controllers
 
 Data for a template comes from up to two controllers, both with the same
@@ -689,7 +717,8 @@ Throwing `Garner\Core\NotFoundException` from a handler renders the site's
 
 `app/twig.php` extends the Twig environment: it returns a callable
 `(Environment $twig, Application $app): void` that registers functions, filters,
-or globals. Use it for render-time computation that belongs in templates — e.g.
+or globals. A filter registered here with the name of a built-in one
+(`markdown`, `first_paragraph`, `excerpt`) replaces it. Use it for render-time computation that belongs in templates — e.g.
 values derived from a title that child templates override via blocks, which no
 controller can know ahead of rendering:
 
